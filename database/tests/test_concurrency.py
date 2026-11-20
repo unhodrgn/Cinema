@@ -306,6 +306,221 @@ def c6_parallel_expirers(ctl, cust, n=20):
     check(states == len(ids) and seatrows == 0, "C6 all EXPIRED + UNPAID, all seat rows deleted")
 
 
+def c7_isolation_levels(ctl, cust):
+    for offset, level in enumerate(("READ COMMITTED", "REPEATABLE READ", "SERIALIZABLE")):
+        screening = make_screening(ctl, 70 + offset)
+        seat, extra = seat_ids(ctl, screening, ["A1", "A2"])
+        old = connect()
+        try:
+            old.set_session(isolation_level=level)
+            assert one(old, "SELECT count(*) FROM bookings WHERE showtime_id=%s", (screening,)) == 0
+            assert one(ctl, "SELECT create_booking(%s,%s,%s)", (cust[0], screening, [seat]))
+            ctl.commit()
+            try:
+                one(old, "SELECT create_booking(%s,%s,%s)", (cust[1], screening, [extra, seat]))
+                old.commit()
+                code = None
+            except psycopg2.Error as exc:
+                code = exc.pgcode
+                old.rollback()
+            allowed = {"UC002"} if level == "READ COMMITTED" else {"UC002", "40001"}
+            check(code in allowed, f"C7 {level} rejects the second allocation", str(code))
+            if code == "40001":
+                try:
+                    one(old, "SELECT create_booking(%s,%s,%s)", (cust[1], screening, [extra, seat]))
+                    old.commit()
+                    retry_code = None
+                except psycopg2.Error as exc:
+                    retry_code = exc.pgcode
+                    old.rollback()
+                check(retry_code == "UC002", f"C7 {level} fresh-transaction retry sees the seat conflict")
+            count = one(ctl, "SELECT count(*) FROM booking_seats WHERE showtime_id=%s", (screening,))
+            parents = one(ctl, "SELECT count(*) FROM bookings WHERE showtime_id=%s", (screening,))
+            ctl.commit()
+            check(count == parents == 1, f"C7 {level} loser left no booking or allocation")
+        finally:
+            old.close()
+
+
+def wait_for_blocker(observer, blocked_pid, holder_pid):
+    """Observe a real lock wait instead of assuming the thread has reached SQL."""
+    until = time.monotonic() + 3
+    while time.monotonic() < until:
+        blocked = one(observer, "SELECT %s = ANY(pg_blocking_pids(%s))", (holder_pid, blocked_pid))
+        observer.commit()
+        if blocked:
+            return True
+        time.sleep(0.01)
+    return False
+
+
+def run_operation(conn, statement, args, result):
+    try:
+        value = one(conn, statement, args)
+        conn.commit()
+        result.append(("ok", value))
+    except psycopg2.Error as exc:
+        conn.rollback()
+        result.append(("err", exc.pgcode))
+
+
+def booking_state(conn, booking):
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT status, payment_status, (SELECT count(*) FROM booking_seats WHERE booking_id=b.booking_id)
+            FROM bookings b WHERE booking_id=%s
+        """, (booking,))
+        state = cur.fetchone()
+    conn.commit()
+    return state
+
+
+def c8_deadline_after_lock(ctl, cust):
+    for offset, operation in enumerate(("pay_booking", "cancel_booking")):
+        screening = make_screening(ctl, 80 + offset)
+        (seat,) = seat_ids(ctl, screening, ["B1"])
+        booking = one(ctl, "SELECT create_booking(%s,%s,%s)", (cust[0], screening, [seat]))
+        ctl.commit()
+        holder, caller = connect(), connect()
+        result = []
+        try:
+            set_deadlines([booking], 2000)
+            deadline = one(holder, "SELECT expires_at FROM bookings WHERE booking_id=%s FOR NO KEY UPDATE",
+                           (booking,))
+            thread = threading.Thread(
+                target=run_operation, args=(caller, f"SELECT {operation}(%s,%s)", (booking, cust[0]), result),
+                daemon=True,
+            )
+            thread.start()
+            blocked = wait_for_blocker(ctl, caller.get_backend_pid(), holder.get_backend_pid())
+            before = one(ctl, "SELECT clock_timestamp() < %s", (deadline,))
+            check(blocked and before, f"C8 {operation} is waiting before the deadline")
+            # Sleep using the database clock, then release the row.
+            one(ctl, "SELECT pg_sleep(greatest(0, extract(epoch FROM (%s - clock_timestamp())) + 0.02))",
+                (deadline,))
+            ctl.commit()
+            holder.rollback()
+            thread.join(8)
+            check(result == [("ok", "EXPIRED")], f"C8 {operation} commits expiration after waiting", str(result))
+            check(booking_state(ctl, booking) == ("EXPIRED", "UNPAID", 0),
+                  f"C8 {operation} retains expired history and releases the seat")
+            check(one(ctl, "SELECT create_booking(%s,%s,%s)", (cust[1], screening, [seat])) is not None,
+                  f"C8 {operation} released seat is bookable")
+            ctl.commit()
+        finally:
+            holder.close()
+            caller.close()
+
+
+def c9_availability_lock(ctl, cust):
+    for offset, action in enumerate(("availability", "create", "paid", "timeout")):
+        screening = make_screening(ctl, 90 + offset)
+        (seat,) = seat_ids(ctl, screening, ["C1"])
+        booking = one(ctl, "SELECT create_booking(%s,%s,%s)", (cust[0], screening, [seat]))
+        ctl.commit()
+        if action != "paid":
+            set_deadlines([booking], -1000)
+        holder, caller = connect(), connect()
+        result = []
+        try:
+            one(holder, "SELECT 1 FROM bookings WHERE booking_id=%s FOR NO KEY UPDATE", (booking,))
+            if action == "paid":
+                assert one(holder, "SELECT pay_booking(%s,%s)", (booking, cust[0])) == "PAID"
+            if action == "create":
+                statement, args = "SELECT create_booking(%s,%s,%s)", (cust[1], screening, [seat])
+            else:
+                statement = "SELECT is_available FROM screening_seat_availability(%s) WHERE seat_id=%s"
+                args = screening, seat
+            thread = threading.Thread(target=run_operation, args=(caller, statement, args, result), daemon=True)
+            thread.start()
+            check(wait_for_blocker(ctl, caller.get_backend_pid(), holder.get_backend_pid()),
+                  f"C9 {action} waits on the relevant booking")
+            if action == "timeout":
+                thread.join(8)
+                check(result == [("err", "55P03")], "C9 lock timeout is retryable, no false availability", str(result))
+                holder.rollback()
+                check(one(ctl, statement, args) is True, "C9 new transaction resolves expiry after timeout")
+                ctl.commit()
+            else:
+                if action == "paid":
+                    holder.commit()
+                else:
+                    holder.rollback()
+                thread.join(8)
+                if action == "create":
+                    valid = len(result) == 1 and result[0][0] == "ok" and isinstance(result[0][1], int)
+                else:
+                    valid = result == [("ok", action == "availability")]
+                check(valid, f"C9 {action} uses the state after acquiring the lock", str(result))
+            expected = ("BOOKED", "PAID", 1) if action == "paid" else ("EXPIRED", "UNPAID", 0)
+            check(booking_state(ctl, booking) == expected, f"C9 {action} leaves a consistent parent and seat state")
+        finally:
+            holder.close()
+            caller.close()
+
+
+def c10_screening_update_race(ctl, cust):
+    for offset, level in enumerate(("READ COMMITTED", "REPEATABLE READ", "SERIALIZABLE")):
+        screening = make_screening(ctl, 100 + offset)
+        (seat,) = seat_ids(ctl, screening, ["D1"])
+        editor, observer = connect(), connect()
+        result = []
+        try:
+            editor.set_session(isolation_level=level)
+            one(editor, "SELECT ticket_price FROM showtimes WHERE showtime_id=%s", (screening,))
+            one(ctl, "SELECT create_booking(%s,%s,%s)", (cust[0], screening, [seat]))
+            run_operation_sql = "UPDATE showtimes SET ticket_price=1 WHERE showtime_id=%s RETURNING ticket_price"
+            thread = threading.Thread(target=run_operation, args=(editor, run_operation_sql, (screening,), result),
+                                      daemon=True)
+            thread.start()
+            check(wait_for_blocker(observer, editor.get_backend_pid(), ctl.get_backend_pid()),
+                  f"C10 {level} editor waits for the first booking")
+            ctl.commit()
+            thread.join(8)
+            expected = "UC001" if level == "READ COMMITTED" else "40001"
+            check(result == [("err", expected)], f"C10 {level} D2 protects the first booking", str(result))
+            check(one(ctl, "SELECT ticket_price FROM showtimes WHERE showtime_id=%s", (screening,)) == 12000,
+                  f"C10 {level} booked screening price stayed unchanged")
+            ctl.commit()
+        finally:
+            ctl.rollback()
+            editor.close()
+            observer.close()
+
+
+def c11_global_and_scoped_expiry(ctl, cust):
+    screening = make_screening(ctl, 110)
+    first_seat, second_seat = seat_ids(ctl, screening, ["E1", "E2"])
+    first = one(ctl, "SELECT create_booking(%s,%s,%s)", (cust[0], screening, [first_seat]))
+    second = one(ctl, "SELECT create_booking(%s,%s,%s)", (cust[1], screening, [second_seat]))
+    ctl.commit()
+    set_deadlines([first, second], -1000)
+    holder, reader = connect(), connect()
+    result = []
+    try:
+        one(holder, "SELECT 1 FROM bookings WHERE booking_id=%s FOR NO KEY UPDATE", (first,))
+        thread = threading.Thread(
+            target=run_operation,
+            args=(reader, "SELECT count(*) FROM screening_seat_availability(%s) WHERE is_available",
+                  (screening,), result),
+            daemon=True,
+        )
+        thread.start()
+        check(wait_for_blocker(ctl, reader.get_backend_pid(), holder.get_backend_pid()),
+              "C11 scoped reader waits on the first booking")
+        check(one(ctl, "SELECT expire_overdue_bookings()") == 1,
+              "C11 global expiry skips the locked row and processes the other")
+        ctl.commit()
+        holder.rollback()
+        thread.join(8)
+        check(result == [("ok", 50)], "C11 scoped reader resolves the row skipped by global expiry", str(result))
+        check(all(booking_state(ctl, booking) == ("EXPIRED", "UNPAID", 0) for booking in (first, second)),
+              "C11 both expiration paths retained history and left no allocations")
+    finally:
+        holder.close()
+        reader.close()
+
+
 def main():
     if not DBNAME:
         print("Set PGDATABASE to a disposable database (refusing to guess).")
@@ -320,7 +535,11 @@ def main():
         print("Need two CUSTOMER accounts.")
         return 2
     print(f"Database: {DBNAME}; customers {cust}")
-    for fn in (c1_same_seat_race, c2_lock_proof, c3_multiseat_overlap, c4_pay_vs_expire, c5_pay_vs_cancel, c6_parallel_expirers):
+    for fn in (
+        c1_same_seat_race, c2_lock_proof, c3_multiseat_overlap, c4_pay_vs_expire,
+        c5_pay_vs_cancel, c6_parallel_expirers, c7_isolation_levels, c8_deadline_after_lock,
+        c9_availability_lock, c10_screening_update_race, c11_global_and_scoped_expiry,
+    ):
         try:
             fn(ctl, cust)
         except Exception as exc:  # report, continue

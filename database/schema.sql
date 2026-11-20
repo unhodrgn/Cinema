@@ -26,12 +26,17 @@
 --   UC009 price snapshot / total_amount inconsistency (D6)
 --   UC010 booking has no seat / bad seat list
 --   UC011 booking or screening not found for this caller
+--   55P03 interactive lock wait timed out; retry the entire transaction
 -- Standard SQLSTATEs also occur: 23505 unique, 23503 FK, 23514 check,
 -- 23P01 exclusion (overlapping screenings in one room, BR-04).
 -- =============================================================================
 BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS btree_gist;
+
+-- The deployment grants access to a dedicated non-owner role. Keep the schema
+-- on the SECURITY DEFINER search path writable only by trusted owners.
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 
 -- ----------------------------------------------------------------- tables ---
 CREATE TABLE users (
@@ -77,7 +82,7 @@ CREATE TABLE showtimes (
  room_id      bigint        NOT NULL REFERENCES theater_rooms(room_id) ON DELETE RESTRICT,
  starts_at    timestamptz   NOT NULL,
  ends_at      timestamptz   NOT NULL,                    -- defaulted from movie duration if omitted
- ticket_price numeric(10,2) NOT NULL CHECK (ticket_price >= 0),   -- per screening (D6)
+ ticket_price numeric(10,2) NOT NULL CHECK (ticket_price >= 0 AND ticket_price < 'Infinity'::numeric),   -- per screening (D6)
  CONSTRAINT showtimes_end_after_start CHECK (ends_at > starts_at),
  CONSTRAINT showtimes_no_room_overlap
    EXCLUDE USING gist (room_id WITH =, tstzrange(starts_at, ends_at, '[)') WITH &&)
@@ -93,9 +98,10 @@ CREATE TABLE bookings (
                 CHECK (payment_status IN ('UNPAID','PAID')),
  booked_at      timestamptz   NOT NULL DEFAULT now(),    -- forced to clock_timestamp() by trigger
  expires_at     timestamptz   NOT NULL,                  -- set by trigger = booked_at + 10 min
- total_amount   numeric(10,2) NOT NULL CHECK (total_amount >= 0),
+ total_amount   numeric(12,2) NOT NULL CHECK (total_amount >= 0 AND total_amount < 'Infinity'::numeric),
  paid_at        timestamptz,                             -- technical: set only when PAID
  cancelled_at   timestamptz,                             -- technical: set only when CANCELLED
+ CONSTRAINT bookings_id_showtime_key UNIQUE (booking_id, showtime_id),
  CONSTRAINT bookings_expiry_is_10_minutes CHECK (expires_at = booked_at + interval '10 minutes'),
  CONSTRAINT bookings_paid_at_matches CHECK ((payment_status = 'PAID') = (paid_at IS NOT NULL)),
  CONSTRAINT bookings_cancelled_at_matches CHECK ((status = 'CANCELLED') = (cancelled_at IS NOT NULL)),
@@ -104,10 +110,14 @@ CREATE TABLE bookings (
 
 CREATE TABLE booking_seats (
  booking_seat_id  bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
- booking_id       bigint        NOT NULL REFERENCES bookings(booking_id) ON DELETE CASCADE,
+ booking_id       bigint        NOT NULL,
+ showtime_id      bigint        NOT NULL,
  seat_id          bigint        NOT NULL REFERENCES seats(seat_id) ON DELETE RESTRICT,
- price_at_booking numeric(10,2) NOT NULL CHECK (price_at_booking >= 0),  -- unit-price snapshot (D6)
- UNIQUE (booking_id, seat_id)
+ price_at_booking numeric(10,2) NOT NULL CHECK (price_at_booking >= 0 AND price_at_booking < 'Infinity'::numeric),  -- unit-price snapshot (D6)
+ CONSTRAINT booking_seats_booking_showtime_fk FOREIGN KEY (booking_id, showtime_id)
+   REFERENCES bookings(booking_id, showtime_id) ON DELETE RESTRICT,
+ CONSTRAINT booking_seats_booking_seat_key UNIQUE (booking_id, seat_id),
+ CONSTRAINT booking_seats_showtime_seat_key UNIQUE (showtime_id, seat_id)
 );
 
 CREATE INDEX idx_showtimes_movie_start        ON showtimes(movie_id, starts_at);
@@ -161,6 +171,11 @@ FOR EACH ROW EXECUTE FUNCTION showtimes_protect_booked();
 --                                       window has elapsed must expire instead
 -- CANCELLED and EXPIRED are terminal. PAID never expires. Payment status never
 -- changes on cancellation or expiry. Identity, timestamps and total are immutable.
+CREATE FUNCTION booking_deadline_elapsed(p_deadline timestamptz, p_now timestamptz)
+RETURNS boolean LANGUAGE sql IMMUTABLE STRICT AS $$
+ SELECT p_now >= p_deadline
+$$;
+
 CREATE FUNCTION bookings_validate() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
  v_now   timestamptz := clock_timestamp();
@@ -175,7 +190,14 @@ BEGIN
    IF v_role IS DISTINCT FROM 'CUSTOMER' THEN
      RAISE EXCEPTION 'Only customers can book' USING ERRCODE = 'UC008';
    END IF;
-   SELECT starts_at INTO v_start FROM showtimes WHERE showtime_id = NEW.showtime_id;
+   -- Write a new row version without changing the schedule. A concurrent editor
+   -- with an older snapshot must retry instead of missing the first booking (D2).
+   UPDATE showtimes SET starts_at = starts_at WHERE showtime_id = NEW.showtime_id
+   RETURNING starts_at INTO v_start;
+   IF NOT FOUND THEN
+     RAISE EXCEPTION 'Screening does not exist' USING ERRCODE = '23503';
+   END IF;
+   v_now := clock_timestamp();
    IF v_start <= v_now THEN
      RAISE EXCEPTION 'Showtime has already started' USING ERRCODE = 'UC004';
    END IF;
@@ -208,7 +230,7 @@ BEGIN
 
  IF NEW.status = 'BOOKED' THEN                             -- payment
    IF OLD.payment_status = 'UNPAID' AND NEW.payment_status = 'PAID' THEN
-     IF v_now >= OLD.expires_at THEN
+     IF booking_deadline_elapsed(OLD.expires_at, v_now) THEN
        RAISE EXCEPTION 'Payment window has elapsed' USING ERRCODE = 'UC006';
      END IF;
      NEW.paid_at := v_now;
@@ -222,7 +244,7 @@ BEGIN
    IF NEW.payment_status <> OLD.payment_status THEN
      RAISE EXCEPTION 'Payment status cannot change while cancelling' USING ERRCODE = 'UC007';
    END IF;
-   IF OLD.payment_status = 'UNPAID' AND v_now >= OLD.expires_at THEN
+   IF OLD.payment_status = 'UNPAID' AND booking_deadline_elapsed(OLD.expires_at, v_now) THEN
      RAISE EXCEPTION 'Payment window has elapsed; the booking must expire, not be cancelled'
        USING ERRCODE = 'UC006';
    END IF;
@@ -238,7 +260,7 @@ BEGIN
    IF OLD.payment_status <> 'UNPAID' OR NEW.payment_status <> 'UNPAID' THEN
      RAISE EXCEPTION 'Only unpaid bookings can expire' USING ERRCODE = 'UC007';
    END IF;
-   IF v_now < OLD.expires_at THEN
+   IF NOT booking_deadline_elapsed(OLD.expires_at, v_now) THEN
      RAISE EXCEPTION 'Payment window has not elapsed' USING ERRCODE = 'UC006';
    END IF;
    NEW.cancelled_at := NULL;
@@ -261,9 +283,21 @@ END $$;
 CREATE TRIGGER trg_bookings_release_seats AFTER UPDATE OF status ON bookings
 FOR EACH ROW EXECUTE FUNCTION bookings_release_seats();
 
+-- D1/D2/D3: ordinary DML must preserve the parent record.
+CREATE FUNCTION bookings_protect_history() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ RAISE EXCEPTION 'Booking history cannot be removed' USING ERRCODE = 'UC007';
+END $$;
+CREATE TRIGGER trg_bookings_protect_delete BEFORE DELETE ON bookings
+FOR EACH ROW EXECUTE FUNCTION bookings_protect_history();
+CREATE TRIGGER trg_bookings_protect_truncate BEFORE TRUNCATE ON bookings
+FOR EACH STATEMENT EXECUTE FUNCTION bookings_protect_history();
+CREATE TRIGGER trg_booking_seats_protect_truncate BEFORE TRUNCATE ON booking_seats
+FOR EACH STATEMENT EXECUTE FUNCTION bookings_protect_history();
+
 -- ---------------------------------------------------- booking_seats triggers ---
--- Locks the screening row first: this serializes concurrent reservations of one
--- screening, so the EXISTS check below is race-safe (verified by concurrency tests).
+-- Take the screening lock before the parent booking lock. The unique index,
+-- rather than a snapshot-dependent query, enforces one allocation per seat.
 CREATE FUNCTION booking_seats_validate() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
  v_showtime bigint; v_status text; v_room bigint; v_start timestamptz;
@@ -272,12 +306,20 @@ BEGIN
  IF TG_OP = 'UPDATE' THEN
    RAISE EXCEPTION 'Seat allocations are immutable' USING ERRCODE = 'UC007';
  END IF;
- SELECT showtime_id, status INTO v_showtime, v_status FROM bookings WHERE booking_id = NEW.booking_id;
+ SELECT showtime_id INTO v_showtime FROM bookings WHERE booking_id = NEW.booking_id;
+ IF NOT FOUND THEN
+   RAISE EXCEPTION 'Booking does not exist' USING ERRCODE = '23503';
+ END IF;
+ IF NEW.showtime_id IS NOT NULL AND NEW.showtime_id <> v_showtime THEN
+   RAISE EXCEPTION 'Seat allocation screening must match the booking' USING ERRCODE = '23503';
+ END IF;
+ NEW.showtime_id := v_showtime;
+ SELECT room_id, starts_at, ticket_price INTO v_room, v_start, v_price
+   FROM showtimes WHERE showtime_id = v_showtime FOR NO KEY UPDATE;
+ SELECT status INTO v_status FROM bookings WHERE booking_id = NEW.booking_id FOR NO KEY UPDATE;
  IF v_status IS DISTINCT FROM 'BOOKED' THEN
    RAISE EXCEPTION 'Booking is not BOOKED' USING ERRCODE = 'UC007';
  END IF;
- SELECT room_id, starts_at, ticket_price INTO v_room, v_start, v_price
-   FROM showtimes WHERE showtime_id = v_showtime FOR UPDATE;
  IF v_start <= clock_timestamp() THEN
    RAISE EXCEPTION 'Showtime has already started' USING ERRCODE = 'UC004';
  END IF;
@@ -288,16 +330,14 @@ BEGIN
  IF v_room IS DISTINCT FROM v_seat_room THEN
    RAISE EXCEPTION 'Seat belongs to another room' USING ERRCODE = 'UC003';
  END IF;
+ IF NEW.price_at_booking IS NOT NULL
+    AND NOT (NEW.price_at_booking >= 0 AND NEW.price_at_booking < 'Infinity'::numeric) THEN
+   RAISE EXCEPTION 'Seat price must be finite and nonnegative' USING ERRCODE = '23514';
+ END IF;
  IF NEW.price_at_booking IS NULL THEN
    NEW.price_at_booking := v_price;                         -- snapshot defaults to the screening price
  ELSIF NEW.price_at_booking <> v_price THEN
    RAISE EXCEPTION 'Price snapshot must equal the screening ticket price' USING ERRCODE = 'UC009';
- END IF;
- IF EXISTS (
-   SELECT 1 FROM booking_seats bs JOIN bookings b ON b.booking_id = bs.booking_id
-   WHERE b.showtime_id = v_showtime AND b.status = 'BOOKED' AND bs.seat_id = NEW.seat_id
- ) THEN
-   RAISE EXCEPTION 'Seat already reserved for this showtime' USING ERRCODE = 'UC002';
  END IF;
  RETURN NEW;
 END $$;
@@ -316,12 +356,12 @@ CREATE TRIGGER trg_booking_seats_protect_delete BEFORE DELETE ON booking_seats
 FOR EACH ROW EXECUTE FUNCTION booking_seats_protect_delete();
 
 -- D6 + atomic creation, checked at COMMIT (deferred) so a booking and its seats
--- may be inserted in any order inside one transaction:
+-- are inserted in that order within one transaction:
 --   BOOKED      -> >= 1 seat row AND total_amount = SUM(price_at_booking)
 --   CANCELLED / EXPIRED -> no seat rows remain (D1, D3)
 -- total_amount is immutable, so it stays available after cancellation/expiry.
 CREATE FUNCTION booking_check_consistency() RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE v_status text; v_total numeric(10,2); v_cnt integer; v_sum numeric(10,2);
+DECLARE v_status text; v_total numeric; v_cnt integer; v_sum numeric;
 BEGIN
  SELECT status, total_amount INTO v_status, v_total FROM bookings WHERE booking_id = NEW.booking_id;
  IF v_status IS NULL THEN RETURN NULL; END IF;
@@ -356,7 +396,13 @@ DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION booking_check_consis
 -- (BEGIN ... COMMIT). Nothing here schedules anything: expiry runs only when
 -- called (request-time expiry, decided by the team).
 --
--- p_as_of exists ONLY so tests can probe the exact deadline. Flask must NOT pass it.
+-- The interactive operations below own their lock sequence:
+--   availability / create: showtime -> booking rows (ascending booking_id) -> seats
+--   pay / cancel: booking -> seats; no conflicting showtime lock
+--   global cleanup: booking rows (ascending booking_id, SKIP LOCKED) -> seats
+-- Call one write operation per transaction. In particular, do not run global
+-- cleanup in a transaction before requesting the showtime lock.
+-- Retry the whole transaction after 40001 at stronger isolation levels.
 
 -- D3: expire every overdue unpaid booking. Idempotent: only BOOKED+UNPAID rows with
 -- expires_at <= p_as_of are touched, so repeated calls expire nothing new and a
@@ -365,18 +411,62 @@ DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION booking_check_consis
 -- Seat rows are deleted by trg_bookings_release_seats in the same transaction.
 -- Not blocked by screening start (bookings_validate has no such check for EXPIRED).
 CREATE FUNCTION expire_overdue_bookings(p_as_of timestamptz DEFAULT clock_timestamp())
-RETURNS integer LANGUAGE plpgsql AS $$
+RETURNS integer LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE v_count integer;
 BEGIN
+ -- An earlier cutoff is useful for bounded cleanup and tests. A supplied
+ -- future cutoff must never expire a booking before the database clock does.
+ p_as_of := LEAST(p_as_of, clock_timestamp());
  UPDATE bookings SET status = 'EXPIRED'
  WHERE booking_id IN (
    SELECT booking_id FROM bookings
    WHERE status = 'BOOKED' AND payment_status = 'UNPAID' AND expires_at <= p_as_of
    ORDER BY booking_id
-   FOR UPDATE SKIP LOCKED
+   FOR NO KEY UPDATE SKIP LOCKED
  );
  GET DIAGNOSTICS v_count = ROW_COUNT;
  RETURN v_count;
+END $$;
+
+-- The caller holds the showtime lock. Wait for unpaid bookings in this
+-- screening, then choose one cutoff after the waits. Locking live unpaid rows
+-- as well avoids missing a deadline crossed while waiting for another row.
+CREATE FUNCTION expire_locked_showtime_bookings(p_showtime_id bigint)
+RETURNS void LANGUAGE plpgsql AS $$
+DECLARE v_cutoff timestamptz;
+BEGIN
+ PERFORM booking_id FROM bookings
+ WHERE showtime_id = p_showtime_id AND status = 'BOOKED' AND payment_status = 'UNPAID'
+ ORDER BY booking_id FOR NO KEY UPDATE;
+
+ v_cutoff := clock_timestamp();
+ UPDATE bookings SET status = 'EXPIRED'
+ WHERE showtime_id = p_showtime_id AND status = 'BOOKED' AND payment_status = 'UNPAID'
+   AND expires_at <= v_cutoff;
+END $$;
+
+-- C-04: a single operation resolves expiry and reads allocations at that cutoff.
+-- A contested lock times out instead of returning unresolved seats as available.
+CREATE FUNCTION screening_seat_availability(p_showtime_id bigint)
+RETURNS TABLE(seat_id bigint, seat_row char, seat_number smallint, is_available boolean)
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp SET lock_timeout = '5s' AS $$
+DECLARE v_room bigint;
+BEGIN
+ SELECT s.room_id INTO v_room FROM showtimes s
+ WHERE s.showtime_id = p_showtime_id FOR NO KEY UPDATE;
+ IF NOT FOUND THEN
+   RAISE EXCEPTION 'Screening not found' USING ERRCODE = 'UC011';
+ END IF;
+ PERFORM expire_locked_showtime_bookings(p_showtime_id);
+
+ RETURN QUERY
+ SELECT se.seat_id, se.seat_row, se.seat_number, bs.booking_id IS NULL
+ FROM seats se
+ LEFT JOIN booking_seats bs ON bs.showtime_id = p_showtime_id AND bs.seat_id = se.seat_id
+ WHERE se.room_id = v_room
+ ORDER BY se.seat_row, se.seat_number;
 END $$;
 
 -- C-06: create a BOOKED + UNPAID booking and all its seat rows atomically.
@@ -384,8 +474,9 @@ END $$;
 -- that price (D6). Runs the expiry step first (D3 #10). Raises on any invalid
 -- seat (nothing is created). Returns the new booking_id.
 CREATE FUNCTION create_booking(p_user_id bigint, p_showtime_id bigint, p_seat_ids bigint[])
-RETURNS bigint LANGUAGE plpgsql AS $$
-DECLARE v_price numeric(10,2); v_id bigint; v_n integer;
+RETURNS bigint LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp SET lock_timeout = '5s' AS $$
+DECLARE v_price numeric(10,2); v_id bigint; v_n integer; v_constraint text;
 BEGIN
  v_n := COALESCE(cardinality(p_seat_ids), 0);
  IF v_n = 0 THEN
@@ -394,32 +485,40 @@ BEGIN
  IF (SELECT count(DISTINCT s) FROM unnest(p_seat_ids) AS s) <> v_n THEN
    RAISE EXCEPTION 'Seat list contains duplicates or NULL' USING ERRCODE = 'UC010';
  END IF;
- SELECT ticket_price INTO v_price FROM showtimes WHERE showtime_id = p_showtime_id FOR UPDATE;
+ SELECT ticket_price INTO v_price FROM showtimes WHERE showtime_id = p_showtime_id FOR NO KEY UPDATE;
  IF NOT FOUND THEN
    RAISE EXCEPTION 'Screening not found' USING ERRCODE = 'UC011';
  END IF;
- PERFORM expire_overdue_bookings();
+ PERFORM expire_locked_showtime_bookings(p_showtime_id);
  INSERT INTO bookings(user_id, showtime_id, total_amount)
  VALUES (p_user_id, p_showtime_id, v_price * v_n)
  RETURNING booking_id INTO v_id;
- INSERT INTO booking_seats(booking_id, seat_id, price_at_booking)
- SELECT v_id, s, v_price FROM unnest(p_seat_ids) AS s ORDER BY s;
+ BEGIN
+   INSERT INTO booking_seats(booking_id, seat_id, price_at_booking)
+   SELECT v_id, s, v_price FROM unnest(p_seat_ids) AS s ORDER BY s;
+ EXCEPTION WHEN unique_violation THEN
+   GET STACKED DIAGNOSTICS v_constraint = CONSTRAINT_NAME;
+   IF v_constraint IN ('booking_seats_showtime_seat_key', 'booking_seats_booking_seat_key') THEN
+     RAISE EXCEPTION 'Seat already reserved for this showtime' USING ERRCODE = 'UC002';
+   END IF;
+   RAISE;
+ END;
  RETURN v_id;
 END $$;
 
 -- C-07: simulated payment. Returns the resulting state:
 --   'PAID'    paid strictly before expires_at
---   'EXPIRED' deadline reached (p_as_of >= expires_at): payment REJECTED and the
+--   'EXPIRED' deadline reached after taking the booking lock: payment rejected and the
 --             booking is expired in the same transaction (D3); caller must COMMIT
 --             so the expiry persists.
 -- Raises UC011 (not found / not the caller's booking) or UC006 (CANCELLED, EXPIRED,
 -- already PAID). The row is locked, so payment and expiry cannot interleave.
-CREATE FUNCTION pay_booking(p_booking_id bigint, p_user_id bigint,
-                            p_as_of timestamptz DEFAULT clock_timestamp())
-RETURNS text LANGUAGE plpgsql AS $$
+CREATE FUNCTION pay_booking(p_booking_id bigint, p_user_id bigint)
+RETURNS text LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp SET lock_timeout = '5s' AS $$
 DECLARE b bookings%ROWTYPE;
 BEGIN
- SELECT * INTO b FROM bookings WHERE booking_id = p_booking_id AND user_id = p_user_id FOR UPDATE;
+ SELECT * INTO b FROM bookings WHERE booking_id = p_booking_id AND user_id = p_user_id FOR NO KEY UPDATE;
  IF NOT FOUND THEN
    RAISE EXCEPTION 'Booking not found' USING ERRCODE = 'UC011';
  END IF;
@@ -429,11 +528,19 @@ BEGIN
  IF b.payment_status = 'PAID' THEN
    RAISE EXCEPTION 'Booking is already paid' USING ERRCODE = 'UC006';
  END IF;
- IF p_as_of >= b.expires_at THEN
+ IF booking_deadline_elapsed(b.expires_at, clock_timestamp()) THEN
    UPDATE bookings SET status = 'EXPIRED' WHERE booking_id = b.booking_id;
    RETURN 'EXPIRED';
  END IF;
- UPDATE bookings SET payment_status = 'PAID' WHERE booking_id = b.booking_id;
+ BEGIN
+   UPDATE bookings SET payment_status = 'PAID' WHERE booking_id = b.booking_id;
+ EXCEPTION WHEN SQLSTATE 'UC006' THEN
+   -- The row lock predates this block and survives its rollback. The trigger's
+   -- later clock check can cross the deadline after our initial decision.
+   IF NOT booking_deadline_elapsed(b.expires_at, clock_timestamp()) THEN RAISE; END IF;
+   UPDATE bookings SET status = 'EXPIRED' WHERE booking_id = b.booking_id;
+   RETURN 'EXPIRED';
+ END;
  RETURN 'PAID';
 END $$;
 
@@ -443,24 +550,36 @@ END $$;
 --               expired instead (D3: expired bookings cannot be cancelled)
 -- Raises UC011 (not found / not the caller's), UC006 (already CANCELLED/EXPIRED),
 -- UC005 (screening already started).
-CREATE FUNCTION cancel_booking(p_booking_id bigint, p_user_id bigint,
-                               p_as_of timestamptz DEFAULT clock_timestamp())
-RETURNS text LANGUAGE plpgsql AS $$
+CREATE FUNCTION cancel_booking(p_booking_id bigint, p_user_id bigint)
+RETURNS text LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp SET lock_timeout = '5s' AS $$
 DECLARE b bookings%ROWTYPE;
 BEGIN
- SELECT * INTO b FROM bookings WHERE booking_id = p_booking_id AND user_id = p_user_id FOR UPDATE;
+ SELECT * INTO b FROM bookings WHERE booking_id = p_booking_id AND user_id = p_user_id FOR NO KEY UPDATE;
  IF NOT FOUND THEN
    RAISE EXCEPTION 'Booking not found' USING ERRCODE = 'UC011';
  END IF;
  IF b.status <> 'BOOKED' THEN
    RAISE EXCEPTION 'Booking is % and cannot be cancelled', b.status USING ERRCODE = 'UC006';
  END IF;
- IF b.payment_status = 'UNPAID' AND p_as_of >= b.expires_at THEN
+ IF b.payment_status = 'UNPAID' AND booking_deadline_elapsed(b.expires_at, clock_timestamp()) THEN
    UPDATE bookings SET status = 'EXPIRED' WHERE booking_id = b.booking_id;
    RETURN 'EXPIRED';
  END IF;
- UPDATE bookings SET status = 'CANCELLED' WHERE booking_id = b.booking_id;
+ BEGIN
+   UPDATE bookings SET status = 'CANCELLED' WHERE booking_id = b.booking_id;
+ EXCEPTION WHEN SQLSTATE 'UC006' THEN
+   IF b.payment_status <> 'UNPAID'
+      OR NOT booking_deadline_elapsed(b.expires_at, clock_timestamp()) THEN RAISE; END IF;
+   UPDATE bookings SET status = 'EXPIRED' WHERE booking_id = b.booking_id;
+   RETURN 'EXPIRED';
+ END;
  RETURN 'CANCELLED';
 END $$;
+
+REVOKE EXECUTE ON FUNCTION expire_overdue_bookings(timestamptz),
+ expire_locked_showtime_bookings(bigint), screening_seat_availability(bigint),
+ create_booking(bigint,bigint,bigint[]), pay_booking(bigint,bigint), cancel_booking(bigint,bigint)
+ FROM PUBLIC;
 
 COMMIT;

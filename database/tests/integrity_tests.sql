@@ -255,7 +255,11 @@ BEGIN
  -- payment exactly at the deadline: rejected and the booking expires
  b3 := create_booking(c1, s, ARRAY[pg_temp.seat(s,'C',1)]);
  PERFORM pg_temp.set_deadline(b3, T);
- PERFORM pg_temp.ok(pay_booking(b3, c1, T) = 'EXPIRED', 'D3 payment AT expires_at is rejected (booking expires)');
+ PERFORM pg_temp.ok(NOT booking_deadline_elapsed(T, T - interval '1 microsecond')
+                    AND booking_deadline_elapsed(T, T)
+                    AND booking_deadline_elapsed(T, T + interval '1 microsecond'),
+                    'D3 payment deadline comparison rejects the exact boundary');
+ PERFORM pg_temp.ok(pay_booking(b3, c1) = 'EXPIRED', 'D3 payment at a reached deadline expires the booking');
  PERFORM pg_temp.ok((SELECT status='EXPIRED' AND payment_status='UNPAID' FROM bookings WHERE booking_id=b3), 'D3 rejected late payment leaves EXPIRED + UNPAID');
  PERFORM pg_temp.ok((SELECT count(*) FROM booking_seats WHERE booking_id=b3) = 0, 'D3 rejected late payment released the seats');
  PERFORM pg_temp.expect_err(format($$SELECT pay_booking(%s, %s)$$, b3, c1), 'UC006', 'D3 expired booking cannot be paid');
@@ -450,6 +454,79 @@ BEGIN
      INSERT INTO bookings(user_id,showtime_id,total_amount,booked_at,expires_at)
        SELECT user_id, (SELECT min(showtime_id) FROM showtimes), 0, now(), now() + interval '9 minutes' FROM users WHERE username='customer_demo';
    END $x$$q$, '23514', 'CHECK expires_at = booked_at + 10 minutes (even if the trigger were bypassed)');
+END $t$;
+
+-- ================================================================ remediation
+DO $t$
+DECLARE
+ c1 bigint := pg_temp.cust();
+ s bigint := pg_temp.mk_show(30, 99999999.99);
+ s2 bigint := pg_temp.mk_show(31);
+ v_seats bigint[];
+ b bigint;
+ b2 bigint;
+BEGIN
+ PERFORM pg_temp.ok(current_setting('server_encoding') = 'UTF8', 'remediation: disposable database uses UTF8');
+ SELECT array_agg(se.seat_id ORDER BY se.seat_id) INTO v_seats
+ FROM seats se JOIN showtimes st ON st.room_id = se.room_id WHERE st.showtime_id = s;
+
+ b := create_booking(c1, s, v_seats[1:1]);
+ PERFORM pg_temp.ok((SELECT total_amount FROM bookings WHERE booking_id=b) = 99999999.99,
+                    'D6 maximum price for one seat is exact');
+ PERFORM pg_temp.expect_err(format('DELETE FROM bookings WHERE booking_id=%s', b), 'UC007',
+                            'D1 active booking cannot be deleted');
+ PERFORM pg_temp.ok(cancel_booking(b, c1) = 'CANCELLED', 'D1 cancellation frees maximum-price seat');
+ PERFORM pg_temp.expect_err(format('DELETE FROM bookings WHERE booking_id=%s', b), 'UC007',
+                            'D1 cancelled history cannot be deleted');
+ PERFORM pg_temp.expect_err(format('UPDATE showtimes SET ticket_price=1 WHERE showtime_id=%s', s),
+                            'UC001', 'D2 cancelled history still locks the screening');
+
+ b := create_booking(c1, s, v_seats[1:2]);
+ PERFORM pg_temp.ok((SELECT total_amount FROM bookings WHERE booking_id=b) = 199999999.98,
+                    'D6 maximum-price booking for two seats does not overflow');
+ PERFORM pg_temp.backdate(b, interval '11 minutes');
+ PERFORM pg_temp.ok((SELECT count(*) FROM screening_seat_availability(s) WHERE is_available) = 50,
+                    'D3 authoritative availability expires and releases both seats');
+ PERFORM pg_temp.ok((SELECT status='EXPIRED' AND total_amount=199999999.98 FROM bookings WHERE booking_id=b),
+                    'D3 and D6 expired history retains exact total');
+ PERFORM pg_temp.expect_err(format('DELETE FROM bookings WHERE booking_id=%s', b), 'UC007',
+                            'D3 expired history cannot be deleted');
+ SET CONSTRAINTS ALL IMMEDIATE;
+ SET CONSTRAINTS ALL DEFERRED;
+ PERFORM pg_temp.expect_err('TRUNCATE bookings, booking_seats', 'UC007', 'history cannot be truncated');
+ PERFORM pg_temp.expect_err('TRUNCATE booking_seats', 'UC007', 'seat allocations cannot be truncated');
+
+ b := create_booking(c1, s, v_seats);
+ PERFORM pg_temp.ok((SELECT total_amount FROM bookings WHERE booking_id=b) = 4999999999.50,
+                    'D6 maximum-price booking for all 50 seats is exact');
+ PERFORM pg_temp.ok((SELECT count(*) FROM booking_seats WHERE booking_id=b AND showtime_id=s
+                     AND price_at_booking=99999999.99) = 50, 'D6 each of 50 seat snapshots is exact');
+ PERFORM pg_temp.ok((SELECT count(*) FROM screening_seat_availability(s) WHERE NOT is_available) = 50,
+                    'BR-08 authoritative availability reads all allocations');
+
+ INSERT INTO bookings(user_id,showtime_id,total_amount) VALUES(c1,s,99999999.99) RETURNING booking_id INTO b2;
+ PERFORM pg_temp.expect_err(format('INSERT INTO booking_seats(booking_id,showtime_id,seat_id) VALUES(%s,%s,%s)',
+                                  b2,s2,v_seats[1]), '23503', 'seat allocation rejects a mismatched screening id');
+ PERFORM pg_temp.expect_err(format('INSERT INTO booking_seats(booking_id,seat_id) VALUES(%s,%s)',
+                                  b2,v_seats[1]), '23505', 'direct seat insert hits declarative uniqueness');
+ -- Complete the direct booking only after legitimately releasing the prior one.
+ PERFORM cancel_booking(b, c1);
+ INSERT INTO booking_seats(booking_id,seat_id) VALUES(b2,v_seats[1]);
+ SET CONSTRAINTS ALL IMMEDIATE;
+ SET CONSTRAINTS ALL DEFERRED;
+
+ PERFORM pg_temp.expect_err(format($$UPDATE showtimes SET ticket_price='NaN' WHERE showtime_id=%s$$, s2),
+                            '23514', 'D6 database rejects NaN screening prices');
+ PERFORM pg_temp.expect_err(format($$UPDATE showtimes SET ticket_price='Infinity' WHERE showtime_id=%s$$, s2),
+                            '22003', 'D6 database rejects infinite screening prices');
+ PERFORM pg_temp.expect_err(format($$INSERT INTO bookings(user_id,showtime_id,total_amount) VALUES(%s,%s,'NaN')$$,c1,s2),
+                            '23514', 'D6 database rejects NaN totals');
+ INSERT INTO bookings(user_id,showtime_id,total_amount) VALUES(c1,s2,12000) RETURNING booking_id INTO b2;
+ PERFORM pg_temp.expect_err(format($$INSERT INTO booking_seats(booking_id,seat_id,price_at_booking) VALUES(%s,%s,'NaN')$$,
+                                  b2,v_seats[1]), '23514', 'D6 database rejects NaN seat snapshots');
+ INSERT INTO booking_seats(booking_id,seat_id) VALUES(b2,v_seats[1]);
+ SET CONSTRAINTS ALL IMMEDIATE;
+ SET CONSTRAINTS ALL DEFERRED;
 END $t$;
 
 -- ================================================================ summary
