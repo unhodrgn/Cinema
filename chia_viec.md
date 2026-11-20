@@ -24,7 +24,7 @@ A — Database Lead
 
 **Database Development**
 
-Conceptual Model → Logical Model → Physical Model → SQLite
+Conceptual Model → Logical Model → Physical Model → PostgreSQL
 
 B — Application Lead
 
@@ -38,7 +38,7 @@ Kết nối ứng dụng với database, kiểm thử nghiệp vụ
 
 **Final Submission**
 
-Source Code + .DB + Documents + PPT
+Source Code + Database (PostgreSQL schema/seed SQL) + Documents + PPT
 
 ### **Nguyên tắc phân công**
 
@@ -142,7 +142,7 @@ Ngày 20/11, hai người phải thống nhất phiên bản schema cuối cùng
 
 21/11 – 23/11
 
-Mục tiêu: Có một SQLite database hoàn chỉnh, đủ dữ liệu và đủ ràng buộc để ứng dụng kết nối.
+Mục tiêu: Có một PostgreSQL database hoàn chỉnh, đủ dữ liệu và đủ ràng buộc để ứng dụng kết nối.
 
 #### **Thành viên A — Database Implementation**
 
@@ -188,7 +188,7 @@ Ngoài ra:
 | ID  | Task                | Công việc cụ thể                                | Deliverable   | Hạn   |
 | --- | ------------------- | ----------------------------------------------- | ------------- | ----- |
 | B06 | Flask Project Setup | Tạo cấu trúc ứng dụng và cấu hình môi trường    | Flask Project | 21/11 |
-| B07 | Database Connection | Xây dựng lớp kết nối SQLite và truy vấn dữ liệu | database.py   | 22/11 |
+| B07 | Database Connection | Xây dựng lớp kết nối PostgreSQL (driver chốt cùng A: psycopg2 hoặc SQLAlchemy) và truy vấn dữ liệu | database.py   | 22/11 |
 | B08 | Authentication      | Register, Login, Logout                         | Auth Module   | 23/11 |
 
 B có thể bắt đầu B06 và chuẩn bị giao diện từ ngày 20/11, sử dụng schema contract đã chốt. Phần kết nối thực tế và kiểm thử phải dùng database của A.
@@ -210,15 +210,14 @@ CinemaReservation/
 │
 ├── database/
 │   ├── schema.sql
-│   ├── seed.sql
-│   └── cinema.db
+│   └── seed.sql
 │
 ├── docs/
 ├── presentation/
 └── README.md
 ```
 
-Chưa cần thiết kế giao diện đẹp. Giai đoạn này chỉ cần Flask khởi chạy và kết nối thành công SQLite.
+Chưa cần thiết kế giao diện đẹp. Giai đoạn này chỉ cần Flask khởi chạy và kết nối thành công PostgreSQL.
 
 ### **PHASE 3 — Application Development**
 
@@ -265,7 +264,7 @@ Giai đoạn này chủ yếu do B phát triển. A tiếp tục kiểm tra data
 | Cancellation | Cập nhật CANCELLED và mở lại ghế                |
 | Admin        | Chỉ ADMIN được thêm/sửa phim và suất chiếu      |
 
-**Lưu ý kỹ thuật cho B:** thao tác xác nhận booking cần chạy trong một database transaction. Không được chỉ kiểm tra ghế ở giao diện rồi mới lưu mà không kiểm tra lại trong database. Dùng `BEGIN IMMEDIATE` và rollback khi có lỗi để tránh hai người đặt cùng một ghế.
+**Lưu ý kỹ thuật cho B:** thao tác xác nhận booking cần chạy trong một database transaction. Không được chỉ kiểm tra ghế ở giao diện rồi mới lưu mà không kiểm tra lại trong database. Thực hiện trong một transaction PostgreSQL (INSERT `bookings`, INSERT `booking_seats`, rồi COMMIT; rollback khi có lỗi). Trigger `trg_validate_booking_seat` của A khóa dòng suất chiếu và chặn đặt trùng ghế; B phải bắt exception của trigger và hiển thị thông báo ghế đã được đặt.
 
 ### **PHASE 4 — Integration & Testing**
 
@@ -277,7 +276,7 @@ Mục tiêu: Xác nhận ứng dụng và database hoạt động như một h�
 
 | ID  | Người phụ trách | Task                    | Công việc                               | Deliverable             |
 | --- | --------------- | ----------------------- | --------------------------------------- | ----------------------- |
-| S03 | Both            | Full Integration        | Kết nối toàn bộ chức năng với cinema.db | Integrated Application  |
+| S03 | Both            | Full Integration        | Kết nối toàn bộ chức năng với PostgreSQL DB | Integrated Application  |
 | S04 | A               | Database Integrity Test | Kiểm tra PK, FK, UNIQUE, CHECK, Trigger | DB Test Results         |
 | S05 | B               | Functional Test         | Kiểm thử tất cả chức năng trên UI       | Functional Test Results |
 | S06 | Both            | Bug Fix                 | Sửa các lỗi phát hiện trong kiểm thử    | Stable Version          |
@@ -303,7 +302,7 @@ Mục tiêu: Xác nhận ứng dụng và database hoạt động như một h�
 | TC14    | Admin thêm suất bị trùng lịch       | A + B          |
 | TC15    | Dữ liệu booking được lưu chính xác  | A              |
 
-Không được đánh dấu hoàn thành chỉ vì giao diện hiển thị đúng. Phải xác nhận dữ liệu trong SQLite thực sự thay đổi đúng.
+Không được đánh dấu hoàn thành chỉ vì giao diện hiển thị đúng. Phải xác nhận dữ liệu trong PostgreSQL thực sự thay đổi đúng.
 
 ### **PHASE 5 — Documentation & Final Submission**
 
@@ -321,7 +320,7 @@ Giai đoạn này có một số công việc chạy song song với Phase 4.
 \| A18 | Glossary Final | Hoàn thiện 용어 사전 | Glossary |\
 \| A19 | Domain Definition Final | Đồng bộ domain và constraint | Domain Definition |\
 \| A20 | Table Description Final | Đồng bộ toàn bộ column và type | Table Description |\
-\| A21 | DB Packaging | Kiểm tra và đóng gói cinema.db | Final cinema.db |
+\| A21 | DB Packaging | Kiểm tra và đóng gói schema.sql, seed.sql, hướng dẫn khởi tạo PostgreSQL | Final DB Package |
 
 #### **Thành viên B — Business Documentation & Presentation**
 
@@ -396,7 +395,7 @@ A cung cấp:
 
 - `schema.sql`
 - `seed.sql`
-- `cinema.db`
+- `verify.sql`
 - Hướng dẫn khởi tạo DB.
 
 B kết nối và kiểm tra dữ liệu thực tế.
@@ -446,7 +445,6 @@ CinemaReservation/
 ├── database/               # A quản lý
 │   ├── schema.sql
 │   ├── seed.sql
-│   ├── cinema.db
 │   └── tests/
 │
 ├── docs/
@@ -494,7 +492,7 @@ Không triển khai thêm các chức năng ngoài phạm vi như thanh toán th
    ERD, Logical Model và tài liệu nghiệp vụ hoàn thành. Schema được cả hai duyệt.
 2. **23/11 — Database Ready**
 
-   SQLite có đầy đủ dữ liệu, constraint và có thể kết nối.
+   PostgreSQL DB có đầy đủ dữ liệu, constraint và có thể kết nối.
 3. **27/11 — Feature Complete**
 
    Toàn bộ chức năng khách hàng và admin hoạt động.
