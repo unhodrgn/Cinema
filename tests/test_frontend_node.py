@@ -31,8 +31,10 @@ def node_test(*files):
 
 
 def test_frontend_unit_tests_pass():
-    result = node_test("tests/api.test.js", "tests/ui.test.js", "tests/auth.test.js",
-                       "tests/format.test.js", "tests/catalog.test.js")
+    # Every test file is run: a list kept by hand forgot seats.test.js once.
+    files = sorted(path.relative_to(FRONTEND).as_posix() for path in (FRONTEND / "tests").glob("*.test.js"))
+    assert {"tests/admin.test.js", "tests/seats.test.js"} <= set(files)
+    result = node_test(*files)
 
     assert result.returncode == 0, result.stdout[-3000:] + result.stderr[-1000:]
     counts = dict(re.findall(r"^ℹ (tests|pass|fail) (\d+)", result.stdout, flags=re.MULTILINE))

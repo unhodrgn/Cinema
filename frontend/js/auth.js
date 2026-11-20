@@ -20,6 +20,12 @@ export const ALLOWED_NEXT_PAGES = new Set([
   "/movies.html",
   "/movie.html",
   "/screenings.html",
+  "/seats.html",
+  "/booking.html",
+  "/bookings.html",
+  "/admin-movies.html",
+  "/admin-screenings.html",
+  "/admin-bookings.html",
 ]);
 
 const SAFE_QUERY = /^[A-Za-z0-9_=&.\-%]*$/;

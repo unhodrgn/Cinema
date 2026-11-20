@@ -6,7 +6,7 @@ a started screening cannot be booked (BR-12) is enforced by the database when bo
 
 from flask import Blueprint, current_app, jsonify
 
-from .database import transaction
+from .database import expire_overdue_bookings, transaction
 from .errors import HTTP_ERRORS, AppError, ValidationError
 from .params import check_path_id, query_date, query_id
 from .security import Policy, policy
@@ -77,3 +77,31 @@ def get_screening(showtime_id):
     if screening is None:
         raise AppError(HTTP_ERRORS[404])
     return jsonify(screening=screening)
+
+
+@bp.get("/<int:showtime_id>/seats")
+@policy(Policy.PUBLIC)
+def get_screening_seats(showtime_id):
+    check_path_id(showtime_id)
+    with transaction() as cur:
+        expire_overdue_bookings(cur)
+        screening = fetch_screening(cur, showtime_id)
+        if screening is None:
+            raise AppError(HTTP_ERRORS[404])
+        cur.execute(
+            """
+            SELECT se.seat_id, se.seat_row, se.seat_number,
+                   NOT EXISTS (
+                     SELECT 1 FROM booking_seats bs JOIN bookings b ON b.booking_id = bs.booking_id
+                     WHERE b.showtime_id = %(showtime)s AND bs.seat_id = se.seat_id AND b.status = 'BOOKED'
+                       AND (b.payment_status = 'PAID' OR b.expires_at > clock_timestamp())
+                   ) AS is_available
+            FROM showtimes s JOIN seats se ON se.room_id = s.room_id
+            WHERE s.showtime_id = %(showtime)s
+            ORDER BY se.seat_row, se.seat_number
+            """,
+            {"showtime": showtime_id},
+        )
+        seats = [dict(row) for row in cur.fetchall()]
+    return jsonify(screening=screening, seats=seats)
+

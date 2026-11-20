@@ -69,6 +69,8 @@ export function screeningRow(screening, { showMovie = false } = {}) {
   );
   if (screening.has_started) {
     parts.push(el("span", { className: "badge badge-neutral", text: "Already started" }));
+  } else if (screening.showtime_id) {
+    parts.push(el("a", { attrs: { href: `/seats.html?screening_id=${screening.showtime_id}` }, text: "Select Seats" }));
   }
   return el("li", { className: "screening" }, ...parts);
 }

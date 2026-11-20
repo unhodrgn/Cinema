@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Select Seats - Cinema Reservation</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/config.js"></script>
+  <script type="module" src="/js/pages/seats.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/">Cinema Reservation</a>
+    <nav id="site-nav" class="site-nav" aria-label="Main"></nav>
+  </header>
+
+  <main class="container">
+    <h1>Select Seats</h1>
+    <div id="screening-info" class="card"></div>
+    <div id="message" aria-live="polite"></div>
+
+    <section id="seat-picker-card" class="card" hidden>
+      <div class="screen-box">SCREEN</div>
+      
+      <div class="seat-legend">
+        <div class="legend-item"><div class="legend-box available"></div><span>Available</span></div>
+        <div class="legend-item"><div class="legend-box selected"></div><span>Selected</span></div>
+        <div class="legend-item"><div class="legend-box occupied"></div><span>Occupied</span></div>
+      </div>
+
+      <div id="seat-grid" class="seat-grid"></div>
+
+      <div class="seat-summary-bar">
+        <div>
+          <strong>Selected:</strong> <span id="selected-list">None</span>
+        </div>
+        <div>
+          <strong>Estimated Total:</strong> <span id="total-price">0</span>
+        </div>
+        <div>
+          <button id="book-button" class="button" type="button" disabled>Proceed to Booking</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

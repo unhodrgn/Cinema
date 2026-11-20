@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manage Screenings - Admin</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/config.js"></script>
+  <script type="module" src="/js/pages/admin_screenings.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/">Cinema Reservation</a>
+    <nav id="site-nav" class="site-nav" aria-label="Main"></nav>
+  </header>
+
+  <main class="container">
+    <h1>Manage Screenings</h1>
+    <div id="message" aria-live="polite"></div>
+
+    <section id="form-section" class="card">
+      <h2 id="form-title">Add New Screening</h2>
+      <p class="muted">Decision D2: once any booking has been created for a screening, that screening can no longer be modified. Times are the cinema's local time.</p>
+      <form id="screening-form" class="form" novalidate>
+        <input type="hidden" id="screening-id" value="">
+        <div class="field">
+          <label for="screening-movie">Movie *</label>
+          <select id="screening-movie" name="movie_id" required>
+            <option value="">Select a movie...</option>
+          </select>
+          <p id="error-movie_id" class="field-error" aria-live="polite" hidden></p>
+        </div>
+        <div class="field">
+          <label for="screening-room">Theater Room *</label>
+          <select id="screening-room" name="room_id" required>
+            <option value="">Select a room...</option>
+          </select>
+          <p id="error-room_id" class="field-error" aria-live="polite" hidden></p>
+        </div>
+        <div class="field">
+          <label for="screening-starts-at">Start Time *</label>
+          <input id="screening-starts-at" name="starts_at" type="datetime-local" required>
+          <p id="error-starts_at" class="field-error" aria-live="polite" hidden></p>
+        </div>
+        <div class="field">
+          <label for="screening-ends-at">End Time (leave empty to calculate it from the movie's running time)</label>
+          <input id="screening-ends-at" name="ends_at" type="datetime-local">
+          <p id="error-ends_at" class="field-error" aria-live="polite" hidden></p>
+        </div>
+        <div class="field">
+          <label for="screening-ticket-price">Ticket Price *</label>
+          <input id="screening-ticket-price" name="ticket_price" type="number" step="0.01" min="0" required placeholder="14000">
+          <p id="error-ticket_price" class="field-error" aria-live="polite" hidden></p>
+        </div>
+        <div class="form-actions">
+          <button id="save-btn" class="button" type="submit">Save Screening</button>
+          <button id="cancel-btn" class="button button-secondary" type="button" hidden>Cancel Edit</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="section-gap">
+      <div class="section-head">
+        <h2>All Screenings</h2>
+        <div class="toolbar toolbar-flush">
+          <label for="filter-movie">Filter by movie:</label>
+          <select id="filter-movie">
+            <option value="">All Movies</option>
+          </select>
+        </div>
+      </div>
+      <div id="screenings-container" class="card card-flush"></div>
+    </section>
+  </main>
+</body>
+</html>

@@ -21,6 +21,16 @@ export async function initNav(container) {
   clear(container);
   container.append(link("/", "Home"), link("/movies.html", "Movies"), link("/screenings.html", "Schedule"));
   if (user) {
+    if (user.role === "CUSTOMER") {
+      container.append(link("/bookings.html", "My Bookings"));
+    }
+    if (user.role === "ADMIN") {
+      container.append(
+        link("/admin-movies.html", "Movies (Admin)"),
+        link("/admin-screenings.html", "Screenings (Admin)"),
+        link("/admin-bookings.html", "All Bookings"),
+      );
+    }
     container.append(
       el("span", { className: "nav-user", text: `${user.username} (${user.role})` }),
       el("button", {

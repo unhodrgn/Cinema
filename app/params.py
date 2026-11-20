@@ -42,19 +42,25 @@ def query_id(name, problems):
     return None
 
 
-def query_date(name, problems):
-    """An optional ``YYYY-MM-DD`` query parameter as an ISO string, or None.
+def strict_iso_date(text):
+    """``text`` as an ISO ``YYYY-MM-DD`` string if it is exactly that shape and a real date, else None.
 
-    Strictly that shape: ``20261125`` or ``2026-W47-3`` (which ``date.fromisoformat`` would
-    accept) are refused, as is any impossible date.
+    ``20261125`` or ``2026-W47-3`` (which ``date.fromisoformat`` would accept) are refused.
     """
-    text = (request.args.get(name) or "").strip()
-    if text == "":
-        return None
-    if _DATE_PATTERN.fullmatch(text):
+    if isinstance(text, str) and _DATE_PATTERN.fullmatch(text):
         try:
             return dt.date.fromisoformat(text).isoformat()
         except ValueError:
             pass
-    problems[name] = DATE_MESSAGE
     return None
+
+
+def query_date(name, problems):
+    """An optional ``YYYY-MM-DD`` query parameter as an ISO string, or None (see ``strict_iso_date``)."""
+    text = (request.args.get(name) or "").strip()
+    if text == "":
+        return None
+    date_text = strict_iso_date(text)
+    if date_text is None:
+        problems[name] = DATE_MESSAGE
+    return date_text

@@ -20,8 +20,10 @@ def service_info():
     return jsonify({"service": "cinema-reservation-api", "status": "ok"})
 
 
-from . import auth, movies, screenings  # noqa: E402  (after ``bp`` exists; none imports this module)
+from . import admin, auth, booking, movies, screenings  # noqa: E402  (after ``bp`` exists; none imports this module)
 
+bp.register_blueprint(admin.bp)
 bp.register_blueprint(auth.bp)
+bp.register_blueprint(booking.bp)
 bp.register_blueprint(movies.bp)
 bp.register_blueprint(screenings.bp)

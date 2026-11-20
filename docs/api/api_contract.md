@@ -205,6 +205,21 @@ The frontend is another origin (another port, or another machine), so browsers e
 | GET | `/api/movies/{id}` | public | `200 {"movie": {...}}`; `404` if unknown |
 | GET | `/api/screenings` | public | `200 {"date", "screenings": [...]}`, query `movie_id`, `date`, section 11.1 |
 | GET | `/api/screenings/{id}` | public | `200 {"screening": {...}}`; `404` if unknown |
+| GET | `/api/screenings/{id}/seats` | public | `200 {"screening": {...}, "seats": [...]}`, section 11.2 |
+| POST | `/api/bookings` | customer | `201 {"booking": {...}}`, section 11.3 |
+| POST | `/api/bookings/{id}/pay` | customer | `200 {"outcome": "PAID"|"EXPIRED", "booking": {...}}`, section 11.3 |
+| GET | `/api/bookings` | customer | `200 {"bookings": [...]}`, section 11.4 |
+| GET | `/api/bookings/{id}` | customer | `200 {"booking": {...}}`, section 11.4 |
+| POST | `/api/bookings/{id}/cancel` | customer | `200 {"outcome": "CANCELLED"|"EXPIRED", "booking": {...}}`, section 11.4 |
+| GET | `/api/admin/movies` | admin | `200 {"movies": [...]}`, section 11.5 |
+| GET | `/api/admin/movies/{id}` | admin | `200 {"movie": {...}}`; `404` if unknown |
+| POST | `/api/admin/movies` | admin | `201 {"movie": {...}}`, section 11.5 |
+| PUT | `/api/admin/movies/{id}` | admin | `200 {"movie": {...}}`, section 11.5 |
+| GET | `/api/admin/screenings` | admin | `200 {"screenings": [...], "rooms": [...]}`, section 11.6 |
+| GET | `/api/admin/screenings/{id}` | admin | `200 {"screening": {...}}`; `404` if unknown |
+| POST | `/api/admin/screenings` | admin | `201 {"screening": {...}}`, section 11.6 |
+| PUT | `/api/admin/screenings/{id}` | admin | `200 {"screening": {...}}`, section 11.6 |
+| GET | `/api/admin/bookings` | admin | `200 {"bookings": [...]}`, section 11.7 |
 | GET | `/health/db` | public | `200 {"status": "ok", "database": "ok"}`; `503 {"status": "unavailable", "database": "unavailable"}` if PostgreSQL cannot be reached or does not answer correctly. No host, port, name, user, version or error text. |
 
 ### 11.1 Catalog shapes (T3, public: no login, D4)
@@ -222,18 +237,123 @@ The frontend is another origin (another port, or another machine), so browsers e
 
 A path id that is not a positive integer, or is larger than the database can hold, is an ordinary `404`.
 
-## 12. Planned endpoints (T4–T8, not implemented)
+### 11.2 Seat availability (T4, public, C-04, C-05)
 
-Listed so the frontend and backend can be built against one map. Business rules are those of B03 and D1–D6; nothing here adds one.
+**`GET /api/screenings/{id}/seats`** runs `expire_overdue_bookings()` in the same transaction, then returns the screening information and its room's 50 seats with availability status.
+* `screening`: the screening object (same shape as `GET /api/screenings/{id}`).
+* `seats`: array of `{"seat_id": 1, "seat_row": "A", "seat_number": 1, "is_available": true/false}`.
+* A seat is unavailable if reserved by an active `BOOKED` booking (paid or within 10-minute payment window).
+* An unknown screening ID answers `404`.
 
-| Task | Method and path | Policy | Business function |
-|---|---|---|---|
-| T4 | `GET /api/screenings/{id}/seats` (runs expiry first) | public | C-04, C-05 |
-| T5 | `POST /api/bookings`, `POST /api/bookings/{id}/pay` | customer | C-06, C-07 |
-| T6 | `GET /api/bookings`, `/api/bookings/{id}`, `POST /api/bookings/{id}/cancel` | customer | C-08, C-09 |
-| T7 | `GET`/`POST /api/admin/movies`, `GET`/`PUT /api/admin/movies/{id}` | admin | A-01 |
-| T7 | `GET`/`POST /api/admin/screenings`, `GET`/`PUT /api/admin/screenings/{id}` | admin | A-02 |
-| T8 | `GET /api/admin/bookings` (view only) | admin | A-03 |
+### 11.3 Booking creation and simulated payment (T5, customer, C-06, C-07)
+
+**`POST /api/bookings`** creates a booking atomically via database function `create_booking()`.
+* Request body: `{"screening_id": 5, "seat_ids": [1, 2]}`.
+* Validates `screening_id` and non-empty `seat_ids` list.
+* Sets `status = 'BOOKED'`, `payment_status = 'UNPAID'`, `expires_at = booked_at + 10 min`, and records price snapshots.
+* Answers `201 {"booking": {...}}`.
+* Fails with `409 seat_unavailable` if any seat is already booked or taken concurrently (`UC002`).
+* Fails with `409 screening_started` if the screening has started (`UC004`).
+* Fails with `400 no_seat_selected` if seat list is empty or invalid (`UC010`).
+
+**`POST /api/bookings/{id}/pay`** processes simulated payment atomically via database function `pay_booking()`.
+* Must be called by the booking's owner (customer).
+* If paid within the 10-minute window, changes `payment_status` to `PAID` and returns `200 {"outcome": "PAID", "booking": {...}}`.
+* If payment window elapsed, marks booking `EXPIRED`, releases seats, commits, and returns `200 {"outcome": "EXPIRED", "booking": {...}}`.
+* Fails with `404` if not found or not owned by user (`UC011`).
+* Fails with `409 invalid_booking_state` if already paid or cancelled (`UC006`).
+
+### 11.4 Customer booking history and cancellation (T6, customer, C-08, C-09)
+
+**`GET /api/bookings`** returns all bookings belonging to the authenticated customer, running expiry first.
+* Sorted by `booked_at DESC`.
+* Each booking includes `seats: [{seat_id, seat_row, seat_number, price_at_booking}]` if `status == 'BOOKED'`, or `seats: []` if cancelled/expired (D1, D3).
+* Answers `200 {"bookings": [...]}`.
+
+**`GET /api/bookings/{id}`** returns a single booking belonging to the customer, running expiry first.
+* Answers `200 {"booking": {...}}`.
+* Fails with `404` if not found or not owned by user.
+
+**`POST /api/bookings/{id}/cancel`** cancels a booking atomically via database function `cancel_booking()`.
+* Must be called by the booking owner before the screening starts (D1).
+* If booking was UNPAID and overdue, it expires instead (`outcome: "EXPIRED"`).
+* If successfully cancelled, changes status to `CANCELLED`, retains `total_amount` and `payment_status` (stays `PAID` if already paid - D1), deletes `booking_seats` (seats released!), sets `cancelled_at`, and returns `200 {"outcome": "CANCELLED", "booking": {...}}`.
+* Fails with `404` if not found or not owned by user (`UC011`).
+* Fails with `409 cancellation_closed` if screening has started (`UC005`).
+* Fails with `409 invalid_booking_state` if already cancelled or expired (`UC006`).
+
+### 11.5 Admin Movie Management (T7, admin, A-01)
+
+**`GET /api/admin/movies`** returns all movies ordered by `movie_id ASC`.
+* Answers `200 {"movies": [...]}`.
+* Requires `Policy.ADMIN`.
+
+**`GET /api/admin/movies/{id}`** returns a single movie.
+* Answers `200 {"movie": {...}}`.
+* Fails with `404` if movie does not exist.
+* Requires `Policy.ADMIN`.
+
+**`POST /api/admin/movies`** creates a new movie.
+* Request body: `{"title": "...", "duration_minutes": 120, "genre": "...", "rating": "...", "synopsis": "...", "release_date": "YYYY-MM-DD"}`.
+* `title` (1..200 chars) and `duration_minutes` (1..300 integer) are required.
+* `genre` (text up to 100 chars, free text, D5) and `rating` (text up to 50 chars, free text, D5) are optional/nullable.
+* `synopsis` (text) and `release_date` (exactly `YYYY-MM-DD`, a real date; `20261120` is refused) are optional/nullable.
+* Text is trimmed; a blank optional value is stored as `null`.
+* Answers `201 {"movie": {...}}`.
+* Requires `Policy.ADMIN`.
+
+**`PUT /api/admin/movies/{id}`** updates an existing movie.
+* **Full replace:** the body is validated exactly like creation and every editable field is overwritten, so an optional field that is left out becomes `null`. Send all fields to keep them.
+* A movie can be edited even when its screenings have bookings. Changing `duration_minutes` does **not** change the end time of screenings that already exist.
+* Answers `200 {"movie": {...}}`.
+* Fails with `404` if movie does not exist.
+* Requires `Policy.ADMIN`.
+
+### 11.6 Admin Screening Management (T7, admin, A-02)
+
+**`GET /api/admin/screenings?movie_id=`** returns screenings (optionally filtered by movie) and the list of rooms.
+* Sorted by `starts_at DESC, room_id ASC`.
+* Each screening includes `has_started` (boolean) and `has_bookings` (boolean).
+* Answers `200 {"screenings": [...], "rooms": [...]}`.
+* Requires `Policy.ADMIN`.
+
+**`GET /api/admin/screenings/{id}`** returns a single screening.
+* Answers `200 {"screening": {...}}`.
+* Fails with `404` if screening does not exist.
+* Requires `Policy.ADMIN`.
+
+**`POST /api/admin/screenings`** creates a new screening.
+* Request body: `{"movie_id": 1, "room_id": 1, "starts_at": "...", "ends_at": "...", "ticket_price": "14000.00"}`.
+* `movie_id`, `room_id` (positive integers of existing records; otherwise `400` with that field), `starts_at` (ISO 8601) and `ticket_price` are required.
+* `ticket_price`: a number or a decimal string, `0` to `99999999.99` with at most two decimal places. Negative, non-finite (`Infinity`, `NaN`), too large or over-precise values are `400` with the field `ticket_price`. These are technical limits (`numeric(10,2)`), not business rules.
+* `starts_at` / `ends_at`: ISO 8601. A time **without** an offset (for example `2030-01-05T10:00`, which is what a `datetime-local` input sends) is the cinema's local time (`APP_TIMEZONE`); a time with an offset keeps its instant. Responses always carry the cinema's offset. The year must be 1900–2200 (technical limit).
+* `ends_at` is optional (if omitted, empty or null, calculated automatically as `starts_at + movie.duration_minutes`); if given it must be strictly after `starts_at`.
+* Overlapping screenings in the same room fail with `409 screening_overlap` (`23P01`); a screening may start at the exact end time of the previous one (the end instant is not part of a screening).
+* Answers `201 {"screening": {...}}`.
+* Requires `Policy.ADMIN`.
+
+**`PUT /api/admin/screenings/{id}`** updates an existing screening.
+* Same body and validation as creation (full replace). If `ends_at` is omitted it is calculated again from the (possibly new) movie's duration.
+* Enforces **D2**: rejected with `409 screening_has_bookings` (`UC001`) if ANY booking references this screening, regardless of booking status (BOOKED, CANCELLED, or EXPIRED), **and** the save would change `movie_id`, `room_id`, `starts_at`, `ends_at` or `ticket_price`. Saving a booked screening with identical values is not a modification and answers `200`.
+* Overlapping screenings in the same room fail with `409 screening_overlap` (`23P01`).
+* Answers `200 {"screening": {...}}`.
+* Fails with `404` if screening does not exist.
+* Requires `Policy.ADMIN`.
+
+### 11.7 Admin Booking List (T8, admin, A-03)
+
+**`GET /api/admin/bookings?status=&screening_id=&user_id=`** view-only list of all bookings across all customers and statuses.
+* Runs `expire_overdue_bookings()` in the same transaction before reading.
+* Optional filters: `status` (`BOOKED`, `CANCELLED`, or `EXPIRED`; case-insensitive, blank means all), `screening_id`, `user_id` (positive whole numbers). Filters combine with AND; an unknown screening or customer gives an empty list; a bad value is `400` with that field in `fields`. Expiry changes made by the request are committed even though the endpoint only reads.
+* Sorted by `booked_at DESC, booking_id DESC`.
+* Each booking includes customer `username`, movie `title`, room `room_name`, times, amounts, and statuses (`status`, `payment_status`).
+* `seats` list is included ONLY for `status == 'BOOKED'`. For cancelled and expired bookings, `seats` is empty `[]` (D1, D3).
+* Answers `200 {"bookings": [...]}`.
+* Requires `Policy.ADMIN`.
+
+## 12. Planned endpoints (all Phase 4 endpoints implemented)
+
+All Phase 4 planned endpoints (T1–T8) are implemented and documented in Section 11.
 
 ## 13. Deployment settings
 

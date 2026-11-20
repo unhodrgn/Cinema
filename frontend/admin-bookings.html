@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>All Bookings - Admin</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/config.js"></script>
+  <script type="module" src="/js/pages/admin_bookings.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/">Cinema Reservation</a>
+    <nav id="site-nav" class="site-nav" aria-label="Main"></nav>
+  </header>
+
+  <main class="container">
+    <h1>All Bookings</h1>
+    <p class="muted">View only. Overdue unpaid bookings are expired when this list is loaded.</p>
+    <div id="message" aria-live="polite"></div>
+
+    <section id="filter-section" class="card">
+      <h2>Filter</h2>
+      <form id="filter-form" class="toolbar" novalidate>
+        <label for="filter-status">Status</label>
+        <select id="filter-status" name="status">
+          <option value="">All</option>
+          <option value="BOOKED">BOOKED</option>
+          <option value="CANCELLED">CANCELLED</option>
+          <option value="EXPIRED">EXPIRED</option>
+        </select>
+        <label for="filter-screening">Screening ID</label>
+        <input id="filter-screening" name="screening_id" class="input-id" inputmode="numeric" autocomplete="off">
+        <label for="filter-user">User ID</label>
+        <input id="filter-user" name="user_id" class="input-id" inputmode="numeric" autocomplete="off">
+        <button class="button" type="submit">Apply</button>
+        <button id="clear-btn" class="button button-secondary" type="button">Clear</button>
+      </form>
+      <p id="error-filters" class="field-error" aria-live="polite" hidden></p>
+    </section>
+
+    <section class="section-gap">
+      <div class="section-head">
+        <h2>Bookings</h2>
+        <p id="summary" class="muted" aria-live="polite"></p>
+      </div>
+      <div id="bookings-container" class="card card-flush"></div>
+    </section>
+  </main>
+</body>
+</html>

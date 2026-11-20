@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Booking Details - Cinema Reservation</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/config.js"></script>
+  <script type="module" src="/js/pages/booking.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/">Cinema Reservation</a>
+    <nav id="site-nav" class="site-nav" aria-label="Main"></nav>
+  </header>
+
+  <main class="container narrow">
+    <h1>Booking Details</h1>
+    <div id="message" aria-live="polite"></div>
+
+    <article id="booking-card" class="card" hidden>
+      <div class="booking-header">
+        <h2 id="movie-title">Movie</h2>
+        <div id="badges" class="badges"></div>
+      </div>
+
+      <dl class="facts">
+        <dt>Booking ID</dt>
+        <dd id="booking-id">-</dd>
+
+        <dt>Room</dt>
+        <dd id="room-name">-</dd>
+
+        <dt>Screening Time</dt>
+        <dd id="screening-time">-</dd>
+
+        <dt>Seats</dt>
+        <dd id="seat-list">-</dd>
+
+        <dt>Total Amount</dt>
+        <dd><strong id="total-amount">-</strong></dd>
+
+        <dt>Booked At</dt>
+        <dd id="booked-at">-</dd>
+
+        <dt id="payment-deadline-label" hidden>Payment Deadline</dt>
+        <dd id="payment-deadline-value" hidden>-</dd>
+      </dl>
+
+      <div id="payment-box" class="message message-info" hidden>
+        <p><strong>Payment required:</strong> Please complete simulated payment before the deadline to confirm your seats.</p>
+        <p id="countdown-timer"></p>
+        <button id="pay-button" class="button" type="button">Pay Now (Simulated)</button>
+      </div>
+
+      <div id="actions-box" class="booking-actions">
+        <button id="cancel-button" class="button button-danger" type="button" hidden>Cancel Booking</button>
+        <a href="/bookings.html" class="button button-secondary">My Bookings</a>
+      </div>
+    </article>
+  </main>
+</body>
+</html>

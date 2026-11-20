@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manage Movies - Admin</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/config.js"></script>
+  <script type="module" src="/js/pages/admin_movies.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/">Cinema Reservation</a>
+    <nav id="site-nav" class="site-nav" aria-label="Main"></nav>
+  </header>
+
+  <main class="container">
+    <h1>Manage Movies</h1>
+    <div id="message" aria-live="polite"></div>
+
+    <section id="form-section" class="card">
+      <h2 id="form-title">Add New Movie</h2>
+      <form id="movie-form" class="form" novalidate>
+        <input type="hidden" id="movie-id" value="">
+        <div class="field">
+          <label for="movie-title">Title *</label>
+          <input id="movie-title" name="title" required maxlength="200" autocomplete="off">
+          <p id="error-title" class="field-error" aria-live="polite"></p>
+        </div>
+        <div class="field">
+          <label for="movie-duration">Running Time (minutes) *</label>
+          <input id="movie-duration" name="duration_minutes" type="number" min="1" max="300" required>
+          <p id="error-duration_minutes" class="field-error" aria-live="polite"></p>
+        </div>
+        <div class="field">
+          <label for="movie-genre">Genre (free text)</label>
+          <input id="movie-genre" name="genre" maxlength="100" autocomplete="off" placeholder="e.g. Action, Sci-Fi">
+          <p id="error-genre" class="field-error" aria-live="polite"></p>
+        </div>
+        <div class="field">
+          <label for="movie-rating">Rating (free text)</label>
+          <input id="movie-rating" name="rating" maxlength="50" autocomplete="off" placeholder="e.g. PG-13, 15+">
+          <p id="error-rating" class="field-error" aria-live="polite"></p>
+        </div>
+        <div class="field">
+          <label for="movie-release">Release Date (YYYY-MM-DD)</label>
+          <input id="movie-release" name="release_date" placeholder="YYYY-MM-DD">
+          <p id="error-release_date" class="field-error" aria-live="polite"></p>
+        </div>
+        <div class="field">
+          <label for="movie-synopsis">Synopsis</label>
+          <textarea id="movie-synopsis" name="synopsis" rows="3"></textarea>
+          <p id="error-synopsis" class="field-error" aria-live="polite"></p>
+        </div>
+        <div class="form-actions">
+          <button id="save-btn" class="button" type="submit">Save Movie</button>
+          <button id="cancel-btn" class="button button-secondary" type="button" hidden>Cancel Edit</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="section-gap">
+      <h2>All Movies</h2>
+      <div id="movies-container" class="card card-flush"></div>
+    </section>
+  </main>
+</body>
+</html>

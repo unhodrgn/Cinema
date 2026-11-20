@@ -58,6 +58,12 @@ def test_endpoints_documented_as_existing_exist_with_the_documented_method_and_p
         "/api", "/health", "/health/db",
         "/api/auth/register", "/api/auth/login", "/api/auth/me", "/api/auth/logout",
         "/api/movies", "/api/movies/{id}", "/api/screenings", "/api/screenings/{id}",
+        "/api/screenings/{id}/seats",
+        "/api/bookings", "/api/bookings/{id}",
+        "/api/bookings/{id}/pay", "/api/bookings/{id}/cancel",
+        "/api/admin/movies", "/api/admin/movies/{id}",
+        "/api/admin/screenings", "/api/admin/screenings/{id}",
+        "/api/admin/bookings",
     }
     policies = route_policies(app)
     rules = {(normalized(rule.rule), method): rule.endpoint
@@ -77,12 +83,15 @@ def test_the_application_has_no_endpoint_the_contract_does_not_document():
     assert actual == documented
 
 
-def test_planned_endpoints_are_not_implemented_yet():
+def test_endpoints_still_planned_in_section_12_do_not_exist_yet():
     # Section 12 is a plan. When a task implements an endpoint it moves to section 11; until
-    # then the route must not exist (the T1 foundation contains no business endpoint).
+    # then the route must not exist. With every Phase 4 endpoint implemented the section lists
+    # none, so it must say so explicitly instead of the check silently passing.
     app = create_app("testing")
     planned = re.findall(r"`(?:GET|POST|PUT)(?:`/`(?:GET|POST|PUT))? (/api/[^`?\s]+)", section(12))
-    assert planned, "could not read the planned endpoints"
+    if not planned:
+        assert "all Phase 4 endpoints implemented" in TEXT.split("\n## 12.", 1)[1].split("\n", 1)[0]
+        return
     actual = {re.sub(r"<[^>]+>", "{x}", rule.rule) for rule in app.url_map.iter_rules()}
     normalized = {re.sub(r"\{[^}]+\}", "{x}", path) for path in planned}
 
