@@ -1,46 +1,32 @@
-# 정규화 검토 (1NF → 3NF)
+# 정규화 분석
 
-**대상:** `database/schema.sql`의 7개 릴레이션. 이전 초안(`CinemaDB_FINAL_PostgreSQL_Handover/docs/04_Normalization_Review_KO.md`)은 승인된 결정(D1~D6) 이전 모델을 기준으로 하므로 이 문서가 대체한다.
+## 제1정규형
 
-## 1. 비정규형 예시
+좌석 목록을 하나의 열에 저장하면 개별 좌석의 검색과 유일성 검사가 어렵다. 좌석 배정을 개별 행으로 나누어 저장 열은 각 행에서 단일 값을 갖는다. 좌석 ID 배열은 확정 함수의 입력 형식이다. 영화 제목과 상영관명은 해당 마스터에, 예매 소유자와 상태는 예매에 저장한다.
 
-`booking_id=B1, movie=영화A, room=1관, seats='A1,A2', price=12000`처럼 한 행에 여러 좌석을 넣으면 반복 그룹과 영화·상영관 정보의 중복이 생긴다.
+## 후보키와 함수 종속
 
-## 2. 1NF
-
-모든 속성은 원자값이다. 좌석은 한 행에 하나씩 `booking_seats`에 저장한다(`A1,A2` 같은 목록 컬럼 없음). 반복 그룹은 `booking_seats`로 분리했다.
-
-## 3. 2NF
-
-복합 후보키가 있는 릴레이션은 `booking_seats(booking_id, seat_id)`와 `seats(room_id, seat_row, seat_number)`이다(대리키 `booking_seat_id`, `seat_id`도 있음). `booking_seats`의 비키 속성 `price_at_booking`은 좌석 한 건의 가격 사실이므로 후보키 전체에 종속한다. 고객·상영 일정·상태는 `booking_id`에만 종속하므로 `bookings`에 두어 부분 종속을 제거했다.
-
-## 4. 3NF — 함수 종속
-
-| 릴레이션 | 결정자 → 종속 속성 | 이행 종속 여부 |
+| 릴레이션 | 최소 후보키 | 분석 |
 |---|---|---|
-| users | user_id → username, password_hash, role, created_at; username → user_id(후보키) | 없음 |
-| movies | movie_id → title, genre, duration_minutes, rating, synopsis, release_date | 없음 |
-| theater_rooms | room_id → room_name; room_name → room_id | 없음 |
-| seats | seat_id → room_id, seat_row, seat_number; (room_id, seat_row, seat_number) → seat_id | 없음 |
-| showtimes | showtime_id → movie_id, room_id, starts_at, ends_at, ticket_price | 영화 제목·상영관명은 `movies`, `theater_rooms`에만 저장 |
-| bookings | booking_id → user_id, showtime_id, status, payment_status, booked_at, expires_at, total_amount, paid_at, cancelled_at | 고객 정보·영화·상영관·상영 시각은 FK로만 참조 |
-| booking_seats | booking_seat_id → booking_id, seat_id, price_at_booking; (booking_id, seat_id) → booking_seat_id | 상영 일정·상영관을 중복 저장하지 않음 (`booking_id → showtime_id → room_id`) |
+| users | user_id, username | ID와 사용자명 각각이 계정 속성을 결정한다. |
+| movies | movie_id | 제목의 유일성을 강제하지 않는다. |
+| theater_rooms | room_id, room_name | 두 식별자가 각각 유일하다. |
+| seats | seat_id, (room_id, seat_row, seat_number) | 위치 표시는 다른 상영관에서 재사용한다. |
+| showtimes | showtime_id. 배제 제약으로 (room_id, starts_at) 및 (room_id, ends_at)도 실질적으로 유일 | 구간이 비어 있지 않아 같은 방의 두 회차가 시작이나 종료 시각을 공유하면 중첩된다. 두 조합은 별도 UNIQUE로 선언하지 않았다. 종료 시각은 현재 영화 길이와 시작 시각만으로 항상 결정되지 않는다. |
+| bookings | booking_id | (booking_id, showtime_id)는 FK 대상으로 선언한 슈퍼키다. booked_at → expires_at가 성립한다. |
+| booking_seats | booking_seat_id, (booking_id, seat_id), 물리 모델의 (showtime_id, seat_id) | booking_id → showtime_id, booking_id → price_at_booking, 상세 내 showtime_id → price_at_booking이 성립한다. |
 
-`bookings.user_id`, `showtime_id`는 각각 `users`, `showtimes`의 키만 보관하므로 비키 속성 간 이행 종속이 없다. 따라서 모든 릴레이션이 3NF(실제로 BCNF)를 만족한다.
+## 제2·제3정규형과 BCNF
 
-## 5. 승인된 요구사항에 따른 의도적 저장(통제된 중복)
+상세의 price_at_booking은 비주요 속성이며 예매 또는 회차로 결정된다. 합성 후보키의 일부에 대한 종속이므로 상세는 업무 규칙을 고려한 엄밀한 2NF와 3NF를 충족하지 않는다. booking_id → showtime_id에서 결정자는 슈퍼키가 아니지만 종속 속성은 물리 후보키의 구성원이다. 이 종속 자체는 3NF의 주요 속성 예외에 해당하며 BCNF에는 위배된다. bookings의 booked_at → expires_at는 비슈퍼키가 비주요 속성을 결정하므로 3NF와 BCNF에 위배된다. 물리 스키마 전체에 3NF 또는 BCNF를 부여하지 않는다.
 
-아래 값은 다른 속성에서 계산할 수 있으나, 승인된 규칙이 **이력으로 보존**하거나 **고정**하도록 요구하므로 저장한다. 불일치는 제약·트리거가 막는다.
+## 통제된 중복
 
-| 저장 값 | 계산 가능한 원천 | 저장하는 이유 | 일관성 보장 |
-|---|---|---|---|
-| `bookings.total_amount` | `Σ booking_seats.price_at_booking` | 취소·만료 시 좌석 행이 삭제되어도 총액이 남아야 함 (D1, D3, D6) | COMMIT 시 `BOOKED`의 총액 = 스냅샷 합(지연 제약 트리거), 변경 불가 |
-| `booking_seats.price_at_booking` | `showtimes.ticket_price` | 예매 시점 단가 스냅샷 (D6) | 트리거가 상영 일정 가격과 일치 요구 (예매가 있으면 가격은 D2로 고정) |
-| `bookings.expires_at` | `booked_at + 10분` | 결제 기한을 저장해 판정·이력 (D3) | CHECK `expires_at = booked_at + 10분`, 트리거가 설정 |
-| `showtimes.ends_at` | `starts_at + movies.duration_minutes` | 종료 시각이 승인 속성이며, 영화 상영 시간이 나중에 바뀌어도 기존 일정이 바뀌면 안 됨 (D2, DB-02) | CHECK `ends_at > starts_at`; 생략 시에만 기본 계산; 명시값 존중 |
+| 저장 값 | 저장 목적 | 무결성 통제 |
+|---|---|---|
+| booking_seats.showtime_id | 회차별 좌석 중복을 고유 인덱스로 차단 | 트리거 도출, (booking_id, showtime_id) 복합 FK, 회차·좌석 UNIQUE |
+| booking_seats.price_at_booking | D6에 따른 확정 당시 좌석별 단가 | 삽입 트리거가 회차 가격과 일치 여부를 검증한다. 배정 행 및 이력이 있는 회차 가격의 변경을 차단한다. |
+| bookings.expires_at | D3 기한을 보존하고 검색할 수 있게 함 | 삽입 트리거, 10분 등식 CHECK, 미결제 확정 행 부분 인덱스 |
+| bookings.total_amount | 상세 삭제 이후에도 확정 총액을 보존 | 확정 함수 계산, 지연 트리거 합계 검사, 본 행 총액 변경 금지 |
 
-`paid_at`, `cancelled_at`은 상태와 일치해야 하는 기술적 시각 컬럼이며 CHECK로 상태와 연동된다.
-
-## 6. 한계
-
-이 문서는 함수 종속을 설계 근거로 서술한 것이며 형식적 증명(암스트롱 공리 전개)을 포함하지 않는다. 교수 요구에 따라 후보키·함수 종속 표를 확장할 수 있다.
+총액은 다른 릴레이션의 상세에서 계산하는 집계값이다. 이 저장 자체가 같은 릴레이션 내 추가 함수 종속을 뜻하지는 않는다. ends_at은 입력이 NULL일 때만 기본값을 계산하며 이후 영화 길이가 바뀌어도 기존 종료 시각은 유지된다.

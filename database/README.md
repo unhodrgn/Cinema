@@ -1,41 +1,22 @@
-# database/ — canonical PostgreSQL database
+# PostgreSQL 데이터베이스
 
-Status: **verified** against D1–D6 on PostgreSQL 18.6 (see `docs/database/database_test_documentation.md`). Not yet tested on PostgreSQL 14–17.
+이 디렉터리는 영화관 예매 시스템의 기준 DDL, 시드, 권한 및 테스트를 제공한다. 개선판 DB는 PostgreSQL 18.7의 신규 UTF-8 데이터베이스에서 검증했다. 배포 전 Member B의 좌석 조회 전환과 응용 프로그램 통합 검증이 필요하다.
 
-| File | Purpose |
+| 파일 | 용도 |
 |---|---|
-| `schema.sql` | Canonical schema: 7 tables, constraints, triggers, 4 operations for Flask. Apply **once** to a new empty database. Needs the `btree_gist` extension. |
-| `seed.sql` | Canonical seed (demo data): 3 accounts, 5 movies, 5 rooms, 250 seats, 140 screenings over 7 `Asia/Seoul` days from the day it runs. Apply after `schema.sql`, once. |
-| `tests/run_all.sh` | Creates a disposable database, runs everything below, drops it. |
-| `tests/integrity_tests.sql` | 177 checks for D1–D6 and retained rules (rolled back). |
-| `tests/reconciliation_probes.sql` | 31 probes keyed to the audit's P-numbers (rolled back; fails on any mismatch). |
-| `tests/test_concurrency.py` | Real multi-session race tests (psycopg2). Needs a fresh DB with no bookings. |
+| schema.sql | 일곱 테이블, 제약, 인덱스, 트리거 및 업무 함수. 신규 빈 DB에 한 번 적용한다. |
+| seed.sql | 데모 계정 3개, 영화 5편, 상영관 5개, 좌석 250개, 서울 시간 기준 7일 동안 상영 일정 140개를 구성한다. |
+| grant_application_role.sql | 전용 앱 역할에 필요한 객체 및 열 권한과 업무 함수 실행 권한을 부여한다. |
+| tests/run_all.sh | 신규 폐기용 UTF-8 DB에서 하위 테스트를 실행한다. |
+| tests/integrity_tests.sql | 무결성 SQL 검사 199건. |
+| tests/reconciliation_probes.sql | 대조 검사 31건과 별도 커밋 실패 확인. |
+| tests/test_concurrency.py | PostgreSQL 세션 간 동시성 검사 58건. |
+| tests/test_application_role.py | 임시 앱 역할로 업무 실행과 권한 제한을 검증한다. |
 
-`CinemaDB_FINAL_PostgreSQL_Handover/` (Member A's delivery) is kept **unchanged** as the historical reference. `schema.sql` and `seed.sql` here are derived from it and corrected as documented in `docs/database/handover_reconciliation_report.md`; do not edit the handover folder or maintain a second schema.
+설치 순서는 신규 UTF-8 DB 생성 → 스키마 → 시드 → 권한 스크립트다. 위치, 소유자 및 접속 설정은 [PostgreSQL 설치 안내서](../docs/database/postgresql_setup_guide.md)를 따른다. [검증 결과](../docs/database/database_test_documentation.md), [Flask 연동 계약](../docs/database/postgresql_flask_integration_contract.md), [Member B 인수인계](../docs/database/member_b_integration_handover.md)를 함께 제공한다. 역사적 인수인계 ZIP 및 기존 [대조 보고서](../docs/database/handover_reconciliation_report.md)는 이전 기준의 참고 자료다.
 
-## Setup
+## 제출 자료 확인
 
-```bash
-createdb cinema_demo                                   # new, empty database
-psql -X -v ON_ERROR_STOP=1 -d cinema_demo -f database/schema.sql
-psql -X -v ON_ERROR_STOP=1 -d cinema_demo -f database/seed.sql
-```
-Connection via the libpq variables (`PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`). Never commit credentials.
-
-## Verify (disposable database only)
-
-```bash
-python -m pip install psycopg2-binary
-bash database/tests/run_all.sh
-```
-Never run the tests or the seed against a shared or demo database: the concurrency test leaves bookings behind, and (D2) a screening that has any booking record can never be edited again.
-
-## For Flask
-
-Read `docs/database/postgresql_flask_integration_contract.md`. In short: call `create_booking`, `pay_booking`, `cancel_booking` and `expire_overdue_bookings()` (request-time expiry; nothing runs automatically); use physical table names; handle the `UC…` SQLSTATEs.
-
-## Open items
-
-* Demo account password hashes come from Member A; their plaintext is undocumented and unverified.
-* Database driver choice (`psycopg2` recommended) and `requirements.txt` are not settled; `requirements.txt` is unchanged.
-* Application-role privileges / `SECURITY DEFINER` is a deployment decision, not implemented.
+- [개념 모델](../docs/database/conceptual_data_model.md), [논리 모델](../docs/database/logical_data_model.md), [물리 모델](../docs/database/physical_data_model.md)에 편집용 ERD와 SVG·PNG가 있다.
+- [정규화](../docs/database/normalization.md), [용어사전](../docs/database/glossary.md), [도메인 정의](../docs/database/domain_definition.md), [테이블 기술서](../docs/database/table_description.md)를 제공한다.
+- DB 인수인계 목록의 모델, DDL, 시드 및 검증 보고서는 저장소에서 확인할 수 있다. 원본 실행 로그와 발표용 캡처 명령은 [검증 증빙](../docs/database/evidence/README.md)에 있다. 별도 스크린샷 제출 형식은 수업 지침을 확인한다. 기존 DB 이전 스크립트와 신규 API의 브라우저 통합 검증은 현재 제출물에 포함되지 않는다.

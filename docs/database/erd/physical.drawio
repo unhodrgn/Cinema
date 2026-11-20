@@ -1,0 +1,170 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="app.diagrams.net">
+  <diagram name="물리적 데이터 모델" id="physical">
+    <mxGraphModel page="1" pageWidth="1380" pageHeight="1050" background="#f0f5f8">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Apple SD Gothic Neo;fontColor=#152b3a;fontSize=31;fontStyle=1;" value="물리적 데이터 모델" vertex="1" parent="1">
+          <mxGeometry x="45" y="22" width="800" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Apple SD Gothic Neo;fontColor=#152b3a;fontSize=17;" value="영화관 예매 시스템  ·  1 = 필수 한 건   /   0..N = 선택적 복수 참여" vertex="1" parent="1">
+          <mxGeometry x="45" y="70" width="950" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="r0label0" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Apple SD Gothic Neo;fontColor=#152b3a;fontSize=13;fontStyle=1;" value="1" vertex="1" parent="1">
+          <mxGeometry x="446" y="147" width="42" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="r0label1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Apple SD Gothic Neo;fontColor=#152b3a;fontSize=13;fontStyle=1;" value="0..N" vertex="1" parent="1">
+          <mxGeometry x="628" y="397" width="42" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="edge0" edge="1" parent="1" source="movies" target="showtimes" style="exitX=1;exitY=0.18571428571428572;entryX=0.31565656565656564;entryY=0.0;endArrow=none;startArrow=none;strokeWidth=2;strokeColor=#52768c;rounded=0;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="441" y="169" as="sourcePoint" />
+            <mxPoint x="620" y="420" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="620" y="169" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="r1label0" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Apple SD Gothic Neo;fontColor=#152b3a;fontSize=13;fontStyle=1;" value="1" vertex="1" parent="1">
+          <mxGeometry x="251" y="523" width="42" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="r1label1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Apple SD Gothic Neo;fontColor=#152b3a;fontSize=13;fontStyle=1;" value="0..N" vertex="1" parent="1">
+          <mxGeometry x="251" y="782" width="42" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="edge1" edge="1" parent="1" source="theater_rooms" target="seats" style="exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=none;startArrow=none;strokeWidth=2;strokeColor=#52768c;rounded=0;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="243" y="520" as="sourcePoint" />
+            <mxPoint x="243" y="805" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="r2label0" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Apple SD Gothic Neo;fontColor=#152b3a;fontSize=13;fontStyle=1;" value="1" vertex="1" parent="1">
+          <mxGeometry x="446" y="437" width="42" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="r2label1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Apple SD Gothic Neo;fontColor=#152b3a;fontSize=13;fontStyle=1;" value="0..N" vertex="1" parent="1">
+          <mxGeometry x="460" y="437" width="42" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="edge2" edge="1" parent="1" source="theater_rooms" target="showtimes" style="exitX=1;exitY=0.39;entryX=0.0;entryY=0.2074468085106383;endArrow=none;startArrow=none;strokeWidth=2;strokeColor=#52768c;rounded=0;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="441" y="459" as="sourcePoint" />
+            <mxPoint x="495" y="459" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="r3label0" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Apple SD Gothic Neo;fontColor=#152b3a;fontSize=13;fontStyle=1;" value="1" vertex="1" parent="1">
+          <mxGeometry x="1151" y="299" width="42" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="r3label1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Apple SD Gothic Neo;fontColor=#152b3a;fontSize=13;fontStyle=1;" value="0..N" vertex="1" parent="1">
+          <mxGeometry x="1151" y="397" width="42" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="edge3" edge="1" parent="1" source="users" target="bookings" style="exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=none;startArrow=none;strokeWidth=2;strokeColor=#52768c;rounded=0;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1143" y="296" as="sourcePoint" />
+            <mxPoint x="1143" y="420" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="r4label0" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Apple SD Gothic Neo;fontColor=#152b3a;fontSize=13;fontStyle=1;" value="1" vertex="1" parent="1">
+          <mxGeometry x="896" y="437" width="42" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="r4label1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Apple SD Gothic Neo;fontColor=#152b3a;fontSize=13;fontStyle=1;" value="0..N" vertex="1" parent="1">
+          <mxGeometry x="910" y="437" width="42" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="edge4" edge="1" parent="1" source="showtimes" target="bookings" style="exitX=1;exitY=0.2074468085106383;entryX=0.0;entryY=0.13087248322147652;endArrow=none;startArrow=none;strokeWidth=2;strokeColor=#52768c;rounded=0;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="891" y="459" as="sourcePoint" />
+            <mxPoint x="945" y="459" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="r5label0" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Apple SD Gothic Neo;fontColor=#152b3a;fontSize=13;fontStyle=1;" value="1" vertex="1" parent="1">
+          <mxGeometry x="1151" y="721" width="42" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="r5label1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Apple SD Gothic Neo;fontColor=#152b3a;fontSize=13;fontStyle=1;" value="0..N" vertex="1" parent="1">
+          <mxGeometry x="1151" y="782" width="42" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="edge5" edge="1" parent="1" source="bookings" target="booking_seats" style="exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=none;startArrow=none;strokeWidth=2;strokeColor=#52768c;rounded=0;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1143" y="718" as="sourcePoint" />
+            <mxPoint x="1143" y="805" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="r6label0" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Apple SD Gothic Neo;fontColor=#152b3a;fontSize=13;fontStyle=1;" value="1" vertex="1" parent="1">
+          <mxGeometry x="446" y="822" width="42" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="r6label1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Apple SD Gothic Neo;fontColor=#152b3a;fontSize=13;fontStyle=1;" value="0..N" vertex="1" parent="1">
+          <mxGeometry x="910" y="822" width="42" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="edge6" edge="1" parent="1" source="seats" target="booking_seats" style="exitX=1;exitY=0.23493975903614459;entryX=0.0;entryY=0.16810344827586207;endArrow=none;startArrow=none;strokeWidth=2;strokeColor=#52768c;rounded=0;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="441" y="844" as="sourcePoint" />
+            <mxPoint x="945" y="844" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="movies" style="rounded=1;arcSize=6;fillColor=#ffffff;strokeColor=#c9d9e3;" value="" vertex="1" parent="1">
+          <mxGeometry x="45" y="130" width="396" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="movies-header" style="rounded=1;arcSize=8;html=1;align=left;spacingLeft=14;fillColor=#174866;strokeColor=none;fontColor=#ffffff;fontSize=19;fontStyle=1;" value="movies" vertex="1" parent="movies">
+          <mxGeometry x="0" y="0" width="396" height="39" as="geometry" />
+        </mxCell>
+        <mxCell id="movies-details" style="text;html=1;align=left;verticalAlign=top;spacingLeft=14;fontSize=15;whiteSpace=wrap;" value="PK  movie_id  bigint  NN · identity&lt;br&gt;title  varchar(200)  NN&lt;br&gt;genre  varchar(100)  NULL&lt;br&gt;duration_minutes  integer  NN&lt;br&gt;rating  varchar(50)  NULL&lt;br&gt;synopsis  text  NULL&lt;br&gt;release_date  date  NULL" vertex="1" parent="movies">
+          <mxGeometry x="0" y="45" width="396" height="165" as="geometry" />
+        </mxCell>
+        <mxCell id="theater_rooms" style="rounded=1;arcSize=6;fillColor=#ffffff;strokeColor=#c9d9e3;" value="" vertex="1" parent="1">
+          <mxGeometry x="45" y="420" width="396" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="theater_rooms-header" style="rounded=1;arcSize=8;html=1;align=left;spacingLeft=14;fillColor=#174866;strokeColor=none;fontColor=#ffffff;fontSize=19;fontStyle=1;" value="theater_rooms" vertex="1" parent="theater_rooms">
+          <mxGeometry x="0" y="0" width="396" height="39" as="geometry" />
+        </mxCell>
+        <mxCell id="theater_rooms-details" style="text;html=1;align=left;verticalAlign=top;spacingLeft=14;fontSize=15;whiteSpace=wrap;" value="PK  room_id  bigint  NN · identity&lt;br&gt;UK  room_name  varchar(60)  NN" vertex="1" parent="theater_rooms">
+          <mxGeometry x="0" y="45" width="396" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="seats" style="rounded=1;arcSize=6;fillColor=#ffffff;strokeColor=#c9d9e3;" value="" vertex="1" parent="1">
+          <mxGeometry x="45" y="805" width="396" height="166" as="geometry" />
+        </mxCell>
+        <mxCell id="seats-header" style="rounded=1;arcSize=8;html=1;align=left;spacingLeft=14;fillColor=#174866;strokeColor=none;fontColor=#ffffff;fontSize=19;fontStyle=1;" value="seats" vertex="1" parent="seats">
+          <mxGeometry x="0" y="0" width="396" height="39" as="geometry" />
+        </mxCell>
+        <mxCell id="seats-details" style="text;html=1;align=left;verticalAlign=top;spacingLeft=14;fontSize=15;whiteSpace=wrap;" value="PK  seat_id  bigint  NN · identity&lt;br&gt;FK  room_id  bigint  NN&lt;br&gt;seat_row  char(1)  NN&lt;br&gt;seat_number  smallint  NN&lt;br&gt;UK (room_id, seat_row, seat_number)" vertex="1" parent="seats">
+          <mxGeometry x="0" y="45" width="396" height="121" as="geometry" />
+        </mxCell>
+        <mxCell id="showtimes" style="rounded=1;arcSize=6;fillColor=#ffffff;strokeColor=#c9d9e3;" value="" vertex="1" parent="1">
+          <mxGeometry x="495" y="420" width="396" height="188" as="geometry" />
+        </mxCell>
+        <mxCell id="showtimes-header" style="rounded=1;arcSize=8;html=1;align=left;spacingLeft=14;fillColor=#174866;strokeColor=none;fontColor=#ffffff;fontSize=19;fontStyle=1;" value="showtimes" vertex="1" parent="showtimes">
+          <mxGeometry x="0" y="0" width="396" height="39" as="geometry" />
+        </mxCell>
+        <mxCell id="showtimes-details" style="text;html=1;align=left;verticalAlign=top;spacingLeft=14;fontSize=15;whiteSpace=wrap;" value="PK  showtime_id  bigint  NN · identity&lt;br&gt;FK  movie_id  bigint  NN&lt;br&gt;FK  room_id  bigint  NN&lt;br&gt;starts_at  timestamptz  NN&lt;br&gt;ends_at  timestamptz  NN&lt;br&gt;ticket_price  numeric(10,2)  NN" vertex="1" parent="showtimes">
+          <mxGeometry x="0" y="45" width="396" height="143" as="geometry" />
+        </mxCell>
+        <mxCell id="users" style="rounded=1;arcSize=6;fillColor=#ffffff;strokeColor=#c9d9e3;" value="" vertex="1" parent="1">
+          <mxGeometry x="945" y="130" width="396" height="166" as="geometry" />
+        </mxCell>
+        <mxCell id="users-header" style="rounded=1;arcSize=8;html=1;align=left;spacingLeft=14;fillColor=#174866;strokeColor=none;fontColor=#ffffff;fontSize=19;fontStyle=1;" value="users" vertex="1" parent="users">
+          <mxGeometry x="0" y="0" width="396" height="39" as="geometry" />
+        </mxCell>
+        <mxCell id="users-details" style="text;html=1;align=left;verticalAlign=top;spacingLeft=14;fontSize=15;whiteSpace=wrap;" value="PK  user_id  bigint  NN · identity&lt;br&gt;UK  username  varchar(60)  NN&lt;br&gt;password_hash  text  NN&lt;br&gt;role  varchar(10)  NN&lt;br&gt;created_at  timestamptz  NN" vertex="1" parent="users">
+          <mxGeometry x="0" y="45" width="396" height="121" as="geometry" />
+        </mxCell>
+        <mxCell id="bookings" style="rounded=1;arcSize=6;fillColor=#ffffff;strokeColor=#c9d9e3;" value="" vertex="1" parent="1">
+          <mxGeometry x="945" y="420" width="396" height="298" as="geometry" />
+        </mxCell>
+        <mxCell id="bookings-header" style="rounded=1;arcSize=8;html=1;align=left;spacingLeft=14;fillColor=#174866;strokeColor=none;fontColor=#ffffff;fontSize=19;fontStyle=1;" value="bookings" vertex="1" parent="bookings">
+          <mxGeometry x="0" y="0" width="396" height="39" as="geometry" />
+        </mxCell>
+        <mxCell id="bookings-details" style="text;html=1;align=left;verticalAlign=top;spacingLeft=14;fontSize=15;whiteSpace=wrap;" value="PK  booking_id  bigint  NN · identity&lt;br&gt;FK  user_id  bigint  NN&lt;br&gt;FK  showtime_id  bigint  NN&lt;br&gt;status  varchar(10)  NN&lt;br&gt;payment_status  varchar(10)  NN&lt;br&gt;booked_at  timestamptz  NN&lt;br&gt;expires_at  timestamptz  NN&lt;br&gt;total_amount  numeric(12,2)  NN&lt;br&gt;paid_at  timestamptz  NULL&lt;br&gt;cancelled_at  timestamptz  NULL&lt;br&gt;UK (booking_id, showtime_id)" vertex="1" parent="bookings">
+          <mxGeometry x="0" y="45" width="396" height="253" as="geometry" />
+        </mxCell>
+        <mxCell id="booking_seats" style="rounded=1;arcSize=6;fillColor=#ffffff;strokeColor=#c9d9e3;" value="" vertex="1" parent="1">
+          <mxGeometry x="945" y="805" width="396" height="232" as="geometry" />
+        </mxCell>
+        <mxCell id="booking_seats-header" style="rounded=1;arcSize=8;html=1;align=left;spacingLeft=14;fillColor=#174866;strokeColor=none;fontColor=#ffffff;fontSize=19;fontStyle=1;" value="booking_seats" vertex="1" parent="booking_seats">
+          <mxGeometry x="0" y="0" width="396" height="39" as="geometry" />
+        </mxCell>
+        <mxCell id="booking_seats-details" style="text;html=1;align=left;verticalAlign=top;spacingLeft=14;fontSize=15;whiteSpace=wrap;" value="PK  booking_seat_id  bigint  NN · identity&lt;br&gt;FK  booking_id  bigint  NN&lt;br&gt;FK  showtime_id  bigint  NN&lt;br&gt;FK  seat_id  bigint  NN&lt;br&gt;price_at_booking  numeric(10,2)  NN&lt;br&gt;FK (booking_id, showtime_id) → bookings&lt;br&gt;UK (booking_id, seat_id)&lt;br&gt;UK (showtime_id, seat_id)" vertex="1" parent="booking_seats">
+          <mxGeometry x="0" y="45" width="396" height="187" as="geometry" />
+        </mxCell>
+        <mxCell id="footer" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Apple SD Gothic Neo;fontColor=#152b3a;fontSize=15;" value="확정 예매: 좌석 상세 1건 이상  ·  취소·만료: 상세 0건, 예매 이력 보존" vertex="1" parent="1">
+          <mxGeometry x="45" y="998" width="900" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

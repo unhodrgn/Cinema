@@ -1,101 +1,24 @@
-# 논리적 데이터 모델 (Logical Data Model)
+# 논리적 데이터 모델
 
-**기준:** `database/schema.sql`. 표기: PK 밑줄 대신 **PK**, 외래키는 FK, 후보키는 UK.
+일곱 개체를 릴레이션, 식별자, 참조 및 업무 제약으로 변환한다. 회차별 유일성에 필요한 물리 참조 열은 [물리적 데이터 모델](physical_data_model.md)에서 다룬다.
 
-## 1. 릴레이션 스키마
+![논리 ERD](erd/logical.svg)
 
-```
-USERS(user_id PK, username UK, password_hash, role, created_at)
-MOVIES(movie_id PK, title, genre, duration_minutes, rating, synopsis, release_date)
-ROOMS(room_id PK, room_name UK)                                  -- theater_rooms
-SEATS(seat_id PK, room_id FK→ROOMS, seat_row, seat_number)       -- UK(room_id, seat_row, seat_number)
-SCREENINGS(showtime_id PK, movie_id FK→MOVIES, room_id FK→ROOMS,
-           starts_at, ends_at, ticket_price)                     -- showtimes
-BOOKINGS(booking_id PK, user_id FK→USERS, showtime_id FK→SCREENINGS,
-         status, payment_status, booked_at, expires_at, total_amount,
-         paid_at, cancelled_at)
-BOOKING_SEATS(booking_seat_id PK, booking_id FK→BOOKINGS, seat_id FK→SEATS,
-              price_at_booking)                                  -- UK(booking_id, seat_id)
-```
+[편집용 Draw.io](erd/logical.drawio) · [SVG](erd/logical.svg) · [PNG](erd/logical.png)
 
-## 2. 무결성 규칙 (논리 수준)
+| 릴레이션 | 속성 | 키와 참조 |
+|---|---|---|
+| USERS | user_id, username, password_hash, role, created_at | PK user_id, 대체 후보키 username |
+| MOVIES | movie_id, title, genre, duration_minutes, rating, synopsis, release_date | PK movie_id |
+| ROOMS | room_id, room_name | PK room_id, 대체 후보키 room_name |
+| SEATS | seat_id, room_id, seat_row, seat_number | PK seat_id, FK room_id → ROOMS, 대체 후보키 (room_id, seat_row, seat_number) |
+| SCREENINGS | showtime_id, movie_id, room_id, starts_at, ends_at, ticket_price | PK showtime_id, FK movie_id → MOVIES, room_id → ROOMS |
+| BOOKINGS | booking_id, user_id, showtime_id, status, payment_status, booked_at, expires_at, total_amount, paid_at, cancelled_at | PK booking_id, FK user_id → USERS, showtime_id → SCREENINGS |
+| BOOKING_SEATS | booking_seat_id, booking_id, seat_id, price_at_booking | PK booking_seat_id, FK booking_id → BOOKINGS, seat_id → SEATS, 대체 후보키 (booking_id, seat_id) |
 
-| 규칙 | 표현 |
-|---|---|
-| 역할은 `CUSTOMER`/`ADMIN` | `role` 도메인 (D4: GUEST 없음) |
-| 예매 상태 `BOOKED`/`CANCELLED`/`EXPIRED`, 결제 상태 `UNPAID`/`PAID` | 도메인 (D3) |
-| `expires_at = booked_at + 10분` | 파생 제약 (D3) |
-| `PAID` ⇔ `paid_at` 존재, `CANCELLED` ⇔ `cancelled_at` 존재, `EXPIRED`는 `PAID`가 아님 | 상태 일관성 |
-| `ends_at > starts_at`; 같은 `room_id`에서 `[starts_at, ends_at)` 구간 비중첩 | BR-04 |
-| 예매 좌석의 `seat.room_id = screening.room_id` | BR-07 (트리거) |
-| (상영 일정, 좌석)당 `BOOKED` 예매 좌석은 최대 1개 | BR-08 (트리거 + 상영 일정 행 잠금) |
-| 예매를 참조하는 상영 일정은 5개 속성 모두 변경 불가 | D2 (트리거) |
-| `BOOKED` 예매: 좌석 ≥ 1, `total_amount = Σ price_at_booking`, `price_at_booking = ticket_price` | D6 (지연 제약 트리거 + 트리거) |
-| `CANCELLED`/`EXPIRED` 예매: 좌석 행 0개, 예매 행·`total_amount`·`payment_status` 보존 | D1, D3 |
+- 모든 FK에서 자식은 부모 한 건을 반드시 참조한다. 부모는 참조 자식이 없을 수 있다. 예매와 좌석의 다대다 관계는 예매 좌석으로 해소한다. 커밋된 확정 예매는 상세 1건 이상, 취소·만료 예매는 0건이다.
+- 장르·등급·줄거리·개봉일은 선택 속성이다. 결제 일시와 취소 일시는 해당 상태에서만 존재한다.
+- 같은 상영관의 시간 구간은 겹치지 않으며, 선택 좌석의 상영관은 예매 회차의 상영관과 같다. 회차는 논리적으로 예매를 통해 결정된다. 물리적으로 회차 ID를 상세에도 저장하여 회차와 좌석의 조합에 유일성을 부여한다.
+- 확정 시각에 10분을 더한 결제 기한, 두 상태, 확정 단가와 총액을 명시한다. 예매 이력이 있는 회차의 업무 속성은 변경할 수 없다.
 
-## 3. 논리 ERD
-
-```mermaid
-erDiagram
-    USERS ||--o{ BOOKINGS : places
-    MOVIES ||--o{ SCREENINGS : scheduled_as
-    ROOMS ||--o{ SEATS : contains
-    ROOMS ||--o{ SCREENINGS : hosts
-    SCREENINGS ||--o{ BOOKINGS : reserved_for
-    BOOKINGS ||--o{ BOOKING_SEATS : holds
-    SEATS ||--o{ BOOKING_SEATS : allocated_to
-
-    USERS {
-        bigint user_id PK
-        varchar username UK
-        text password_hash
-        varchar role
-    }
-    MOVIES {
-        bigint movie_id PK
-        varchar title
-        varchar genre
-        int duration_minutes
-        varchar rating
-        text synopsis
-        date release_date
-    }
-    ROOMS {
-        bigint room_id PK
-        varchar room_name UK
-    }
-    SEATS {
-        bigint seat_id PK
-        bigint room_id FK
-        char seat_row
-        smallint seat_number
-    }
-    SCREENINGS {
-        bigint showtime_id PK
-        bigint movie_id FK
-        bigint room_id FK
-        timestamptz starts_at
-        timestamptz ends_at
-        numeric ticket_price
-    }
-    BOOKINGS {
-        bigint booking_id PK
-        bigint user_id FK
-        bigint showtime_id FK
-        varchar status
-        varchar payment_status
-        timestamptz booked_at
-        timestamptz expires_at
-        numeric total_amount
-        timestamptz paid_at
-        timestamptz cancelled_at
-    }
-    BOOKING_SEATS {
-        bigint booking_seat_id PK
-        bigint booking_id FK
-        bigint seat_id FK
-        numeric price_at_booking
-    }
-```
-
-정규화 분석은 `normalization.md`, 물리 구현은 `physical_data_model.md`를 참조한다.
+참조 정책 및 자료형은 [테이블 기술서](table_description.md), 함수 종속은 [정규화](normalization.md)를 참조한다.

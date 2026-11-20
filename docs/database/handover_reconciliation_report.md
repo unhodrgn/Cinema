@@ -1,5 +1,7 @@
 # Handover Reconciliation Report — Member A PostgreSQL Handover vs. B01–B05 / D1–D6
 
+> **이력 자료:** 이 보고서는 PostgreSQL 18.6에서 수행한 이전 대조 검증을 보존한다. 본문의 당시 상태와 완료 판정은 최신 DB 또는 응용 프로그램 배포 판정이 아니다. 제출 기준은 [검증 결과 보고서](database_test_documentation.md)와 [PostgreSQL–Flask 연동 계약](postgresql_flask_integration_contract.md)이다.
+
 **Project:** 영화관 예매 및 좌석 관리 시스템 (Cinema Reservation System)
 **Prepared by:** Member B (Application Lead)
 **Date:** 2026-11-20 (KST)
@@ -8,7 +10,7 @@
 
 > **Audit verdict on the ORIGINAL handover (2026-11-20, sections 1–3): not ready for Flask.** It was a clean, internally consistent schema built to an earlier model; it lacked what D2 (price), D3, D5 and D6 require.
 >
-> **Resolution (section 10): the corrections were implemented in the canonical files `database/schema.sql`, `database/seed.sql` and `database/tests/`, and verified by execution (177 integrity checks, 31 probes, 16 concurrency checks, all passing on PostgreSQL 18.6).** The original handover folder is unchanged. Sections 1–3 are kept as the historical audit evidence; sections 4 and 6–8 describe the current state.
+> **Resolution (section 10): the corrections were implemented in the canonical files `database/schema.sql`, `database/seed.sql` and `database/tests/`, and verified by execution (177 integrity checks, 31 probes, 16 concurrency checks, all passing on PostgreSQL 18.6).** The original handover folder is unchanged. Sections 1–3 are kept as the historical audit evidence; sections 4 and 6–8 describe the state at the time of the original reconciliation.
 
 ---
 
@@ -123,7 +125,7 @@ Legend: ✅ satisfied (verified by execution) · ❌ not satisfied · ⚠️ par
 | X3 | `cancelled_at` column; booking-identity immutability | Harmless supporting detail | Keep; document as technical column |
 | X4 | `movies.duration_minutes BETWEEN 1 AND 300`; `seat_row` A–E, `seat_number` 1–10 | Reasonable, consistent with 50 seats/room; B uses as-is | Document as technical domain limits |
 
-## 4. Main-repository incorporation status (current)
+## 4. Main-repository incorporation status (historical snapshot)
 
 | Path | State | Notes |
 |---|---|---|
@@ -186,7 +188,7 @@ The audit assigned DB-01…DB-11 to Member A as database owner. By instruction, 
 | PostgreSQL 14–17 | Not tested (18.6 only). |
 | `p_as_of` argument | Present on `expire_overdue_bookings`, `pay_booking`, `cancel_booking` for deterministic deadline tests only; Flask must not pass it. A may remove it if tests are re-designed. |
 
-## 8. Readiness (current)
+## 8. Readiness assessment (historical snapshot)
 
 **READY FOR FLASK INTEGRATION** against the canonical database, with the open items above (none is a failing requirement): all critical approved requirements D1–D6 and the retained rules passed execution-based verification (section 10 and `database_test_documentation.md`). Flask work must follow the integration contract and must not start a login demo until demo passwords are set.
 

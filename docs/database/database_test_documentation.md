@@ -1,83 +1,35 @@
-# Database Test Documentation
+# PostgreSQL 검증 결과 보고서
 
-Covers the canonical database (`database/schema.sql`, `database/seed.sql`). Everything below was executed; the results are copied from real runs on 2026-11-20 against **PostgreSQL 18.6** (Windows). Other PostgreSQL versions (14–17) were **not** tested.
+## 검증 기준
 
-## 1. Safety rules
+DB 개선 커밋 65c9632a1becb1282ec020111c7c3c94ecff4a2b의 SQL 및 테스트를 기준으로 한다. 최종 제출 검토는 2026년 11월 21일(KST)에 PostgreSQL 18.7에서 수행하였다. 새 클러스터에 Unix 소켓으로 접속하여 서로 다른 UTF-8 폐기용 데이터베이스에서 표준 런너 실행과 원문 수집용 개별 실행을 완료하였다. 실행 환경 및 실제 원문은 [증빙 목록](evidence/README.md)에 연결되어 있다.
 
-* Run only on a **new, disposable** database. `integrity_tests.sql` and `reconciliation_probes.sql` roll back; `test_concurrency.py` commits (its bookings are permanent history and cannot be deleted) and therefore **refuses to run unless the database is freshly seeded with zero bookings**.
-* The test role must own the tables (the role that created the schema does). Tests simulate elapsed time only by temporarily disabling USER triggers inside the rolled-back transaction (or, for concurrency, on the disposable database); no application path does that.
-* The runner creates its own uniquely named database (`cinema_test_<timestamp>_<pid>`) and drops **only that one**. It never touches any other database or the PostgreSQL service.
-
-## 2. Files
-
-| File | Kind | Content |
-|---|---|---|
-| `database/tests/run_all.sh` | runner | schema → seed → integrity → probes → concurrency on a disposable DB |
-| `database/tests/integrity_tests.sql` | SQL, one rolled-back transaction | 177 checks: seed, D1–D6, DB-02/03, seats, rollback, constraints, trigger-order regression |
-| `database/tests/reconciliation_probes.sql` | SQL, rolled back | 31 probes with the audit's P-numbers; fails on any MISMATCH |
-| `database/tests/test_concurrency.py` | Python (psycopg2), real sessions | 16 checks, scenarios C1–C6 |
-
-## 3. How to run
-
-```bash
-# connection through the libpq environment, e.g. a throwaway server on port 54329
-export PGHOST=127.0.0.1 PGPORT=54329 PGUSER=<owner role>        # PGPASSWORD if needed
-python -m pip install psycopg2-binary                           # for test_concurrency.py
-bash database/tests/run_all.sh                                  # KEEP_DB=1 keeps the database
-
-# or step by step on an empty database:
-createdb cinema_verify
-psql -X -v ON_ERROR_STOP=1 -d cinema_verify -f database/schema.sql
-psql -X -v ON_ERROR_STOP=1 -d cinema_verify -f database/seed.sql
-psql -X -v ON_ERROR_STOP=1 -d cinema_verify -f database/tests/integrity_tests.sql
-psql -X -v ON_ERROR_STOP=1 -d cinema_verify -f database/tests/reconciliation_probes.sql
-PGDATABASE=cinema_verify python database/tests/test_concurrency.py
-```
-
-## 4. Results (final run of `run_all.sh`)
-
-| Step | Result |
+| 실행 항목 | 실제 결과 |
 |---|---|
-| 1 `schema.sql` | OK (no errors) |
-| 2 `seed.sql` | OK — 3 users, 5 movies, 5 rooms, 250 seats, 140 screenings, 20 per day over 7 days |
-| 3 `integrity_tests.sql` | **ALL 177 CHECKS PASSED**, exit 0, nothing persisted |
-| 4 `reconciliation_probes.sql` | **SUMMARY: 31 MATCH, 0 MISMATCH**, exit 0; P16 expected error raised and 0 rows persisted; 2 INFO items (application responsibilities) |
-| 5 `test_concurrency.py` | **16/16 checks passed**, exit 0 (race outcome in the final run: 24 payments won, 16 expiries won; repeated runs: 22/18, 23/17, 29/11 — always valid) |
-| overall | `ALL DATABASE TESTS PASSED`, disposable database dropped |
+| schema.sql 및 seed.sql | 적용 성공. 계정 3개, 영화 5편, 상영관 5개, 좌석 250개, 회차 140개, 예매 및 예매 좌석 각각 0개. 기본 테이블 총 7개 |
+| integrity_tests.sql | 199/199 통과, 종료 코드 0, 트랜잭션 롤백 |
+| reconciliation_probes.sql | 31 MATCH / 0 MISMATCH, 종료 코드 0. P16의 무좌석 예매는 커밋에 실패했고 남은 예매 행은 0개 |
+| test_concurrency.py | 58/58 통과, 종료 코드 0 |
+| test_application_role.py | 임시 역할과 실제 권한 스크립트로 업무 성공·금지 권한을 확인, 종료 코드 0 |
+| run_all.sh | ALL DATABASE TESTS PASSED. 테스트 DB 정리 |
+| 이전 개선 작업의 응용 프로그램 pytest | 1197 통과, 2 건너뜀, 0 실패 |
+| 이전 개선 작업의 JavaScript 테스트 | Node에 파일을 직접 전달하여 85/85 통과 |
 
-The earlier audit of Member A's original handover (7/7 original integrity tests and the original concurrency test passed, but 13 probes mismatched D1–D6) is recorded in `handover_reconciliation_report.md`.
+Pytest에서 시작된 회차가 시드에 없던 사례 한 건과 Windows 전용 directory junction 사례 한 건을 건너뛰었다. SQL의 상영 시작 후 확정 거부 테스트는 통과했다. 이번 제출 검토에서는 DB 테스트만 다시 실행하였다. 이전 응용 프로그램 검증은 좌석 조회 전환 이후의 통합 테스트를 대신할 수 없다.
 
-## 5. What each decision is checked by
+## 검증 사례와 업무 규칙
 
-| Req. | Verified by (examples; each is a named PASS line) |
+| 주제 | 확인 내용 |
 |---|---|
-| D1 | cancel → `CANCELLED`, parent stays, 0 seat rows, `payment_status` preserved (UNPAID and PAID), total kept, history queryable, no re-activation, other user cannot cancel, cancel after start rejected and atomic |
-| D2 | movie / room / start / end / ticket_price / combined changes each rejected with `UC001` for BOOKED, CANCELLED and EXPIRED bookings; free screening editable; no-op update allowed |
-| D3 | new booking BOOKED+UNPAID, `paid_at` NULL, `expires_at` = `booked_at` + exactly 10 min; payment before expiry; payment 1.5 s before deadline; payment **at** the deadline rejected (booking expires); payment after the deadline rejected by function and by DB trigger; expiry **1 µs before** does nothing, **at** the exact deadline expires; seats deleted, parent kept; PAID never expires (even directly); repeated calls return 0; expiry works after the screening started; expired booking cannot be paid/cancelled/reactivated; nothing expires without a call |
-| D4 | `GUEST` role rejected (23514); ADMIN cannot own a booking (`UC008`); no scheduler extension installed |
-| D5 | six movie attributes stored and read back, no genre/rating restriction, role defaults to CUSTOMER, `username` unique |
-| D6 | per-screening price (9500 and 14000 screenings), per-seat snapshot, total = price × seats and = Σ snapshots, wrong snapshot / wrong total / missing seats rejected, total immutable, total kept after cancel and after expiry |
-| DB-02/03 | `ends_at` default and CHECK, duration edit allowed, existing end times unchanged, new screening uses new duration, back-to-back and 1-minute-gap screenings allowed, true overlaps rejected (`23P01`), other room allowed |
-| Retained | seat ownership (`UC003`), duplicate active seat (`UC002`) incl. multi-seat, atomic rollback of `create_booking`, FK/UNIQUE/CHECK/RESTRICT violations, `expires_at` CHECK even if the trigger were bypassed, trigger-order robustness under `SET CONSTRAINTS ALL IMMEDIATE` |
-| Concurrency | C1 8 sessions one seat → exactly 1 win; C2 B blocked until A commits then `UC002`; C3 overlapping multi-seat → one wins, loser leaves nothing; C4 40 payments vs 2 expirers at the deadline → every row valid, both outcomes occurred; C5 20 pay-vs-cancel races valid; C6 5 parallel expirers → each booking expired exactly once |
+| BR-04, BR-07 | 동일 상영관 중첩·다른 상영관 좌석 거부, 이어지는 두 상영 허용 |
+| BR-08 | 세 격리 수준에서 동일 회차·좌석의 두 번째 할당 거부. 기존 스냅샷의 REPEATABLE READ 및 SERIALIZABLE에서 40001, 새 트랜잭션 재시도에서 UC002 관찰 |
+| D1, D2, D3 | 예약·취소·만료 이력의 삭제와 절단 차단, 취소·만료 시 상세 전부 제거, 이력이 남은 일정 갱신 차단. 최초 확정과 일정 수정의 경합 검증 |
+| D3 경계와 경쟁 | 기한 전·동일·이후 비교, 결제·취소가 잠금 대기 중 기한을 지난 경우 EXPIRED 커밋, 회차별 정리와 전체 정리의 동시 실행, 55P03 이후 새 트랜잭션에서 재조회 |
+| D5, D6 | 앱 역할의 가입·영화/일정 관리 및 권한 밖 역할 변경 차단. 최고가 1/2/50석의 총액 및 금액 열 NaN 거부 |
+| 실제 경합 결과 | C4의 40개 예매 중 표준 런너는 PAID 26건·EXPIRED 14건, 개별 실행은 PAID 24건·EXPIRED 16건이었다. 두 실행 모두 검사를 통과하였다. |
 
-## 6. Test sensitivity (mutation checks)
+## 재현과 남은 증빙
 
-To make sure the tests can fail, five deliberate defects were applied to scratch copies of the schema and `integrity_tests.sql` was run; each was caught by the expected check:
+[설치 안내서](postgresql_setup_guide.md)의 폐기용 실행 절차를 따른다. 테스트 정의는 [database/tests](../../database/tests/)에 있다. 현재 커밋의 원문 로그와 발표용 캡처 명령은 [증빙 목록](evidence/README.md)에 있다. 별도 스크린샷은 생성하지 않았다.
 
-| Defect | Caught by |
-|---|---|
-| `ticket_price` removed from the D2 trigger | `D2 ticket_price change rejected (BOOKED)` |
-| expiry allowed before `expires_at` | `D3 DB trigger rejects expiring before expires_at` |
-| duplicate-seat check disabled | `BR-08 same seat, same screening, other customer rejected` |
-| cancel of an overdue unpaid booking allowed | `D3 DB rejects direct cancel of an overdue unpaid booking` |
-| consistency trigger renamed so it fires before seat release | `ORDER cancel works with constraints IMMEDIATE` (found by verification, fixed, now a regression test) |
-
-The new integrity suite also fails against Member A's original schema (`column s.ends_at does not exist`), as expected.
-
-## 7. Limits
-
-* Tested on PostgreSQL 18.6 only; the schema uses only features available in 14 (identity columns, EXCLUDE with `btree_gist`, constraint triggers, `FOR UPDATE SKIP LOCKED`).
-* The exact-deadline checks use the functions' optional `p_as_of` argument (tests only); real-clock behaviour is covered by the 1.5-second pre-deadline payment, the post-deadline payments and the timed race C4.
-* Flask-level behaviour (sessions, authorisation, registration role, request-time expiry calls) is application scope and is **not** tested here.
-* Demo account passwords are unverified (see the contract §7); no login was tested.
+아직 확인하지 않은 항목은 PostgreSQL 14–17, 기존 데이터 이전, 배포용 앱 로그인으로 실행한 전체 테스트, Member B의 변경 이후 브라우저 통합이다. 신규 DB 검증 및 기존 앱 결과는 완료되었으며, 해당 항목은 [통합 승인 조건](member_b_integration_handover.md)에 따른다.

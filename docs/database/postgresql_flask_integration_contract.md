@@ -1,202 +1,69 @@
-# PostgreSQL ↔ Flask Integration Contract
+# PostgreSQL–Flask 연동 계약
 
-**Project:** 영화관 예매 및 좌석 관리 시스템 (Cinema Reservation System)
-**Applies to:** `database/schema.sql` and `database/seed.sql` (canonical) · verified on PostgreSQL 18.6
-**Authority:** B01–B05 and BR-DL-001 (D1–D6). This contract implements them; it changes none of them.
-**Supersedes:** `CinemaDB_FINAL_PostgreSQL_Handover/docs/05_Integration_Contract_KO.md` (kept unchanged as history; outdated — it still describes `CONFIRMED`, `paid_at` auto-payment and no expiry).
+**대상:** DB 개선 커밋 65c9632a1becb1282ec020111c7c3c94ecff4a2b. DB 동작은 PostgreSQL 18.7에서 확인했다. 이 문서의 좌석 조회 전환, 재시도, 응답 매핑 및 화면 항목은 Member B가 구현할 계약이다. Flask 소스의 현재 상태와 완료 상태를 구분한다.
 
-Every statement below was checked against the executed schema and tests (`docs/database/database_test_documentation.md`). Flask code must follow this contract; it must not add columns, tables or triggers (request database changes from Member A).
+## 1. 데이터 명칭과 접근 규칙
 
----
-
-## 1. Physical tables and columns
-
-Logical names in B01–B05 map to physical tables as follows. **Use the physical names in all SQL.**
-
-| Logical | Physical | Primary key |
-|---|---|---|
-| USERS | `users` | `user_id` |
-| MOVIES | `movies` | `movie_id` |
-| ROOMS | `theater_rooms` | `room_id` |
-| SEATS | `seats` | `seat_id` |
-| SCREENINGS | `showtimes` | `showtime_id` |
-| BOOKINGS | `bookings` | `booking_id` |
-| BOOKING_SEATS | `booking_seats` | `booking_seat_id` |
-
-All keys are `bigint GENERATED ALWAYS AS IDENTITY` (never supply an id on INSERT).
-
-| Table | Columns (all `NOT NULL` unless marked *null*) |
+| 업무 개체 | 물리 테이블 |
 |---|---|
-| `users` | `user_id`, `username varchar(60) UNIQUE` (= account ID), `password_hash text`, `role` ∈ {`CUSTOMER`,`ADMIN`} default `CUSTOMER`, `created_at timestamptz` |
-| `movies` | `movie_id`, `title varchar(200)`, `genre varchar(100)` *null*, `duration_minutes integer` (1–300), `rating varchar(50)` *null*, `synopsis text` *null*, `release_date date` *null* |
-| `theater_rooms` | `room_id`, `room_name varchar(60) UNIQUE` |
-| `seats` | `seat_id`, `room_id` → `theater_rooms`, `seat_row char(1)` A–E, `seat_number smallint` 1–10, `UNIQUE(room_id, seat_row, seat_number)` |
-| `showtimes` | `showtime_id`, `movie_id` → `movies`, `room_id` → `theater_rooms`, `starts_at timestamptz`, `ends_at timestamptz` (> `starts_at`), `ticket_price numeric(10,2)` ≥ 0 |
-| `bookings` | `booking_id`, `user_id` → `users`, `showtime_id` → `showtimes`, `status`, `payment_status`, `booked_at timestamptz`, `expires_at timestamptz`, `total_amount numeric(10,2)` ≥ 0, `paid_at` *null*, `cancelled_at` *null* |
-| `booking_seats` | `booking_seat_id`, `booking_id` → `bookings`, `seat_id` → `seats`, `price_at_booking numeric(10,2)` ≥ 0, `UNIQUE(booking_id, seat_id)` |
+| 사용자 계정 · 영화 | users · movies |
+| 상영관 · 좌석 · 상영 일정 | theater_rooms · seats · showtimes |
+| 예매 · 예매 좌석 | bookings · booking_seats |
 
-Relationships: `theater_rooms 1─N seats`, `theater_rooms 1─N showtimes`, `movies 1─N showtimes`, `users 1─N bookings`, `showtimes 1─N bookings`, `bookings 1─N booking_seats` (≥ 1 while `BOOKED`, 0 otherwise), `seats 1─N booking_seats`. There is **no** seat-status column: availability is per screening (§8). No table stores a GUEST; an unauthenticated visitor has no row (D4).
+회원가입은 계정 ID와 비밀번호만 받는다. Flask가 단방향 해시를 생성하고 users의 username, password_hash만 삽입한다. 데이터베이스 기본 역할은 CUSTOMER다. 브라우징, 좌석 조회·임시 선택은 비로그인 허용이다. 확정·결제·취소·고객 이력은 인증 고객의 범위에서 처리한다. 영화·일정 관리 및 전체 예매 목록은 ADMIN 전용이다. DB 서비스 계정은 신뢰된 서버 프로세스에서만 사용하며, 고객 ID는 요청 본문이 아닌 인증 세션에서 가져온다.
 
-Genre and rating are **free text** (no vocabulary is approved); `release_date` is a `date`. Flask must not invent a list.
+상영 일정·예매 시각은 timestamptz다. API는 UTC 오프셋을 포함한 ISO 8601, 개봉일은 ISO 날짜, 금액은 십진 문자열을 사용한다. 화면 및 오프셋 없는 입력의 업무 시간대는 Asia/Seoul이다. 기한 및 상영 시작 판정은 DB의 실제 시각을 사용한다. 상세 자료형은 [테이블 기술서](table_description.md)에 있다.
 
-## 2. Status values
+## 2. 호출과 트랜잭션
 
-| Column | Values | Meaning |
+| 업무 | 호출 형태 | 정상 결과와 주의점 |
 |---|---|---|
-| `bookings.status` | `BOOKED` | confirmed; holds seats (an unpaid one only until `expires_at`) |
-| | `CANCELLED` | whole booking cancelled; seat rows deleted; terminal |
-| | `EXPIRED` | unpaid at/after `expires_at`; seat rows deleted; terminal |
-| `bookings.payment_status` | `UNPAID` | simulated payment not completed (initial) |
-| | `PAID` | simulated payment completed; the booking never expires |
+| 좌석 조회 | SELECT * FROM public.screening_seat_availability(%s) | seat_id, seat_row, seat_number, is_available. 회차별 만료를 처리하므로 쓰기 가능한 트랜잭션이 필요하다. |
+| 예매 확정 | SELECT public.create_booking(%s, %s, %s::bigint[]) | 고객 ID, 회차 ID, 좌석 배열로 호출. 가격과 총액은 DB가 계산하고 확정 ID를 반환한다. |
+| 결제 | SELECT public.pay_booking(%s, %s) | 예매 ID와 고객 ID. PAID 또는 이번 요청에서 만료시킨 EXPIRED. |
+| 취소 | SELECT public.cancel_booking(%s, %s) | 예매 ID와 고객 ID. CANCELLED 또는 이번 요청에서 만료시킨 EXPIRED. |
+| 이력용 전체 정리 | SELECT public.expire_overdue_bookings() | 처리한 건수. 잠긴 행을 건너뛴다. 좌석 가용성을 판정하는 호출로 사용하지 않는다. |
 
-The two are independent: a paid booking that is cancelled stays `CANCELLED` + `PAID` (no refund state exists); an expired booking stays `EXPIRED` + `UNPAID`. `paid_at` is set by the database exactly when `payment_status = 'PAID'`; `cancelled_at` exactly when `status = 'CANCELLED'`. Neither is writable by Flask.
+모든 호출은 매개변수를 바인딩한다. 지연 제약은 기본 모드를 사용한다. 함수 반환 뒤 트랜잭션을 커밋한 다음 응답한다. 새로 발생한 EXPIRED는 커밋 가능한 업무 결과이며, 이미 종결된 예매에 대한 재호출은 UC006일 수 있다. 커밋 오류까지 처리 범위에 포함한다.
 
-Allowed transitions (enforced by trigger `trg_bookings_validate`; anything else raises `UC007`/`UC006`):
-`BOOKED+UNPAID → BOOKED+PAID` (strictly before `expires_at`) · `BOOKED+UNPAID → EXPIRED+UNPAID` (at/after `expires_at`, works after the screening started) · `BOOKED+* → CANCELLED+(same payment)` (before screening start; an overdue unpaid booking must expire instead). `booked_at`, `expires_at`, `total_amount`, `user_id`, `showtime_id` never change.
+조회·확정의 잠금 순서는 회차 → 예매 ID 오름차순 → 좌석 상세다. 결제·취소는 해당 예매 → 좌석 상세 순이며 회차 배타 잠금을 요청하지 않는다. 전체 정리는 예매 ID 순으로 잠금을 시도하고 잠긴 행을 건너뛴다. 한 트랜잭션에서 업무 쓰기 동작 하나를 실행한다. 전체 정리를 먼저 실행한 트랜잭션에서 회차 잠금을 요청하지 않는다. 가용성 판정은 해당 처리 시점 기준이며 후속 선택에 대한 점유 보장은 없다.
 
-## 3. Operations Flask must use
+잠금 획득 시도당 5초는 좌석 조회·확정·결제·취소 DB 함수에 적용된다. HTTP 전체 제한 시간 및 재시도 예산은 별도로 관리한다. 40001이 나오면 롤백 후 새 스냅샷으로 전체 트랜잭션을 제한 횟수만큼 재시도한다. 55P03이면 롤백하고 재시도 가능한 응답을 반환한다. 이미 확정적으로 커밋된 요청이나 커밋 여부가 불명인 연결 오류는 자동으로 재전송하지 않는다.
 
-Four database functions are the supported way to change bookings. Each is one atomic unit; call it inside the request's transaction. **Never** pass the optional `p_as_of` argument (it exists only so tests can probe the exact deadline).
+## 3. 오류 계약
 
-| Function | Returns | Purpose |
+psycopg2의 pgcode로 판정하고 DB 원문을 응답에 노출하지 않는다.
+
+| SQLSTATE | 의미 | HTTP 및 처리 |
 |---|---|---|
-| `create_booking(user_id, showtime_id, seat_ids bigint[])` | `booking_id` | C-06 booking confirmation |
-| `pay_booking(booking_id, user_id)` | `'PAID'` or `'EXPIRED'` | C-07 simulated payment |
-| `cancel_booking(booking_id, user_id)` | `'CANCELLED'` or `'EXPIRED'` | C-09 cancellation |
-| `expire_overdue_bookings()` | integer (count expired) | D3 expiry step |
+| UC001 | 예매 이력이 있는 일정 변경 | 409 screening_has_bookings |
+| UC002 | 같은 회차에서 선택 좌석이 이미 배정됨 | 409 seat_unavailable, 다시 조회하고 재선택 |
+| UC003 | 다른 상영관의 좌석 | 400 invalid_seat |
+| UC004 | 상영 시작 이후 확정 | 409 screening_started |
+| UC005 | 상영 시작 이후 취소 | 409 cancellation_closed |
+| UC006 | 종결 상태·이미 결제 등 허용되지 않는 상태 또는 직접 SQL의 기한 위반 | 409 invalid_booking_state |
+| UC007 | 직접 이력 삭제·절단, 불변 열 변경, 허용되지 않는 전이 | 내부 오류 |
+| UC008 | 고객 계정이 아닌 예매 주체 | 403 customer_only |
+| UC009 | 단가 스냅샷 또는 합계 불일치 | 내부 오류 |
+| UC010 | 빈 좌석 배열, 배열 내 중복·NULL, 확정 상세 누락 | 400 no_seat_selected (정상 API가 빈 배열 등은 사전에 검증) |
+| UC011 | 없는 일정 또는 해당 고객의 예매를 찾을 수 없음 | 404 not_found |
+| 23505 / 23503 / 23514 | 일반 유일성 / 참조 / CHECK 위반 | 현재 계약상 각각 409 duplicate_value / 400 unknown_reference / 400 invalid_value |
+| 23P01 / 23001 / 22003 | 일정 중첩 / 참조 대상 삭제 제한 / 숫자 범위 오류 | 중첩은 409 screening_overlap. 그 외 원인과 입력 경로를 확인한다. |
+| 40001 / 55P03 | 직렬화 실패 / 잠금 시간 초과 | 40001은 제한된 전체 재시도. 소진 또는 55P03이면 503 booking_retry. 이 매핑은 연동 작업이다. |
 
-### 3.1 Booking creation (C-06)
-Flask first checks the session: user is logged in and `role = 'CUSTOMER'` (D4). Then:
-```python
-with conn:                                   # BEGIN ... COMMIT; rolls back on any exception
-    with conn.cursor() as cur:
-        cur.execute("SELECT create_booking(%s, %s, %s)", (user_id, showtime_id, seat_ids))   # seat_ids: Python list of ints
-        booking_id = cur.fetchone()[0]
-        cur.execute("SELECT status, payment_status, booked_at, expires_at, total_amount FROM bookings WHERE booking_id=%s", (booking_id,))
-```
-The database does, atomically: runs the expiry step first (D3 #10); locks the screening row; computes `total_amount = ticket_price × number of seats`; inserts the `BOOKED`/`UNPAID` booking with `booked_at = now` and `expires_at = booked_at + 10 minutes`; inserts one `booking_seats` row per seat with `price_at_booking = ticket_price`. If any seat fails (other room, already reserved, nonexistent, started screening…) **nothing** is created. Flask must not send `total_amount`, prices or timestamps. Direct `INSERT`s are still guarded (consistency is checked at COMMIT) but are not the supported path.
+## 4. 조회와 관리자 작업
 
-### 3.2 Payment (C-07)
-```python
-with conn:
-    with conn.cursor() as cur:
-        cur.execute("SELECT pay_booking(%s, %s)", (booking_id, user_id))
-        outcome = cur.fetchone()[0]
-# 'PAID'    -> success.
-# 'EXPIRED' -> payment REJECTED because current_time >= expires_at; the booking was expired
-#              in this same transaction. The transaction MUST be committed (leave the 'with'
-#              normally) so the expiry persists; only then show "payment window elapsed".
-```
-Payment is valid only for the caller's own `BOOKED`+`UNPAID` booking strictly before `expires_at`. The row is locked, so payment and expiry can never interleave. Raises `UC011` (not found / not yours), `UC006` (already `CANCELLED`/`EXPIRED`/`PAID`).
+이력은 소유자 범위와 관리자 범위를 구분한다. 예매 상태와 좌석을 한 문장 또는 같은 스냅샷에서 읽는다. BOOKED의 상세에는 각 좌석과 price_at_booking을 포함한다. BOOKED/UNPAID에서 결제 기한을 표시한다. CANCELLED와 EXPIRED는 삭제된 좌석 상세를 반환하거나 화면에 복원하지 않는다. 취소·만료 이력의 총액은 남는다.
 
-### 3.3 Expiration (D3) and how to invoke it
-`expire_overdue_bookings()` sets `EXPIRED` on every `BOOKED`+`UNPAID` booking whose `expires_at <= now` and deletes **all** its `booking_seats` rows, in one transaction. It is idempotent (a second call returns 0), never touches `PAID`/`CANCELLED`/`EXPIRED` rows, keeps the parent row, and is not blocked by the screening having started or by the screening-protection rule. Rows locked by a concurrent payment/cancel are skipped (that transaction decides them itself).
+관리자는 영화·일정을 추가하거나 수정한다. 일정 종료 시각은 NULL로 제출하면 DB가 영화 길이로 계산해 저장한다. 명시한 종료 시각은 검증 후 저장한다. 영화 길이의 후속 변경은 기존 일정 종료 시각을 바꾸지 않는다. 예매가 있는 일정은 상태를 불문하고 업무 속성을 변경할 수 없다.
 
-**Invocation requirement (team decision: request-time expiry; nothing runs by itself — no pg_cron, worker or scheduler exists):**
+## 5. 전환 작업과 권한
 
-| Request | Required |
+| 파일 | 함수 및 작업 |
 |---|---|
-| C-04 seat availability | call `SELECT expire_overdue_bookings()` **first**, in the same request |
-| C-06 booking | built into `create_booking` (no extra call needed) |
-| C-07 payment | built into `pay_booking` (it expires that booking itself) |
-| C-09 cancel | built into `cancel_booking` |
-| C-08 history, A-03 all bookings | call it first so no overdue booking is displayed as `BOOKED` (recommended) |
+| app/screenings.py | get_screening_seats()의 기존 전체 정리 + 별도 만료 필터를 회차별 함수 호출로 교체한다. 공개 접근과 screening/seats 응답 구조는 유지한다. |
+| app/database.py, app/errors.py | transaction() 바깥에서 재시도하고 describe_database_error()의 신규 오류 매핑을 적용한다. |
+| app/booking.py, app/admin.py | create_booking(), pay_booking(), cancel_booking()의 커밋 경로를 확인하고 list_bookings(), admin_list_bookings()의 일관된 조회를 적용한다. |
+| frontend/js/pages/seats.js, booking.js, bookings.js | 충돌과 재시도 안내를 구분하며, EXPIRED와 좌석별 단가를 표시한다. |
 
-If Flask forgets the call, the database is still safe (an overdue booking can neither be paid nor cancelled; `create_booking` will not double-book), but availability screens would show stale holds — so make the call part of the shared request helper.
-
-### 3.4 Cancellation (C-09)
-```python
-with conn:
-    with conn.cursor() as cur:
-        cur.execute("SELECT cancel_booking(%s, %s)", (booking_id, user_id))
-        outcome = cur.fetchone()[0]       # 'CANCELLED' or 'EXPIRED'
-```
-`'CANCELLED'`: status → `CANCELLED`, **all** seat rows deleted, parent kept, `payment_status` unchanged, `total_amount` retained. `'EXPIRED'`: the booking was an unpaid one past its deadline, so it was expired instead (D3: expired bookings cannot be cancelled) — commit, then tell the user it had expired. Raises `UC011` (not yours), `UC006` (already `CANCELLED`/`EXPIRED`), `UC005` (screening already started). Partial-seat cancellation does not exist.
-
-## 4. Transaction boundaries
-
-* One user action = one database transaction (`with conn:` in psycopg2, or `conn.commit()`/`conn.rollback()` explicitly). Default `READ COMMITTED` is correct; the triggers take their own locks.
-* `create_booking` / `pay_booking` / `cancel_booking` / `expire_overdue_bookings` are all-or-nothing: on any exception roll back and nothing changed.
-* For `pay_booking` and `cancel_booking`, a returned `'EXPIRED'` is a **committed** outcome, not an error: do not raise before committing.
-* Never run `SET CONSTRAINTS … IMMEDIATE` around `create_booking` (booking and seats are validated together at COMMIT).
-* Do not check availability in Python and then insert separately (check-then-write race): always call `create_booking` and handle `UC002`.
-* Do not issue direct `UPDATE bookings`, `INSERT/DELETE booking_seats` or `UPDATE showtimes` for booked data except as stated in §7 (admin editing of unbooked screenings).
-
-## 5. Seat availability (C-04) — query behaviour
-
-Run in the same transaction as `SELECT expire_overdue_bookings();`. A seat is unavailable only if a seat row exists for a `BOOKED` booking of that screening that is either `PAID` or still inside its payment window; cancelled/expired bookings have no seat rows. Verified: the query shows an overdue-but-unprocessed booking's seats as available even before expiry runs.
-```sql
-SELECT se.seat_id, se.seat_row, se.seat_number,
-       NOT EXISTS (
-         SELECT 1 FROM booking_seats bs JOIN bookings b ON b.booking_id = bs.booking_id
-         WHERE b.showtime_id = %(showtime)s AND bs.seat_id = se.seat_id AND b.status = 'BOOKED'
-           AND (b.payment_status = 'PAID' OR b.expires_at > clock_timestamp())
-       ) AS is_available
-FROM showtimes s JOIN seats se ON se.room_id = s.room_id
-WHERE s.showtime_id = %(showtime)s
-ORDER BY se.seat_row, se.seat_number;
-```
-Seat selection (C-05) holds nothing; seats are held only by a successful `create_booking`. Browsing (C-02…C-05) needs no login (D4).
-
-Other read queries Flask needs:
-```sql
--- C-08 / A-03: booking summary (seat details exist only for BOOKED)
-SELECT b.booking_id, m.title, s.starts_at, s.ends_at, r.room_name, b.booked_at, b.expires_at,
-       b.total_amount, b.status, b.payment_status
-FROM bookings b JOIN showtimes s ON s.showtime_id=b.showtime_id JOIN movies m ON m.movie_id=s.movie_id
-JOIN theater_rooms r ON r.room_id=s.room_id
-WHERE b.user_id = %s ORDER BY b.booked_at DESC;                         -- A-03: drop the WHERE (ADMIN only)
-SELECT se.seat_row, se.seat_number, bs.price_at_booking
-FROM booking_seats bs JOIN seats se ON se.seat_id=bs.seat_id WHERE bs.booking_id=%s;   -- empty for CANCELLED/EXPIRED: never promise seats
-```
-Display `expires_at` for `BOOKED`+`UNPAID` rows as the payment deadline.
-
-## 6. Errors and constraints Flask must handle
-
-Read `e.pgcode` (psycopg2). The custom `UC…` codes are stable; do not match on message text.
-
-| SQLSTATE | Raised when | Suggested response |
-|---|---|---|
-| `UC001` | admin edits a screening that has any booking record (any status; any attribute incl. price/end time) — D2 | "has bookings; cannot be modified" |
-| `UC002` | seat already reserved for this screening (incl. lost race) | ask user to re-select seats |
-| `UC003` | seat belongs to another room | internal/tampering error |
-| `UC004` | screening already started (booking) | block |
-| `UC005` | cancellation after screening start | block |
-| `UC006` | payment/cancel not allowed: booking already `CANCELLED`/`EXPIRED`/`PAID`, or payment window elapsed (direct SQL) | explain state |
-| `UC007` | illegal change (immutable column, illegal transition, direct delete of seat rows, …) | internal error: Flask must not issue such statements |
-| `UC008` | booking owner is not a `CUSTOMER` (e.g. ADMIN) | block |
-| `UC009` | price snapshot ≠ screening price, or `total_amount` ≠ sum of snapshots | internal error (use `create_booking`) |
-| `UC010` | empty/duplicate seat list, or `BOOKED` booking without seats at COMMIT | "select at least one seat" |
-| `UC011` | booking/screening not found **for this user** | 404 |
-| `23505` | duplicate `username` (registration), duplicate seat position | "account ID taken" |
-| `23503` | unknown user / seat / screening / movie / room id | 400 |
-| `23514` | CHECK violation (invalid role, duration, row/number, price < 0, `ends_at <= starts_at`) | validation message |
-| `23P01` | screening overlaps another in the same room (BR-04; real `[start,end)` intervals, **no buffer**) | show conflict, ask for another time |
-| `23001` | deleting a row that is referenced (user, screening…) — not an application feature | internal error |
-
-Enforced by the database (do not duplicate as the only guard, but still validate for UX): role/status domains, seat ↔ room ownership, one active booking per seat per screening (race-safe: the screening row is locked), no overlap, no booking/cancel after start, atomic booking + seats, price snapshot = screening price, `total_amount` = sum of snapshots (immutable, kept after cancel/expiry), D1/D2/D3 transitions.
-
-## 7. Application (Flask) responsibilities — not enforced by the database
-
-| Area | Flask must |
-|---|---|
-| Authentication (D4, BR-05) | session login; browsing/availability public; require login for confirm/pay/cancel; **no GUEST account**; check `role` |
-| Registration (D5) | only account ID + password. `INSERT INTO users(username, password_hash)` — **never pass `role`** (default `CUSTOMER`; the DB would accept `ADMIN`, so public registration must not allow it). Hash with a one-way password hash (e.g. Werkzeug `generate_password_hash`), never plaintext |
-| Ownership (BR-09) | pass `session user_id` to `pay_booking`/`cancel_booking` and filter history by it |
-| Authorisation (BR-13) | movies/screenings add/edit and A-03 only for `ADMIN` |
-| Expiry invocation | per §3.3 |
-| Admin screening add | `INSERT INTO showtimes(movie_id, room_id, starts_at, ends_at, ticket_price)`; `ends_at` may be omitted (defaults to start + movie duration, stored) |
-| Admin screening edit | `UPDATE showtimes SET …` only; the database rejects with `UC001` if any booking row exists, any status. Catch it; optionally pre-check `NOT EXISTS (SELECT 1 FROM bookings WHERE showtime_id=…)` for UX |
-| Admin movie edit | `UPDATE movies`; changing `duration_minutes` is allowed and never moves existing screenings (their `ends_at` is stored) |
-| Time | convert Seoul-local input to `timestamptz` explicitly; never compare with the Flask host clock — the database decides every deadline; show times in `Asia/Seoul` |
-| SQL safety | parameter binding only |
-| Demo accounts | `admin_demo`, `customer_demo`, `customer_demo2` exist with Member A's password hashes; **their plaintext passwords are not documented and unverified** — set known passwords (hash with Werkzeug) before demonstrating a login |
-
-## 8. PostgreSQL connection requirements
-
-* PostgreSQL **14+** (verified on 18.6 only). Extension `btree_gist` is required by `schema.sql` (shipped with PostgreSQL; creating it needs a role allowed to — the database owner can since PG 13).
-* Driver: **not yet decided** (B01 §7.1). The examples above use `psycopg2` (also what the tests use); `psycopg2-binary` is the recommended dependency. `requirements.txt` is intentionally unchanged until the team confirms.
-* Configuration through environment variables (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`); `.env` is git-ignored; never commit credentials.
-* The four functions and all triggers run **with the caller's privileges** (they are not `SECURITY DEFINER`), so the Flask database role needs table privileges as well as `EXECUTE`: `SELECT` on all tables, `INSERT` on `users`, `INSERT/UPDATE` on `bookings`, `INSERT/DELETE` on `booking_seats` (the cancel/expiry triggers delete seat rows), `INSERT/UPDATE` on `movies` and `showtimes`. Triggers guard every direct write, but restricting Flask to the functions alone would need `SECURITY DEFINER` — an open deployment decision for Member A that is **not** implemented. This repository's schema creates no roles; use a non-owner, non-superuser role for the application. The owner role is for setup and tests only.
-* Create the database empty, then: `psql -X -v ON_ERROR_STOP=1 -d <db> -f database/schema.sql` and `… -f database/seed.sql` (once). Tests: `bash database/tests/run_all.sh` on a **disposable** database only.
-* Timestamps are `timestamptz`; the seed uses 7 consecutive `Asia/Seoul` days starting on the day it is run.
+현재 저장소는 psycopg2-binary를 사용한다. 서비스 역할은 [권한 스크립트](../../database/grant_application_role.sql)로 구성하고 로그인은 따로 관리한다. 다섯 공개 업무 함수는 전용 객체 소유자의 권한으로 실행되며, 직접 예매 쓰기 권한은 앱 역할에 부여하지 않는다. 신규 DB 구성은 [설치 안내서](postgresql_setup_guide.md), 통합 회귀와 배포 조건은 [Member B 인수인계](member_b_integration_handover.md)에서 확인한다.
