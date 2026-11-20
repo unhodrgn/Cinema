@@ -14,11 +14,22 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from .cors import OriginError, parse_origin_list
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DOTENV_PATH = PROJECT_ROOT / ".env"
 
 DEFAULT_TIMEZONE = "Asia/Seoul"
 MIN_SECRET_KEY_LENGTH = 16
+
+# Bearer-token lifetime (revised Phase 4 plan, section 4): 8 hours by default,
+# configurable between one minute and 30 days.
+DEFAULT_AUTH_TOKEN_MAX_AGE_SECONDS = 8 * 60 * 60
+MIN_AUTH_TOKEN_MAX_AGE_SECONDS = 60
+MAX_AUTH_TOKEN_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
+
+# Largest accepted request body. The API only receives small JSON documents.
+MAX_REQUEST_BODY_BYTES = 64 * 1024
 
 # Fixed key for the testing configuration only. It is not a secret and is never
 # read from the environment, so tests cannot pick up a real key.
@@ -86,6 +97,17 @@ class _EnvReader:
         self.errors.append(f"{name} must be one of 1/0, true/false, yes/no, on/off (got {value!r})")
         return default
 
+    def origins(self, name):
+        """A tuple of exact CORS origins from a comma-separated variable (empty if unset)."""
+        value = self.text(name)
+        if value is None:
+            return ()
+        try:
+            return parse_origin_list(value)
+        except OriginError as error:
+            self.errors.append(f"{name}: {error}")
+            return ()
+
     def timezone(self, name, default):
         value = self.text(name)
         if value is None:
@@ -107,6 +129,8 @@ class Config:
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
 
+    MAX_CONTENT_LENGTH = MAX_REQUEST_BODY_BYTES
+
     def __init__(self, environ=None):
         reader = _EnvReader(os.environ if environ is None else environ)
 
@@ -121,6 +145,14 @@ class Config:
         )
         self.APP_TIMEZONE = reader.timezone("APP_TIMEZONE", default=DEFAULT_TIMEZONE)
         self.DEBUG = self._read_debug(reader)
+        # Exact origins of the independent frontend; empty (default) = same-origin only.
+        self.CORS_ALLOWED_ORIGINS = reader.origins("CORS_ALLOWED_ORIGINS")
+        self.AUTH_TOKEN_MAX_AGE_SECONDS = reader.integer(
+            "AUTH_TOKEN_MAX_AGE_SECONDS",
+            default=DEFAULT_AUTH_TOKEN_MAX_AGE_SECONDS,
+            minimum=MIN_AUTH_TOKEN_MAX_AGE_SECONDS,
+            maximum=MAX_AUTH_TOKEN_MAX_AGE_SECONDS,
+        )
 
         if reader.errors:
             problems = "\n".join(f"  - {message}" for message in reader.errors)

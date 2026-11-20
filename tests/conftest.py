@@ -21,6 +21,8 @@ CONFIG_VARIABLES = (
     "DB_CONNECT_TIMEOUT",
     "APP_TIMEZONE",
     "FLASK_DEBUG",
+    "CORS_ALLOWED_ORIGINS",
+    "AUTH_TOKEN_MAX_AGE_SECONDS",
 )
 
 # Snapshots taken before any fixture runs, so the per-test environment isolation below
@@ -84,6 +86,61 @@ def cinema_test_db(postgres_settings):
         postgres_settings, disposable_db.SCHEMA_PATH, disposable_db.SEED_PATH, forbidden
     ) as database:
         yield database
+
+
+@pytest.fixture(scope="session")
+def cinema_template_db(postgres_settings):
+    """A seeded ``cinema_test_*`` database used ONLY as a template for per-test clones.
+
+    Nothing may ever connect to it (PostgreSQL refuses to clone a database that is in
+    use), so no fixture hands out a connection to it. Created once per session by the
+    same safe provisioning as ``cinema_test_db`` and dropped at the end.
+    """
+    try:
+        disposable_db.check_server(postgres_settings)
+    except psycopg2.OperationalError:
+        pytest.skip(
+            f"PostgreSQL test server not reachable at "
+            f"{postgres_settings.host}:{postgres_settings.port}"
+        )
+    forbidden = disposable_db.read_forbidden_names(_ORIGINAL_ENVIRON, _DOTENV_VALUES)
+    with disposable_db.provision_database(
+        postgres_settings, disposable_db.SCHEMA_PATH, disposable_db.SEED_PATH, forbidden
+    ) as template:
+        yield template
+
+
+@pytest.fixture
+def fresh_db(cinema_template_db):
+    """A private, freshly seeded database for ONE test (opt-in: about 0.4 s to create and drop).
+
+    Use it for tests that commit bookings: a booking can never be deleted and a booked
+    screening can never be edited (D2), so such tests must not share a database. The clone
+    is dropped after the test, whether it passed or failed.
+    """
+    forbidden = disposable_db.read_forbidden_names(_ORIGINAL_ENVIRON, _DOTENV_VALUES)
+    with disposable_db.clone_database(cinema_template_db, forbidden) as clone:
+        yield clone
+
+
+@pytest.fixture
+def fresh_connection(fresh_db):
+    """An owner connection to the per-test clone (also usable by the time-travel helpers)."""
+    connection = fresh_db.connect()
+    try:
+        yield connection
+    finally:
+        if not connection.closed:
+            connection.rollback()
+            connection.close()
+
+
+@pytest.fixture
+def fresh_app(fresh_db):
+    """A testing app connected to the per-test clone, with a unique application_name."""
+    overrides = dict(fresh_db.app_config())
+    overrides["DB_APPLICATION_NAME"] = "cinema_flask_test_" + uuid.uuid4().hex[:8]
+    return create_app("testing", overrides)
 
 
 @pytest.fixture

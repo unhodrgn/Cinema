@@ -1,0 +1,221 @@
+"""T1: architecture rules for the independent frontend, checked statically.
+
+The frontend must have no database access, no backend imports, no template syntax, no
+unsafe DOM sinks and no third-party resources; the backend must render nothing.
+"""
+
+import json
+import re
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
+FRONTEND = ROOT / "frontend"
+APP = ROOT / "app"
+
+# Files that ship to the browser (the node tests and server.py are checked separately).
+BROWSER_FILES = sorted(
+    path
+    for path in FRONTEND.rglob("*")
+    if path.is_file()
+    and path.suffix in {".html", ".js", ".css"}
+    and "tests" not in path.relative_to(FRONTEND).parts
+    and "node_modules" not in path.relative_to(FRONTEND).parts
+)
+ALL_FRONTEND_TEXT_FILES = sorted(
+    path
+    for path in FRONTEND.rglob("*")
+    if path.is_file()
+    and path.suffix in {".html", ".js", ".css", ".py", ".json", ".md", ".txt"}
+    and "node_modules" not in path.relative_to(FRONTEND).parts
+)
+
+
+def strip_js_comments(text):
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+    return re.sub(r"(^|[\s;{}()])//[^\n]*", r"\1", text)
+
+
+def strip_css_comments(text):
+    return re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+
+
+def python_code(text):
+    """Python source without docstrings and comment lines (prose may mention PostgreSQL)."""
+    import ast
+
+    lines = text.splitlines()
+    for node in ast.walk(ast.parse(text)):
+        if isinstance(node, (ast.Module, ast.FunctionDef, ast.ClassDef)):
+            first = node.body[0] if node.body else None
+            is_docstring = (
+                isinstance(first, ast.Expr)
+                and isinstance(first.value, ast.Constant)
+                and isinstance(first.value.value, str)
+            )
+            if is_docstring:
+                for number in range(first.lineno - 1, first.end_lineno):
+                    lines[number] = ""
+    return "\n".join(line for line in lines if not line.lstrip().startswith("#"))
+
+
+def code_of(path):
+    text = path.read_text(encoding="utf-8")
+    if path.suffix == ".py":
+        return python_code(text)
+    if path.suffix == ".js":
+        return strip_js_comments(text)
+    if path.suffix == ".css":
+        return strip_css_comments(text)
+    if path.suffix == ".html":
+        return re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
+    return text
+
+
+def test_the_frontend_has_files_to_check():
+    names = {path.name for path in BROWSER_FILES}
+
+    assert {"index.html", "style.css", "api.js", "ui.js", "index.js"} <= names
+
+
+# --- no database, no backend --------------------------------------------------------------
+
+DATABASE_MARKERS = [
+    r"psycopg", r"postgres", r"sqlalchemy", r"\bDB_(HOST|PORT|NAME|USER|PASSWORD)\b",
+    r"\bSECRET_KEY\b", r"password_hash", r"\bpg_",
+    r"\bSELECT\b[^;\n]*\bFROM\b", r"\bINSERT\s+INTO\b", r"\bDELETE\s+FROM\b",
+    r"\bUPDATE\b[^;\n]*\bSET\b", r"\bCREATE\s+(TABLE|FUNCTION|TRIGGER)\b",
+    r"\bcreate_booking\b", r"\bpay_booking\b", r"\bcancel_booking\b", r"\bexpire_overdue_bookings\b",
+]
+
+
+@pytest.mark.parametrize("path", ALL_FRONTEND_TEXT_FILES, ids=lambda p: str(p.relative_to(FRONTEND)))
+def test_no_database_access_credentials_or_sql_in_the_frontend(path):
+    # Code only: prose in comments and docstrings may legitimately name PostgreSQL.
+    code = code_of(path) if path.suffix in {".html", ".js", ".css", ".py"} else path.read_text(encoding="utf-8")
+
+    for marker in DATABASE_MARKERS:
+        assert not re.search(marker, code, flags=re.IGNORECASE), f"{path.name} matches {marker!r}"
+
+
+def js_import_specifiers(text):
+    pattern = r"""(?:import\s+(?:[^'"]*?\s+from\s+)?|import\(\s*)['"]([^'"]+)['"]"""
+    return re.findall(pattern, strip_js_comments(text))
+
+
+@pytest.mark.parametrize(
+    "path", [p for p in FRONTEND.rglob("*.js") if "node_modules" not in p.parts], ids=lambda p: str(p.relative_to(FRONTEND))
+)
+def test_javascript_imports_stay_inside_the_frontend(path):
+    for specifier in js_import_specifiers(path.read_text(encoding="utf-8")):
+        if specifier.startswith("node:"):
+            assert "tests" in path.relative_to(FRONTEND).parts, f"{path.name} imports {specifier}"
+            continue
+        assert specifier.startswith(("./", "../")), f"{path.name}: bare import {specifier}"
+        target = (path.parent / specifier).resolve()
+        assert target.is_relative_to(FRONTEND.resolve()), f"{path.name} imports outside frontend: {specifier}"
+        assert target.exists(), f"{path.name} imports a missing file: {specifier}"
+        assert "app" not in target.relative_to(FRONTEND.resolve()).parts[:1]
+
+
+def test_the_frontend_never_references_backend_source_paths():
+    for path in ALL_FRONTEND_TEXT_FILES:
+        text = path.read_text(encoding="utf-8")
+        assert not re.search(r"(\.\./)+app/|/app/(config|database|errors|__init__)", text), path.name
+
+
+def test_package_json_declares_no_dependencies():
+    package = json.loads((FRONTEND / "package.json").read_text(encoding="utf-8"))
+
+    assert package["private"] is True
+    assert package["type"] == "module"
+    for key in ("dependencies", "devDependencies", "peerDependencies", "optionalDependencies"):
+        assert key not in package
+
+
+def test_there_is_no_committed_config_file_and_no_credentials_file():
+    assert not (FRONTEND / "config.js").exists()
+    for name in (".env", ".env.local", "credentials.json", "secrets.json"):
+        assert not (FRONTEND / name).exists()
+
+
+# --- no template syntax, no unsafe DOM sinks, no third-party resources --------------------
+
+UNSAFE_SINKS = [
+    r"\.innerHTML\b", r"\.outerHTML\b", r"insertAdjacentHTML", r"document\.write", r"\beval\s*\(",
+    r"new\s+Function\b", r"setTimeout\s*\(\s*['\"`]", r"setInterval\s*\(\s*['\"`]",
+    r"\.srcdoc\b", r"createContextualFragment", r"DOMParser", r"javascript:",
+]
+
+
+@pytest.mark.parametrize("path", BROWSER_FILES, ids=lambda p: str(p.relative_to(FRONTEND)))
+def test_no_unsafe_dom_sinks(path):
+    code = code_of(path)
+
+    for sink in UNSAFE_SINKS:
+        assert not re.search(sink, code, flags=re.IGNORECASE), f"{path.name} uses {sink}"
+
+
+@pytest.mark.parametrize("path", [p for p in BROWSER_FILES if p.suffix == ".html"], ids=lambda p: p.name)
+def test_html_pages_are_static_and_csp_friendly(path):
+    code = code_of(path)
+
+    assert "{{" not in code and "{%" not in code and "{#" not in code, "template syntax"
+    assert not re.search(r"<script(?![^>]*\bsrc=)[^>]*>", code, flags=re.IGNORECASE), "inline script"
+    assert not re.search(r"\son[a-z]+\s*=", code, flags=re.IGNORECASE), "inline event handler"
+    assert not re.search(r"\sstyle\s*=", code, flags=re.IGNORECASE), "inline style attribute"
+    assert not re.search(r"<style\b", code, flags=re.IGNORECASE), "inline style element"
+    assert not re.search(r"<(iframe|object|embed|base)\b", code, flags=re.IGNORECASE)
+    assert "<!doctype html>" in code.lower()
+    assert re.search(r"<html[^>]*\blang=", code, flags=re.IGNORECASE)
+    assert re.search(r'<meta name="viewport"', code)
+
+
+@pytest.mark.parametrize("path", BROWSER_FILES, ids=lambda p: str(p.relative_to(FRONTEND)))
+def test_no_third_party_or_absolute_urls_in_browser_files(path):
+    code = code_of(path)
+
+    assert not re.search(r"https?://", code, flags=re.IGNORECASE), "external URL"
+    assert not re.search(r"@import\s+url", code, flags=re.IGNORECASE)
+    assert "cdn." not in code.lower()
+
+
+def test_html_resources_are_local_files_that_exist():
+    for page in (p for p in BROWSER_FILES if p.suffix == ".html"):
+        for target in re.findall(r"""(?:src|href)=["']([^"']+)["']""", code_of(page)):
+            if target.startswith(("#", "?")) or target == "/":
+                continue  # "/" is the index page
+            assert target.startswith("/"), f"{page.name}: {target} must be a root-relative path"
+            if target == "/config.js":
+                continue  # generated by the frontend server
+            assert (FRONTEND / target.lstrip("/")).is_file(), f"{page.name}: missing {target}"
+
+
+def test_every_page_loads_config_before_its_module():
+    for page in (p for p in BROWSER_FILES if p.suffix == ".html"):
+        code = code_of(page)
+        if 'type="module"' in code:
+            assert code.index('src="/config.js"') < code.index('type="module"'), page.name
+
+
+# --- the backend renders nothing ----------------------------------------------------------
+
+RENDERING = [
+    r"render_template", r"render_template_string", r"send_from_directory", r"send_file",
+    r"jinja2", r"Markup", r"\|\s*safe\b", r"make_response\([^)]*<",
+]
+
+
+def test_backend_code_renders_no_pages_and_serves_no_files():
+    for path in sorted(APP.glob("*.py")):
+        text = path.read_text(encoding="utf-8")
+        code = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
+        for pattern in RENDERING:
+            assert not re.search(pattern, code), f"{path.name} matches {pattern!r}"
+
+
+def test_the_backend_disables_static_files_and_templates_explicitly():
+    source = (APP / "__init__.py").read_text(encoding="utf-8")
+
+    assert "static_folder=None" in source and "template_folder=None" in source

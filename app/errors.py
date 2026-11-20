@@ -9,8 +9,10 @@ Nothing the driver says (SQL text, constraint or column names, hosts, users, pas
 connection strings, tracebacks) ever reaches a response: responses carry only the fixed
 ``code`` and ``message`` below. Details go to the log.
 
-Responses are JSON for now; the frontend phase will render pages from the same
-``ErrorInfo`` values.
+Every response is JSON: ``{"error": {"code": ..., "message": ...}}``, plus a ``fields``
+object only for validation errors. This includes Flask's own HTTP errors (404, 405, 413,
+...), which are converted from the default HTML pages to the same envelope. The
+independent frontend renders messages from these values; the backend never renders pages.
 """
 
 import logging
@@ -34,11 +36,17 @@ class ErrorInfo:
 
 
 class AppError(Exception):
-    """An error that carries an ``ErrorInfo`` and becomes an HTTP response."""
+    """An error that carries an ``ErrorInfo`` and becomes an HTTP response.
 
-    def __init__(self, info):
+    ``fields`` (field name -> fixed message) is added to the body for validation errors;
+    ``headers`` are extra response headers such as ``WWW-Authenticate``.
+    """
+
+    def __init__(self, info, fields=None, headers=None):
         super().__init__(info.code)
         self.info = info
+        self.fields = dict(fields) if fields else None
+        self.headers = dict(headers) if headers else None
 
 
 INTERNAL_ERROR = ErrorInfo(
@@ -50,6 +58,36 @@ DATABASE_UNAVAILABLE = ErrorInfo(
     "The service is temporarily unavailable. Please try again later.",
     True,
 )
+
+# API-level errors (docs/api/api_contract.md). Messages are fixed text: they never echo
+# request data, parser output or exception messages.
+UNAUTHORIZED = ErrorInfo(401, "unauthorized", "Authentication is required.")
+# One message for an unknown account and for a wrong password (B03 CM-01): the response
+# must never reveal which of the two it was.
+INVALID_CREDENTIALS = ErrorInfo(
+    401, "invalid_credentials", "The account ID or password is incorrect."
+)
+FORBIDDEN = ErrorInfo(403, "forbidden", "You do not have permission to do this.")
+VALIDATION_ERROR = ErrorInfo(400, "validation_error", "One or more fields are not valid.")
+INVALID_JSON = ErrorInfo(400, "invalid_json", "The request body must be a valid JSON object.")
+UNSUPPORTED_MEDIA_TYPE = ErrorInfo(
+    415, "unsupported_media_type", "Requests with a body must use Content-Type: application/json."
+)
+
+# Flask / Werkzeug HTTP errors, by status. ``exception.description`` is never used.
+HTTP_ERRORS = {
+    400: ErrorInfo(400, "bad_request", "The request could not be understood."),
+    401: UNAUTHORIZED,
+    403: FORBIDDEN,
+    404: ErrorInfo(404, "not_found", "The requested resource was not found."),
+    405: ErrorInfo(
+        405, "method_not_allowed", "This method is not allowed for the requested resource."
+    ),
+    413: ErrorInfo(413, "payload_too_large", "The request body is too large."),
+    415: UNSUPPORTED_MEDIA_TYPE,
+}
+# Headers worth keeping from a Werkzeug HTTP exception (its Content-Type is HTML).
+_KEPT_HTTP_HEADERS = ("Allow", "WWW-Authenticate", "Retry-After")
 
 # Contract section 6. "Suggested response" column in comments.
 SQLSTATE_ERRORS = {
@@ -125,15 +163,38 @@ def translate_database_error(error):
     return AppError(describe_database_error(error))
 
 
-def error_response(info):
-    response = jsonify({"error": {"code": info.code, "message": info.message}})
+class ValidationError(AppError):
+    """Invalid request data: HTTP 400 ``validation_error`` with a ``fields`` object."""
+
+    def __init__(self, fields):
+        super().__init__(VALIDATION_ERROR, fields=fields)
+
+
+def describe_http_error(error):
+    """The ``ErrorInfo`` for a Werkzeug ``HTTPException``, chosen by its status only."""
+    info = HTTP_ERRORS.get(error.code)
+    if info is not None:
+        return info
+    status = error.code or 500
+    if status >= 500:
+        return ErrorInfo(status, "server_error", INTERNAL_ERROR.message, True)
+    return ErrorInfo(status, "http_error", "The request could not be processed.")
+
+
+def error_response(info, fields=None, headers=None):
+    body = {"error": {"code": info.code, "message": info.message}}
+    if fields:
+        body["error"]["fields"] = fields
+    response = jsonify(body)
     response.status_code = info.status
     response.headers["Cache-Control"] = "no-store"
+    for name, value in (headers or {}).items():
+        response.headers[name] = value
     return response
 
 
 def _handle_app_error(error):
-    return error_response(error.info)
+    return error_response(error.info, fields=error.fields, headers=error.headers)
 
 
 def _handle_database_unavailable(error):
@@ -157,7 +218,17 @@ def _handle_database_error(error):
 
 def _handle_unexpected_error(error):
     if isinstance(error, HTTPException):
-        return error  # 404, 405, ... keep their normal behaviour
+        if error.response is not None:
+            return error.response  # abort(response): the caller built it deliberately
+        # 404, 405, 413, ...: same status and headers as before, but the JSON envelope
+        # instead of Werkzeug's HTML page.
+        headers = {
+            name: value for name, value in error.get_headers() if name in _KEPT_HTTP_HEADERS
+        }
+        info = describe_http_error(error)
+        if info.internal:
+            logger.error("HTTP error %s", error.code)
+        return error_response(info, headers=headers)
     if current_app.debug:
         raise error  # let the interactive debugger show the real problem
     logger.exception("unhandled %s", type(error).__name__)

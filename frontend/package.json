@@ -1,0 +1,9 @@
+{
+  "name": "cinema-frontend",
+  "private": true,
+  "type": "module",
+  "description": "Independent frontend. No dependencies: this file only lets Node's built-in test runner load the ES modules.",
+  "scripts": {
+    "test": "node --test tests/api.test.js tests/ui.test.js tests/auth.test.js tests/format.test.js tests/catalog.test.js"
+  }
+}

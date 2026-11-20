@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Movie - Cinema Reservation</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/config.js"></script>
+  <script type="module" src="/js/pages/movie.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/">Cinema Reservation</a>
+    <nav id="site-nav" class="site-nav" aria-label="Main"></nav>
+  </header>
+
+  <main class="container">
+    <p><a href="/movies.html">&larr; All movies</a></p>
+    <div id="message" aria-live="polite"></div>
+    <div id="details"></div>
+
+    <section id="schedule-section" class="card" aria-labelledby="schedule-title" hidden>
+      <h2 id="schedule-title">Screenings</h2>
+      <div class="toolbar">
+        <label for="date">Date</label>
+        <input id="date" name="date" type="date">
+      </div>
+      <div id="schedule-message" aria-live="polite"></div>
+      <ul id="schedule" class="screening-list"></ul>
+    </section>
+  </main>
+</body>
+</html>

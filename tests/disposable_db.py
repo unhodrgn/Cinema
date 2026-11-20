@@ -17,6 +17,7 @@ and ``database/seed.sql``, used by tests, and dropped again. Because this code i
 """
 
 import re
+import time
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -200,10 +201,24 @@ class DisposableDatabase:
     def __repr__(self):
         return f"<DisposableDatabase {self.name} created={self.created}>"
 
-    def create(self):
+    def create(self, template=None, busy_retry_seconds=2.0):
+        """Create this database, empty or cloned from ``template``.
+
+        ``template`` is another ``DisposableDatabase`` and must itself have been created
+        by this process (registry) and carry this session's marker: a database this
+        session did not create is never used as a template. ``CREATE DATABASE ...
+        TEMPLATE`` does not copy the database comment, so the marker is always written
+        again below. PostgreSQL refuses the clone while anything is connected to the
+        template, so nothing may keep a connection to it open. A session that was only
+        just closed can linger for a moment, hence the short retry before giving up.
+        """
         assert_disposable_name(self.name, self.forbidden_names)
         if self.created:
             raise UnsafeDatabaseError(f"{self.name} was already created by this fixture")
+        template_clause = ""
+        if template is not None:
+            template._require_owned()
+            template_clause = f" TEMPLATE {_quote(template.name)}"
         admin = _open(self.settings, MAINTENANCE_DATABASE, autocommit=True)
         try:
             with admin.cursor() as cur:
@@ -212,7 +227,18 @@ class DisposableDatabase:
                     raise UnsafeDatabaseError(
                         f"refusing to create {self.name}: a database with that name already exists"
                     )
-                cur.execute(f"CREATE DATABASE {_quote(self.name)}")
+                deadline = time.monotonic() + busy_retry_seconds
+                while True:
+                    try:
+                        cur.execute(f"CREATE DATABASE {_quote(self.name)}{template_clause}")
+                        break
+                    except psycopg2.errors.ObjectInUse:
+                        if time.monotonic() >= deadline:
+                            raise DatabaseSetupError(
+                                f"cannot clone {template.name}: a connection to the template "
+                                "is open (nothing may connect to a template database)"
+                            ) from None
+                        time.sleep(0.05)
                 self.created = True
                 _created_this_session.add(self.name)
                 try:
@@ -294,6 +320,25 @@ class DisposableDatabase:
         if not self.created:
             raise UnsafeDatabaseError(f"{self.name} has not been created by this fixture")
 
+    def _require_owned(self):
+        """Raise unless this database was created by this process and still carries its marker."""
+        self._require_created()
+        if self.name not in _created_this_session:
+            raise UnsafeDatabaseError(f"{self.name} is not in this session's registry")
+        admin = _open(self.settings, MAINTENANCE_DATABASE, autocommit=True)
+        try:
+            with admin.cursor() as cur:
+                cur.execute(
+                    "SELECT shobj_description(oid, 'pg_database') FROM pg_database "
+                    "WHERE datname = %s",
+                    (self.name,),
+                )
+                row = cur.fetchone()
+        finally:
+            admin.close()
+        if row is None or row[0] != MARKER:
+            raise UnsafeDatabaseError(f"{self.name} does not carry this session's marker")
+
 
 @contextmanager
 def provision_database(settings, schema_path, seed_path, forbidden_names=()):
@@ -311,3 +356,21 @@ def provision_database(settings, schema_path, seed_path, forbidden_names=()):
     finally:
         if database.created:
             database.drop()
+
+
+@contextmanager
+def clone_database(template, forbidden_names=()):
+    """A private, fully seeded copy of ``template`` for one test; always dropped afterwards.
+
+    ``template`` must be a database created by this process (see ``DisposableDatabase.create``).
+    The clone is created and dropped through the same checks as any disposable database:
+    name pattern, registry, session marker (written again, it is not copied) and the
+    development-database refusal.
+    """
+    clone = DisposableDatabase(template.settings, forbidden_names=forbidden_names)
+    try:
+        clone.create(template=template)
+        yield clone
+    finally:
+        if clone.created:
+            clone.drop()

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Register - Cinema Reservation</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/config.js"></script>
+  <script type="module" src="/js/pages/register.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/">Cinema Reservation</a>
+    <nav id="site-nav" class="site-nav" aria-label="Main"></nav>
+  </header>
+
+  <main class="container narrow">
+    <h1>Create an account</h1>
+    <p class="muted">An account ID and a password are all that is needed.</p>
+    <div id="form-message" aria-live="polite"></div>
+
+    <form id="register-form" class="card form" method="post" novalidate>
+      <div class="field">
+        <label for="username">Account ID</label>
+        <input id="username" name="username" type="text" autocomplete="username"
+               autocapitalize="none" spellcheck="false" maxlength="60" required>
+        <p id="username-error" class="field-error" hidden></p>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="new-password"
+               maxlength="256" required>
+        <p id="password-error" class="field-error" hidden></p>
+      </div>
+      <button id="submit" class="button" type="submit">Register</button>
+    </form>
+
+    <p class="muted">Already registered? <a href="/login.html" id="login-link">Log in</a></p>
+  </main>
+</body>
+</html>
