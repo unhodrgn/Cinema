@@ -17,10 +17,7 @@
 
   <main class="container">
     <h1>Cinema Reservation System</h1>
-    <p>
-      This page is served by the frontend server. It has no database access: everything it
-      shows comes from the REST API over HTTP.
-    </p>
+    <p>Browse the movies, choose your seats and book your tickets online.</p>
 
     <section aria-labelledby="browse-title" class="card">
       <h2 id="browse-title">Browse</h2>
@@ -28,15 +25,7 @@
       <p><a href="/movies.html">See the movies</a> or <a href="/screenings.html">the day's schedule</a>.</p>
     </section>
 
-    <section aria-labelledby="status-title" class="card">
-      <h2 id="status-title">Service status</h2>
-      <ul id="status-list" class="status-list" aria-live="polite">
-        <li data-service="api"><span class="label">API</span> <span class="badge badge-wait">checking</span></li>
-        <li data-service="database"><span class="label">Database (reported by the API)</span> <span class="badge badge-wait">checking</span></li>
-      </ul>
-      <p class="muted">API address: <span id="api-address">unknown</span></p>
-      <p id="status-message"></p>
-    </section>
+    <div id="status-message" aria-live="polite"></div>
   </main>
 </body>
 </html>

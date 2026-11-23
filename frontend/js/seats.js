@@ -76,3 +76,29 @@ export function calculateTotal(count, ticketPrice) {
 
   return `${totalWhole}.${totalFrac.toString().padStart(2, "0")}`;
 }
+
+/**
+ * Take every seat that is no longer free out of `selected` (a Set of seat ids) after the seat map
+ * was reloaded. A selected seat that is missing from the map counts as gone too. Returns the
+ * labels of the seats that were removed (sorted by row, then number), e.g. ["D5"].
+ */
+export function dropUnavailable(selected, seats) {
+  const bySeat = new Map((Array.isArray(seats) ? seats : []).map((seat) => [seat.seat_id, seat]));
+  const removed = [];
+  for (const id of Array.from(selected)) {
+    const seat = bySeat.get(id);
+    if (seat && seat.is_available) continue;
+    selected.delete(id);
+    if (seat) removed.push(seat);
+  }
+  removed.sort((a, b) => a.seat_row.localeCompare(b.seat_row) || a.seat_number - b.seat_number);
+  return removed.map(seatLabel);
+}
+
+/** The sentence shown when seats of the selection were taken by someone else ("" for none). */
+export function takenSeatsMessage(labels) {
+  if (!Array.isArray(labels) || labels.length === 0) return "";
+  const what = labels.length === 1 ? `Seat ${labels[0]} was` : `Seats ${labels.join(", ")} were`;
+  return `${what} just taken by someone else and removed from your selection. Please choose another seat.`;
+}
+

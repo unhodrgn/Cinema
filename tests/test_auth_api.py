@@ -492,7 +492,8 @@ def test_a_tampered_token_is_401_invalid_token(app, client, owner):
     user_id, _ = make_user(owner)
     other_id, _ = make_user(owner)
     token = token_for(app, user_id)
-    flipped = token[:-1] + ("A" if token[-1] != "A" else "B")
+    head, _, signature = token.rpartition(".")
+    flipped = head + "." + "A" * len(signature)  # whole signature replaced; one flipped char can decode unchanged
     # another user's payload with this user's signature
     grafted = token_for(app, other_id).split(".")[0] + "." + ".".join(token.split(".")[1:])
 

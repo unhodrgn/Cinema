@@ -227,7 +227,8 @@ def test_a_token_contains_no_role_or_username(app):
 
 def test_a_tampered_token_is_rejected(app):
     token = token_for(app, 1)
-    flipped = token[:-1] + ("A" if token[-1] != "A" else "B")
+    head, _, signature = token.rpartition(".")
+    flipped = head + "." + "A" * len(signature)  # whole signature replaced; one flipped char can decode unchanged
     forged_payload = token_for(app, 2).split(".")[0] + "." + ".".join(token.split(".")[1:])
 
     with app.app_context():

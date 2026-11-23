@@ -4,23 +4,23 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
-  formatDate, formatDateTime, formatDuration, formatMoney, formatTime, formatTimeRange,
+  formatDate, formatDateTime, formatDateTimeRange, formatDuration, formatMoney, formatTime, formatTimeRange,
   isDateText, isIdText,
 } from "../js/format.js";
 
 test("money keeps the decimal string exact and groups thousands", () => {
   const cases = {
-    "12000.00": "12,000", "9500.50": "9,500.50", "0.00": "0", "0": "0", "0.5": "0.5", "999.99": "999.99",
-    "1000": "1,000", "1234567.80": "1,234,567.80", "99999999.99": "99,999,999.99", "-5.25": "-5.25",
-    " 12000.00 ": "12,000",
+    "12000.00": "₩12,000", "9500.50": "₩9,500.50", "0.00": "₩0", "0": "₩0", "0.5": "₩0.5", "999.99": "₩999.99",
+    "1000": "₩1,000", "1234567.80": "₩1,234,567.80", "99999999.99": "₩99,999,999.99", "-5.25": "-₩5.25",
+    " 12000.00 ": "₩12,000",
   };
   for (const [input, expected] of Object.entries(cases)) assert.equal(formatMoney(input), expected, input);
 });
 
 test("money never goes through floating point", () => {
-  assert.equal(formatMoney("0.1"), "0.1");
-  assert.equal(formatMoney("9007199254740993.01"), "9,007,199,254,740,993.01"); // beyond 2**53
-  assert.equal(formatMoney("12345678901234567890.10"), "12,345,678,901,234,567,890.10");
+  assert.equal(formatMoney("0.1"), "₩0.1");
+  assert.equal(formatMoney("9007199254740993.01"), "₩9,007,199,254,740,993.01"); // beyond 2**53
+  assert.equal(formatMoney("12345678901234567890.10"), "₩12,345,678,901,234,567,890.10");
 });
 
 test("money refuses anything that is not a plain decimal string", () => {
@@ -72,4 +72,15 @@ test("id and date text checks accept only the plain shapes", () => {
   for (const bad of ["2026-1-25", "20261125", "2026-11-25T10:00", "", null, undefined, 5, "26-11-25"]) {
     assert.ok(!isDateText(bad), String(bad));
   }
+});
+
+test("a date-and-time range shows the date once, and both dates when the end is on another day", () => {
+  const start = "2026-11-25T19:00:00+09:00";
+  assert.equal(formatDateTimeRange(start, "2026-11-25T21:05:00+09:00"), "2026-11-25 19:00 - 21:05");
+  assert.equal(formatDateTimeRange("2026-11-25T23:30:00+09:00", "2026-11-26T01:10:00+09:00"),
+    "2026-11-25 23:30 - 2026-11-26 01:10");
+  assert.equal(formatDateTimeRange(start, ""), "2026-11-25 19:00");
+  assert.equal(formatDateTimeRange(start, undefined), "2026-11-25 19:00");
+  assert.equal(formatDateTimeRange("", "2026-11-25T21:05:00+09:00"), "");
+  assert.equal(formatDateTimeRange(null, null), "");
 });

@@ -66,7 +66,7 @@ def book(connection, user_id, showtime_id, seat_ids):
 def test_a_clone_is_a_seeded_disposable_database(fresh_db, fresh_connection):
     assert fresh_db.name.startswith(disposable_db.TEST_DB_PREFIX)
     assert scalar(fresh_connection, "SELECT current_database()") == fresh_db.name
-    assert scalar(fresh_connection, "SELECT count(*) FROM showtimes") == 140
+    assert scalar(fresh_connection, "SELECT count(*) FROM showtimes") == 280
     assert scalar(fresh_connection, "SELECT count(*) FROM seats") == 250
     assert scalar(fresh_connection, "SELECT count(*) FROM bookings") == 0
 

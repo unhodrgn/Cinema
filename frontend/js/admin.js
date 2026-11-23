@@ -2,7 +2,7 @@
 // conversion of an API timestamp into the value of a datetime-local input.
 // Like the rest of the frontend this builds the page with text nodes only (ui.js).
 
-import { getAuth, loginUrl } from "./auth.js";
+import { getAuth, loginUrl, pageUser } from "./auth.js";
 import { formatDateTime } from "./format.js";
 import { el, showMessage } from "./ui.js";
 
@@ -23,11 +23,10 @@ export async function requireAdmin({
   auth = getAuth(),
   navigate = (url) => globalThis.location.assign(url),
 }) {
-  let user = null;
-  try {
-    user = await auth.currentUser();
-  } catch {
-    user = null;
+  const { user, failed } = await pageUser(auth, messageBox);
+  if (failed) {
+    if (hideNode) hideNode.hidden = true;
+    return null; // the API cannot be reached: the message says so, no redirect
   }
   if (!user) {
     navigate(loginUrl(page));
@@ -72,3 +71,20 @@ export function badge(kind, text) {
   const allowed = ["ok", "error", "wait", "neutral"];
   return el("span", { className: `badge badge-${allowed.includes(kind) ? kind : "neutral"}`, text });
 }
+
+/**
+ * Whether the Edit button of a screening is locked, and the tooltip that says why:
+ * `{ disabled, title }`. Two rules apply, the server enforces both: a screening that has already
+ * started is history, and (D2) a screening that has bookings can no longer be modified. The
+ * "started" reason is shown first, matching the server's order of checks.
+ */
+export function screeningEditLock(screening) {
+  if (screening && screening.has_started) {
+    return { disabled: true, title: "This screening has already started and can't be edited." };
+  }
+  if (screening && screening.has_bookings) {
+    return { disabled: true, title: "This screening has bookings and cannot be modified (D2)." };
+  }
+  return { disabled: false, title: null };
+}
+

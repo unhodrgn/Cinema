@@ -12,7 +12,7 @@ from flask import Blueprint, current_app, jsonify, request
 
 from .body import json_body
 from .database import expire_overdue_bookings, transaction
-from .errors import HTTP_ERRORS, AppError, ValidationError
+from .errors import HTTP_ERRORS, SCREENING_STARTED, AppError, ValidationError
 from .params import check_path_id, query_id, strict_iso_date
 from .security import Policy, policy
 
@@ -40,10 +40,15 @@ MIN_TIMESTAMP_YEAR = 1900
 MAX_TIMESTAMP_YEAR = 2200
 
 
+# Words for the person filling in the form: messages never show an internal field name.
+_TIMESTAMP_LABELS = {"starts_at": "Start time", "ends_at": "End time"}
+
+
 def _parse_timestamp(value, field_name, problems):
     """Parse an ISO timestamp string. If naive, localize to APP_TIMEZONE."""
+    label = _TIMESTAMP_LABELS.get(field_name, "Date and time")
     if not isinstance(value, str) or not value.strip():
-        problems[field_name] = f"{field_name} is required."
+        problems[field_name] = f"{label} is required."
         return None
     try:
         parsed = dt.datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
@@ -51,11 +56,11 @@ def _parse_timestamp(value, field_name, problems):
             tz = ZoneInfo(current_app.config["APP_TIMEZONE"])
             parsed = parsed.replace(tzinfo=tz)
     except Exception:
-        problems[field_name] = f"{field_name} must be a valid ISO 8601 timestamp."
+        problems[field_name] = f"{label} must be a valid date and time."
         return None
     if not (MIN_TIMESTAMP_YEAR <= parsed.year <= MAX_TIMESTAMP_YEAR):
         problems[field_name] = (
-            f"{field_name} must be between the years {MIN_TIMESTAMP_YEAR} and {MAX_TIMESTAMP_YEAR}."
+            f"{label} must be between the years {MIN_TIMESTAMP_YEAR} and {MAX_TIMESTAMP_YEAR}."
         )
         return None
     return parsed
@@ -97,8 +102,10 @@ def _validate_movie_input(body):
         title = title.strip()
 
     duration = body.get("duration_minutes")
-    if duration is None or isinstance(duration, bool) or not isinstance(duration, int):
-        problems["duration_minutes"] = "Running time must be an integer."
+    if duration is None:
+        problems["duration_minutes"] = "Running time is required."
+    elif isinstance(duration, bool) or not isinstance(duration, int):
+        problems["duration_minutes"] = "Running time must be a whole number of minutes."
     elif not (1 <= duration <= 300):
         problems["duration_minutes"] = "Running time must be between 1 and 300 minutes."
 
@@ -245,11 +252,11 @@ def _validate_screening_input(body):
 
     movie_id = body.get("movie_id")
     if movie_id is None or isinstance(movie_id, bool) or not isinstance(movie_id, int) or movie_id <= 0:
-        problems["movie_id"] = "A valid movie ID is required."
+        problems["movie_id"] = "Please choose a movie."
 
     room_id = body.get("room_id")
     if room_id is None or isinstance(room_id, bool) or not isinstance(room_id, int) or room_id <= 0:
-        problems["room_id"] = "A valid room ID is required."
+        problems["room_id"] = "Please choose a theater room."
 
     starts_at = _parse_timestamp(body.get("starts_at"), "starts_at", problems)
 
@@ -361,10 +368,18 @@ def admin_update_screening(showtime_id):
     data = _validate_screening_input(body)
 
     with transaction() as cur:
-        # Check screening existence
-        cur.execute("SELECT showtime_id FROM showtimes WHERE showtime_id = %s", (showtime_id,))
-        if cur.fetchone() is None:
+        # Existence, and whether it has started (database clock, like BR-12). The row is locked so
+        # a start-time edit cannot race with this check. A started screening is never edited
+        # (any change, even an identical save); the D2 rule below (bookings) applies as well.
+        cur.execute(
+            "SELECT starts_at <= clock_timestamp() AS has_started FROM showtimes WHERE showtime_id = %s FOR UPDATE",
+            (showtime_id,),
+        )
+        row = cur.fetchone()
+        if row is None:
             raise AppError(HTTP_ERRORS[404])
+        if row["has_started"]:
+            raise AppError(SCREENING_STARTED)
 
         cur.execute("SELECT 1 FROM movies WHERE movie_id = %s", (data["movie_id"],))
         if cur.fetchone() is None:

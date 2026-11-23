@@ -95,7 +95,7 @@ def test_schema_was_applied(db_connection):
 
 @pytest.mark.parametrize(
     "table, expected",
-    [("users", 3), ("movies", 5), ("theater_rooms", 5), ("seats", 250), ("showtimes", 140)],
+    [("users", 3), ("movies", 5), ("theater_rooms", 5), ("seats", 250), ("showtimes", 280)],
 )
 def test_seed_record_counts(db_connection, table, expected):
     assert scalar(db_connection, f"SELECT count(*) FROM {table}") == expected

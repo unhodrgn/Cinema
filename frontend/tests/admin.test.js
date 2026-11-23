@@ -4,7 +4,8 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
 
-import { badge, dataTable, requireAdmin, toInputDateTime } from "../js/admin.js";
+import { badge, dataTable, requireAdmin, screeningEditLock, toInputDateTime } from "../js/admin.js";
+import { pageUser } from "../js/auth.js";
 import {
   BOOKING_STATUSES,
   bookingColumns,
@@ -131,11 +132,43 @@ test("requireAdmin sends a logged-out visitor to the login page and then to the 
   assert.deepEqual(navigations, ["/login.html?next=%2Fadmin-bookings.html"]);
 });
 
-test("requireAdmin treats an unreachable API like a logged-out visitor", async () => {
+const NETWORK_ERROR = Object.assign(new Error("The server cannot be reached. Please check that it is running."), {
+  code: "network_error",
+});
+
+test("requireAdmin does NOT redirect to login when the API cannot be reached: it says so and stops", async () => {
   const navigations = [];
-  const got = await requireAdmin({ page: "/admin-movies.html", messageBox: new FakeNode("div"), auth: fakeAuth(new Error("network")), navigate: (u) => navigations.push(u) });
+  const box = new FakeNode("div");
+  const form = new FakeNode("section");
+  const got = await requireAdmin({
+    page: "/admin-movies.html", messageBox: box, hideNode: form,
+    auth: fakeAuth(NETWORK_ERROR), navigate: (u) => navigations.push(u),
+  });
   assert.equal(got, null);
-  assert.equal(navigations.length, 1);
+  assert.deepEqual(navigations, []);
+  assert.match(box.textContent, /server cannot be reached/);
+  assert.equal(form.hidden, true);
+});
+
+test("requireAdmin also does not redirect on a server error (5xx)", async () => {
+  const navigations = [];
+  const box = new FakeNode("div");
+  const error = Object.assign(new Error("Something went wrong on the server."), { status: 500 });
+  const got = await requireAdmin({ page: "/admin-movies.html", messageBox: box, auth: fakeAuth(error), navigate: (u) => navigations.push(u) });
+  assert.equal(got, null);
+  assert.deepEqual(navigations, []);
+  assert.match(box.textContent, /went wrong on the server/);
+});
+
+test("pageUser: a user, no user (401 or no token) and an unreachable API are three different answers", async () => {
+  const user = { user_id: 3, username: "bob", role: "CUSTOMER" };
+  const box = new FakeNode("div");
+  assert.deepEqual(await pageUser(fakeAuth(user), box), { user, failed: false });
+  assert.deepEqual(await pageUser(fakeAuth(null), box), { user: null, failed: false });
+  assert.equal(box.textContent, "");
+
+  assert.deepEqual(await pageUser(fakeAuth(NETWORK_ERROR), box), { user: null, failed: true });
+  assert.match(box.textContent, /server cannot be reached/);
 });
 
 test("requireAdmin refuses a customer: message shown, form hidden, no redirect", async () => {
@@ -200,7 +233,7 @@ test("readFilters reports every bad filter and leaves it out of the query", () =
 
 test("the booking table shows one row per booking with every column", () => {
   const booking = {
-    booking_id: 9, user_id: 4, username: "alice", showtime_id: 21, title: "Phim 1", room_name: "Room 2",
+    booking_id: 9, user_id: 4, username: "alice", showtime_id: 21, title: "Skyline Rescue", room_name: "Room 2",
     starts_at: "2026-11-25T19:00:00+09:00", ends_at: "2026-11-25T21:00:00+09:00", total_amount: "28000.00",
     status: "BOOKED", payment_status: "UNPAID", booked_at: "2026-11-25T18:00:00+09:00",
     expires_at: "2026-11-25T18:10:00+09:00", paid_at: null, cancelled_at: null,
@@ -211,7 +244,7 @@ test("the booking table shows one row per booking with every column", () => {
     ["Booking", "Customer", "Movie", "Screening", "Seats", "Total", "Status", "Booked", "Last event"]);
   const wrapper = dataTable(columns, [booking]);
   assert.deepEqual(wrapper.all("td").map((td) => td.textContent), [
-    "#9", "alice (#4)", "Phim 1", "#21 · Room 2 · 2026-11-25 19:00", "A1, A2", "28,000",
+    "#9", "alice (#4)", "Skyline Rescue", "#21 · Room 2 · 2026-11-25 19:00", "A1, A2", "₩28,000",
     "BOOKEDUNPAID", "2026-11-25 18:00", "Pay by 2026-11-25 18:10",
   ]);
 });
@@ -225,4 +258,24 @@ test("the booking table renders hostile customer and movie text as plain text", 
   const wrapper = dataTable(bookingColumns(), [booking]);
   assert.equal(wrapper.all("img").length + wrapper.all("script").length, 0);
   assert.ok(wrapper.all("td")[1].textContent.includes(HOSTILE));
+});
+
+// --- the Edit lock of a screening --------------------------------------------------------------
+
+test("screeningEditLock: a started screening is locked with its own tooltip", () => {
+  const lock = screeningEditLock({ has_started: true, has_bookings: false });
+  assert.deepEqual(lock, { disabled: true, title: "This screening has already started and can't be edited." });
+});
+
+test("screeningEditLock: a screening with bookings is locked by D2, a free future one is not locked", () => {
+  assert.deepEqual(screeningEditLock({ has_started: false, has_bookings: true }),
+    { disabled: true, title: "This screening has bookings and cannot be modified (D2)." });
+  assert.deepEqual(screeningEditLock({ has_started: false, has_bookings: false }), { disabled: false, title: null });
+  assert.deepEqual(screeningEditLock({}), { disabled: false, title: null });
+});
+
+test("screeningEditLock: both rules apply at once, and the started reason comes first", () => {
+  const lock = screeningEditLock({ has_started: true, has_bookings: true });
+  assert.equal(lock.disabled, true);
+  assert.match(lock.title, /already started/);
 });

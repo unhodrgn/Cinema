@@ -10,6 +10,7 @@ from app.errors import (
     INTERNAL_ERROR,
     INVALID_CREDENTIALS,
     INVALID_JSON,
+    SCREENING_STARTED,
     SQLSTATE_ERRORS,
     VALIDATION_ERROR,
 )
@@ -34,7 +35,8 @@ def documented_errors():
 
 def implemented_errors():
     infos = list(SQLSTATE_ERRORS.values()) + list(HTTP_ERRORS.values())
-    infos += [INTERNAL_ERROR, DATABASE_UNAVAILABLE, VALIDATION_ERROR, INVALID_JSON, INVALID_CREDENTIALS]
+    infos += [INTERNAL_ERROR, DATABASE_UNAVAILABLE, VALIDATION_ERROR, INVALID_JSON, INVALID_CREDENTIALS,
+              SCREENING_STARTED]
     return {(info.status, info.code) for info in infos}
 
 

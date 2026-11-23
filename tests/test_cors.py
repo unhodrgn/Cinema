@@ -290,3 +290,79 @@ def test_credentials_are_never_allowed(client):
     ):
         assert "Access-Control-Allow-Credentials" not in response.headers
         assert allow_origin(response) != "*"
+
+
+# --- regression: a real preflight for EVERY route and EVERY method it supports ---------------
+# Found in the browser check (Phase 5): a URL served by separate GET and POST rules was granted
+# only for the first rule's method, so every admin write and GET /api/bookings failed in a browser.
+
+import re  # noqa: E402
+
+from app.cors import ALLOWED_METHODS  # noqa: E402
+
+
+def _concrete(rule_text):
+    return re.sub(r"<[^>]+>", "1", rule_text)
+
+
+def _methods_by_path(app):
+    """{concrete path: set of methods any rule for it accepts} for the API and health routes."""
+    by_path = {}
+    for rule in app.url_map.iter_rules():
+        if rule.rule.startswith(("/api", "/health")):
+            by_path.setdefault(_concrete(rule.rule), set()).update(rule.methods & set(ALLOWED_METHODS))
+    return by_path
+
+
+ROUTE_METHODS = sorted((path, method) for path, methods in _methods_by_path(make_app()).items() for method in methods)
+WRITE_HEADERS = {"Access-Control-Request-Headers": "authorization,content-type"}
+
+
+def test_the_route_list_covers_the_whole_api():
+    paths = {path for path, _ in ROUTE_METHODS}
+    assert "/api/admin/movies" in paths and "/api/bookings" in paths and "/api/admin/screenings/1" in paths
+    assert {m for p, m in ROUTE_METHODS if p == "/api/admin/movies"} == {"GET", "POST"}
+    assert {m for p, m in ROUTE_METHODS if p == "/api/bookings"} == {"GET", "POST"}
+    assert {m for p, m in ROUTE_METHODS if p == "/api/admin/movies/1"} == {"GET", "PUT"}
+
+
+@pytest.mark.parametrize("path, method", ROUTE_METHODS)
+def test_a_preflight_is_granted_for_every_route_and_every_method_it_supports(client, path, method):
+    response = preflight(client, FRONTEND, method, path, WRITE_HEADERS)
+
+    assert response.status_code == 204
+    assert allow_origin(response) == FRONTEND
+    assert "POST" in response.headers["Access-Control-Allow-Methods"]
+
+
+@pytest.mark.parametrize("path, method", ROUTE_METHODS)
+def test_a_preflight_from_a_disallowed_origin_gets_no_permission_on_every_route(client, path, method):
+    response = preflight(client, EVIL, method, path, WRITE_HEADERS)
+
+    assert allow_origin(response) is None
+    assert "Access-Control-Allow-Methods" not in response.headers
+
+
+def test_a_preflight_for_a_method_the_url_does_not_accept_is_refused(client):
+    by_path = _methods_by_path(client.application)
+    checked = 0
+    for path, accepted in by_path.items():
+        for method in set(ALLOWED_METHODS) - accepted:
+            response = preflight(client, FRONTEND, method, path, WRITE_HEADERS)
+            assert allow_origin(response) is None, (path, method)
+            assert "Access-Control-Allow-Methods" not in response.headers, (path, method)
+            checked += 1
+    assert checked > 20  # most URLs accept only one of GET / POST / PUT
+
+
+@pytest.mark.parametrize("method", ["DELETE", "PATCH", "TRACE", ""])
+def test_a_preflight_for_a_method_outside_the_allow_list_is_refused_on_every_route(client, method):
+    for path in _methods_by_path(client.application):
+        response = preflight(client, FRONTEND, method, path, WRITE_HEADERS)
+        assert allow_origin(response) is None, (path, method)
+
+
+def test_a_preflight_for_an_unknown_path_or_header_is_refused(client):
+    assert allow_origin(preflight(client, FRONTEND, "POST", "/api/admin/nothing", WRITE_HEADERS)) is None
+    odd_header = {"Access-Control-Request-Headers": "authorization,x-custom"}
+    assert allow_origin(preflight(client, FRONTEND, "POST", "/api/admin/movies", odd_header)) is None

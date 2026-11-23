@@ -2,8 +2,9 @@
 // All values are rendered with text nodes (no innerHTML).
 
 import { getApi } from "../api.js";
-import { getAuth, loginUrl } from "../auth.js";
-import { formatMoney, formatTimeRange } from "../format.js";
+import { getAuth, loginUrl, pageUser } from "../auth.js";
+import { confirmExpiry, createCountdown } from "../deadline.js";
+import { formatDateTimeRange, formatMoney } from "../format.js";
 import { initNav } from "../nav.js";
 import { seatLabel } from "../seats.js";
 import { clear, el, showMessage } from "../ui.js";
@@ -11,15 +12,10 @@ import { clear, el, showMessage } from "../ui.js";
 async function main() {
   await initNav(document.getElementById("site-nav"));
 
-  const auth = getAuth();
-  let user = null;
-  try {
-    user = await auth.currentUser();
-  } catch {
-    user = null;
-  }
-
   const messageBox = document.getElementById("message");
+  const { user, failed } = await pageUser(getAuth(), messageBox);
+  if (failed) return;
+
   const card = document.getElementById("booking-card");
   const movieTitle = document.getElementById("movie-title");
   const badgesBox = document.getElementById("badges");
@@ -49,35 +45,61 @@ async function main() {
     return;
   }
 
-  let timerInterval = null;
+  let countdown = null;
+  let deadlineChecked = false; // the post-deadline check ran once; do not repeat it forever
 
   function stopTimer() {
-    if (timerInterval) {
-      clearInterval(timerInterval);
-      timerInterval = null;
+    if (countdown) {
+      countdown.stop();
+      countdown = null;
+    }
+  }
+
+  const EXPIRED_TEXT = "Payment window has elapsed. The booking has expired and seats are released.";
+
+  /** The countdown reached zero: the server decides, so ask it again and show the answer. */
+  async function onDeadlineReached() {
+    payButton.disabled = true;
+    if (deadlineChecked) {
+      countdownTimer.textContent = "Time elapsed. Press Pay Now to check the booking status.";
+      payButton.disabled = false;
+      return;
+    }
+    deadlineChecked = true;
+    countdownTimer.textContent = "Time elapsed. Checking the booking status…";
+    const { booking, stillOpen } = await confirmExpiry({
+      reload: async () => {
+        try {
+          return (await getApi().get(`/api/bookings/${bookingId}`)).booking;
+        } catch {
+          return null;
+        }
+      },
+      wait: (ms) => new Promise((resolve) => globalThis.setTimeout(resolve, ms)),
+    });
+    if (!booking) {
+      countdownTimer.textContent = "Time elapsed. The booking status could not be loaded; reload the page.";
+      payButton.disabled = false;
+      return;
+    }
+    render(booking);
+    if (booking.status === "EXPIRED") {
+      showMessage(messageBox, "error", EXPIRED_TEXT);
+    } else if (stillOpen) {
+      payButton.disabled = false; // the server still allows payment: let the user try
     }
   }
 
   function startCountdown(expiresAtIso) {
     stopTimer();
-    const expiresMs = Date.parse(expiresAtIso);
-    if (Number.isNaN(expiresMs)) return;
-
-    function update() {
-      const remainingMs = expiresMs - Date.now();
-      if (remainingMs <= 0) {
-        countdownTimer.textContent = "Time elapsed! This booking will expire.";
-        stopTimer();
-        return;
-      }
-      const totalSec = Math.floor(remainingMs / 1000);
-      const min = Math.floor(totalSec / 60);
-      const sec = totalSec % 60;
-      countdownTimer.textContent = `Time remaining: ${min}m ${sec < 10 ? "0" : ""}${sec}s`;
-    }
-
-    update();
-    timerInterval = setInterval(update, 1000);
+    payButton.disabled = false;
+    countdown = createCountdown({
+      expiresAtIso,
+      onTick: (text) => {
+        countdownTimer.textContent = text;
+      },
+      onElapsed: onDeadlineReached,
+    });
   }
 
   async function loadBooking() {
@@ -96,7 +118,7 @@ async function main() {
     movieTitle.textContent = b.title;
     bookingIdEl.textContent = String(b.booking_id);
     roomNameEl.textContent = b.room_name;
-    screeningTimeEl.textContent = formatTimeRange(b.starts_at, b.ends_at);
+    screeningTimeEl.textContent = formatDateTimeRange(b.starts_at, b.ends_at);
     totalAmountEl.textContent = formatMoney(b.total_amount);
     bookedAtEl.textContent = b.booked_at ? b.booked_at.slice(0, 19).replace("T", " ") : "-";
 
@@ -147,7 +169,7 @@ async function main() {
       if (response.outcome === "PAID") {
         showMessage(messageBox, "success", "Payment successful! Your booking is fully confirmed.");
       } else if (response.outcome === "EXPIRED") {
-        showMessage(messageBox, "error", "Payment window has elapsed. The booking has expired and seats are released.");
+        showMessage(messageBox, "error", EXPIRED_TEXT);
       }
       render(response.booking);
     } catch (err) {

@@ -72,10 +72,10 @@ def test_the_real_frontend_modules_read_the_live_catalog(fresh_db, tmp_path):
             assert status == 200, page
             assert "connect-src 'self' " + live.api_origin in headers["content-security-policy"]
 
-    assert out["titles"] == [f"Phim {n}" for n in range(1, 6)] and out["detailMatches"] is True
+    assert out["titles"] == ["Skyline Rescue", "Paper Lanterns", "Dinner for Eight", "Cold Signal", "Little Cloud"] and out["detailMatches"] is True
     assert out["day"] == day and out["count"] == 20 and out["perMovie"] == 4
     assert out["started"] is False  # tomorrow cannot have started
-    assert out["prices"] == ["12,000"]
+    assert out["prices"] == ["₩12,000"]
     assert out["firstStart"].startswith(day) and all(re.fullmatch(r"\d\d:\d\d - \d\d:\d\d", t) for t in out["times"])
     assert out["times"] == sorted(out["times"])  # ordered by start time
     assert out["badDate"]["code"] == "validation_error" and "date" in out["badDate"]["fields"]

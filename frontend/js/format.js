@@ -5,20 +5,21 @@
 // the page reads the same in every browser time zone. There is deliberately no `Date` and no
 // `Intl` here: converting to the viewer's zone would show other people's local time.
 //
-// Money: decimal strings ("12000.00"); never converted to a floating-point number. No
-// currency is approved for the project, so none is shown.
+// Money: decimal strings ("12000.00"); never converted to a floating-point number. Amounts are
+// Korean won, shown with the ₩ sign in front ("₩12,000").
+export const CURRENCY_SIGN = "₩";
 
 const ISO_DATE_TIME = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/;
 const DECIMAL = /^(-?)(\d+)(?:\.(\d+))?$/;
 
-/** "12000.00" -> "12,000"; "9500.50" -> "9,500.50"; anything else -> "". */
+/** "12000.00" -> "₩12,000"; "9500.50" -> "₩9,500.50"; "-5.25" -> "-₩5.25"; anything else -> "". */
 export function formatMoney(value) {
   const match = DECIMAL.exec(typeof value === "string" ? value.trim() : "");
   if (!match) return "";
   const [, sign, whole, fraction = ""] = match;
   const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const kept = /^0*$/.test(fraction) ? "" : `.${fraction}`;
-  return `${sign}${grouped}${kept}`;
+  return `${sign}${CURRENCY_SIGN}${grouped}${kept}`;
 }
 
 /** "2026-11-25T19:00:00+09:00" -> "2026-11-25 19:00" (as written); invalid -> "". */
@@ -44,6 +45,17 @@ export function formatTimeRange(start, end) {
   const from = formatTime(start);
   const to = formatTime(end);
   return from && to ? `${from} - ${to}` : from;
+}
+
+/**
+ * "2026-11-25 19:00 - 21:00" (date once, as written). When the end falls on another day the end
+ * carries its own date: "2026-11-25 23:30 - 2026-11-26 01:10". A missing or invalid end gives only the start.
+ */
+export function formatDateTimeRange(start, end) {
+  const from = formatDateTime(start);
+  if (!from) return "";
+  if (!formatTime(end)) return from;
+  return formatDate(end) === formatDate(start) ? `${from} - ${formatTime(end)}` : `${from} - ${formatDateTime(end)}`;
 }
 
 /** "120 min". */

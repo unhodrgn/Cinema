@@ -311,8 +311,8 @@ def main():
         print("Set PGDATABASE to a disposable database (refusing to guess).")
         return 2
     ctl = connect()
-    if one(ctl, "SELECT count(*) FROM bookings") != 0 or one(ctl, "SELECT count(*) FROM showtimes") != 140:
-        print("Refusing to run: database must be freshly seeded (140 screenings) with no bookings.")
+    if one(ctl, "SELECT count(*) FROM bookings") != 0 or one(ctl, "SELECT count(*) FROM showtimes") != 280:
+        print("Refusing to run: database must be freshly seeded (280 screenings) with no bookings.")
         return 2
     ctl.commit()
     cust = customers(ctl)

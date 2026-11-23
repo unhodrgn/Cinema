@@ -330,7 +330,7 @@ def test_list_screenings_returns_screenings_and_the_rooms(admin):
     data = admin.get("/api/admin/screenings").get_json()
     assert len(data["rooms"]) >= 5
     assert set(data["rooms"][0]) == {"room_id", "room_name"}
-    assert len(data["screenings"]) >= 140
+    assert len(data["screenings"]) >= 280
     first = data["screenings"][0]
     assert {"showtime_id", "movie_id", "title", "room_id", "room_name", "starts_at", "ends_at",
             "ticket_price", "has_started", "has_bookings"} <= set(first)
@@ -668,3 +668,118 @@ def test_a_booking_keeps_its_price_snapshot_when_the_screening_price_changes_bef
     booking = customer.get(f"/api/bookings/{booking_id}").get_json()["booking"]
     assert booking["total_amount"] == "13000.00"
     assert booking["seats"][0]["price_at_booking"] == "13000.00"
+
+
+# --- regression (Phase 5 browser check): messages are written for people, not for programmers ---
+
+RAW_NAMES = ("starts_at", "ends_at", "movie_id", "room_id", "duration_minutes", "ticket_price", "release_date", " ID ")
+
+
+def _all_messages(response):
+    return list(error_of(response)["fields"].values())
+
+
+def test_screening_validation_messages_name_no_internal_field(admin):
+    empty = _all_messages(admin.post("/api/admin/screenings", {}))
+    bad_time = _all_messages(admin.post("/api/admin/screenings", {
+        "movie_id": 1, "room_id": 1, "starts_at": "not a time", "ends_at": "x", "ticket_price": 1}))
+    odd_year = _all_messages(admin.post("/api/admin/screenings", {
+        "movie_id": 1, "room_id": 1, "starts_at": "1800-01-01T10:00", "ticket_price": 1}))
+
+    for message in empty + bad_time + odd_year:
+        assert not any(raw in message for raw in RAW_NAMES), message
+    assert "Please choose a movie." in empty and "Please choose a theater room." in empty
+    assert "Start time is required." in empty
+    assert "Start time must be a valid date and time." in bad_time
+    assert "End time must be a valid date and time." in bad_time
+
+
+def test_movie_validation_messages_name_no_internal_field(admin):
+    missing = _all_messages(admin.post("/api/admin/movies", {}))
+    wrong_type = _all_messages(admin.post("/api/admin/movies", {"title": "T", "duration_minutes": "90"}))
+
+    for message in missing + wrong_type:
+        assert not any(raw in message for raw in RAW_NAMES), message
+    assert "Running time is required." in missing
+    assert "Running time must be a whole number of minutes." in wrong_type
+
+
+# --- a screening that has started can no longer be edited (like a real cinema) -----------------
+
+
+def _spare_screening(admin_db, started=False, starts_in_hours=3):
+    """A screening alone in its own new room (so it can be moved into the past without an overlap)."""
+    conn = admin_db.connect()
+    try:
+        spare = time_travel.create_spare_room_screening(conn, starts_in_hours=starts_in_hours)
+        if started:
+            time_travel.start_screening_in_past(conn, spare["showtime_id"])
+    finally:
+        conn.close()
+    return spare
+
+
+def _screening_of(admin, spare):
+    return admin.get(f"/api/admin/screenings/{spare['showtime_id']}").get_json()["screening"]
+
+
+def test_a_started_screening_cannot_be_edited(admin, admin_db):
+    spare = _spare_screening(admin_db, started=True)
+    screening = _screening_of(admin, spare)
+    assert screening["has_started"] is True and screening["has_bookings"] is False
+
+    response = admin.put(f"/api/admin/screenings/{spare['showtime_id']}", update_body(screening, ticket_price="5000"))
+
+    assert response.status_code == 409, response.get_json()
+    assert error_of(response) == {"code": "screening_has_started",
+                                  "message": "This screening has already started and can't be edited."}
+    assert _screening_of(admin, spare) == screening  # nothing changed
+
+
+def test_a_started_screening_rejects_even_an_identical_save(admin, admin_db):
+    spare = _spare_screening(admin_db, started=True)
+    screening = _screening_of(admin, spare)
+
+    response = admin.put(f"/api/admin/screenings/{spare['showtime_id']}", update_body(screening))
+
+    assert response.status_code == 409 and error_of(response)["code"] == "screening_has_started"
+
+
+def test_a_future_screening_without_bookings_can_be_edited(admin, admin_db):
+    spare = _spare_screening(admin_db)
+    screening = _screening_of(admin, spare)
+    assert screening["has_started"] is False and screening["has_bookings"] is False
+
+    response = admin.put(f"/api/admin/screenings/{spare['showtime_id']}", update_body(screening, ticket_price="7500"))
+
+    assert response.status_code == 200, response.get_json()
+    assert _screening_of(admin, spare)["ticket_price"] == "7500.00"
+
+
+def test_both_locks_apply_a_booked_future_screening_and_a_started_one_are_each_refused(admin, customer, admin_db):
+    booked = _spare_screening(admin_db)
+    book_first_free_seat(customer, booked["showtime_id"])
+    response = admin.put(f"/api/admin/screenings/{booked['showtime_id']}",
+                         update_body(_screening_of(admin, booked), ticket_price="1"))
+    assert response.status_code == 409 and error_of(response)["code"] == "screening_has_bookings"
+
+    # started AND booked: the booking was made while it was still in the future
+    both = _spare_screening(admin_db)
+    book_first_free_seat(customer, both["showtime_id"])
+    conn = admin_db.connect()
+    try:
+        time_travel.start_screening_in_past(conn, both["showtime_id"])
+    finally:
+        conn.close()
+    screening = _screening_of(admin, both)
+    assert screening["has_started"] is True and screening["has_bookings"] is True
+    response = admin.put(f"/api/admin/screenings/{both['showtime_id']}", update_body(screening, ticket_price="1"))
+    assert response.status_code == 409 and error_of(response)["code"] == "screening_has_started"
+
+
+def test_editing_an_unknown_screening_is_still_404_and_invalid_data_still_400(admin, admin_db):
+    spare = _spare_screening(admin_db, started=True)
+    screening = _screening_of(admin, spare)
+    assert admin.put("/api/admin/screenings/99999999", update_body(screening)).status_code == 404
+    bad = admin.put(f"/api/admin/screenings/{spare['showtime_id']}", {})  # validation comes before the lock
+    assert bad.status_code == 400 and error_of(bad)["code"] == "validation_error"

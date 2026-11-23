@@ -96,6 +96,7 @@ Validation errors add a `fields` object (field name → fixed message):
 | 409 | `screening_has_bookings` | Screening has booking records and cannot be modified, any status (`UC001`, D2) |
 | 409 | `seat_unavailable` | Seat already reserved, including a lost race (`UC002`) |
 | 409 | `screening_started` | Screening already started (`UC004`) |
+| 409 | `screening_has_started` | An administrator tried to edit a screening that has already started (database clock); not a database rule |
 | 409 | `cancellation_closed` | Screening started, no cancellation (`UC005`) |
 | 409 | `invalid_booking_state` | Not possible in the booking's state (`UC006`) |
 | 409 | `screening_overlap` | Overlaps another screening in the room (`23P01`) |
@@ -334,6 +335,7 @@ A path id that is not a positive integer, or is larger than the database can hol
 
 **`PUT /api/admin/screenings/{id}`** updates an existing screening.
 * Same body and validation as creation (full replace). If `ends_at` is omitted it is calculated again from the (possibly new) movie's duration.
+* A screening that has already started (`starts_at` is not in the future, database clock) can no longer be edited: any `PUT` is rejected with `409 screening_has_started` ("This screening has already started and can't be edited."), even an identical save. This is checked first, so a started screening that also has bookings answers `screening_has_started`.
 * Enforces **D2**: rejected with `409 screening_has_bookings` (`UC001`) if ANY booking references this screening, regardless of booking status (BOOKED, CANCELLED, or EXPIRED), **and** the save would change `movie_id`, `room_id`, `starts_at`, `ends_at` or `ticket_price`. Saving a booked screening with identical values is not a modification and answers `200`.
 * Overlapping screenings in the same room fail with `409 screening_overlap` (`23P01`).
 * Answers `200 {"screening": {...}}`.

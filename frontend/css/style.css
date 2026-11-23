@@ -322,20 +322,23 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   flex-direction: column;
   gap: 0.4rem;
   margin: 1.5rem auto;
+  max-width: 100%;
   overflow-x: auto;
   padding: 0.5rem 0;
   width: fit-content;
 }
+/* One grid row per seat row: a label column and ten seat columns that may shrink (down to a
+   still tappable size) so the 10 seats always fit the card; at most 2.2rem each on wide screens. */
 .seat-row {
   align-items: center;
-  display: flex;
+  display: grid;
   gap: 0.35rem;
+  grid-template-columns: 1.5rem repeat(10, minmax(0, 2.2rem));
 }
 .seat-row-label {
   color: var(--muted);
   font-weight: 600;
   text-align: center;
-  width: 1.5rem;
 }
 .seat-btn {
   align-items: center;
@@ -347,11 +350,12 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   display: inline-flex;
   font-size: 0.85rem;
   font-weight: 500;
-  height: 2.2rem;
+  aspect-ratio: 1;
   justify-content: center;
+  min-width: 0;
   padding: 0;
   transition: border-color 0.1s, background-color 0.1s;
-  width: 2.2rem;
+  width: 100%;
 }
 .seat-btn:hover:not(:disabled) {
   border-color: var(--accent);
@@ -369,6 +373,13 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   cursor: not-allowed;
   opacity: 0.5;
   text-decoration: line-through;
+}
+
+/* Narrow screens: tighter columns so ten seats and their row label fit a 375px phone. This block
+   must stay AFTER the base .seat-row / .seat-btn rules (same specificity, last one wins). */
+@media (max-width: 480px) {
+  .seat-row { gap: 0.2rem; grid-template-columns: 1.1rem repeat(10, minmax(0, 2.2rem)); }
+  .seat-btn { font-size: 0.75rem; }
 }
 
 .seat-summary-bar {

@@ -69,6 +69,12 @@ INVALID_CREDENTIALS = ErrorInfo(
 )
 FORBIDDEN = ErrorInfo(403, "forbidden", "You do not have permission to do this.")
 VALIDATION_ERROR = ErrorInfo(400, "validation_error", "One or more fields are not valid.")
+# A screening that has started is history, like in a real cinema: it can no longer be edited.
+# Not a database rule (the database only protects screenings that have bookings, D2): the
+# application checks it against the database clock when an administrator saves a screening.
+SCREENING_STARTED = ErrorInfo(
+    409, "screening_has_started", "This screening has already started and can't be edited."
+)
 INVALID_JSON = ErrorInfo(400, "invalid_json", "The request body must be a valid JSON object.")
 UNSUPPORTED_MEDIA_TYPE = ErrorInfo(
     415, "unsupported_media_type", "Requests with a body must use Content-Type: application/json."

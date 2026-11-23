@@ -105,8 +105,8 @@ BEGIN
  PERFORM pg_temp.ok((SELECT count(*) FROM theater_rooms) = 5, 'SEED 5 rooms');
  PERFORM pg_temp.ok((SELECT count(*) FROM seats) = 250, 'SEED 250 seats');
  PERFORM pg_temp.ok((SELECT bool_and(c = 50) AND count(*) = 5 FROM (SELECT count(*) c FROM seats GROUP BY room_id) x), 'SEED 50 seats per room');
- PERFORM pg_temp.ok((SELECT count(*) FROM showtimes) = 140, 'SEED 140 screenings');
- PERFORM pg_temp.ok((SELECT count(DISTINCT (starts_at AT TIME ZONE 'Asia/Seoul')::date) FROM showtimes) = 7, 'SEED 7 consecutive days');
+ PERFORM pg_temp.ok((SELECT count(*) FROM showtimes) = 280, 'SEED 280 screenings');
+ PERFORM pg_temp.ok((SELECT count(DISTINCT (starts_at AT TIME ZONE 'Asia/Seoul')::date) FROM showtimes) = 14, 'SEED 14 consecutive days');
  PERFORM pg_temp.ok((SELECT bool_and(c = 20) FROM (SELECT count(*) c FROM showtimes GROUP BY (starts_at AT TIME ZONE 'Asia/Seoul')::date) x), 'SEED 20 screenings per day');
  PERFORM pg_temp.ok((SELECT count(*) FROM showtimes s JOIN movies m USING (movie_id)
                       WHERE s.ends_at <> s.starts_at + m.duration_minutes * interval '1 minute') = 0, 'SEED every ends_at = starts_at + movie duration (DB-02)');
@@ -441,7 +441,7 @@ BEGIN
  PERFORM pg_temp.expect_err(format($$INSERT INTO movies(title,duration_minutes) VALUES ('x', 0)$$), '23514', 'CHECK duration_minutes >= 1');
  PERFORM pg_temp.expect_err(format($$INSERT INTO seats(room_id,seat_row,seat_number) VALUES ((SELECT min(room_id) FROM theater_rooms),'F',1)$$), '23514', 'CHECK seat_row in A..E');
  PERFORM pg_temp.expect_err(format($$INSERT INTO seats(room_id,seat_row,seat_number) VALUES ((SELECT min(room_id) FROM theater_rooms),'A',1)$$), '23505', 'UNIQUE (room_id, seat_row, seat_number)');
- PERFORM pg_temp.expect_err(format($$INSERT INTO theater_rooms(room_name) VALUES ('Phòng 1')$$), '23505', 'UNIQUE room_name');
+ PERFORM pg_temp.expect_err(format($$INSERT INTO theater_rooms(room_name) VALUES ('Hall 1')$$), '23505', 'UNIQUE room_name');
  PERFORM pg_temp.expect_err(format($$UPDATE showtimes SET ticket_price = -1 WHERE showtime_id = %s$$, pg_temp.mk_show(18)), '23514', 'CHECK ticket_price >= 0');
  PERFORM pg_temp.expect_err(format($$DELETE FROM users WHERE user_id = %s$$, c1), '23001', 'FK users referenced by bookings cannot be deleted (RESTRICT)');
  PERFORM pg_temp.expect_err($q$DO $x$ BEGIN

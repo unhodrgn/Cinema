@@ -219,3 +219,85 @@ def test_the_backend_disables_static_files_and_templates_explicitly():
     source = (APP / "__init__.py").read_text(encoding="utf-8")
 
     assert "static_folder=None" in source and "template_folder=None" in source
+
+
+# --- regression (Phase 5 browser check, #12): no developer-facing text on the home page ------------
+
+DEVELOPER_TEXT = ["frontend server", "database access", "api address", "rest api", "over http", "api_base_url",
+                  "reported by the api"]
+
+
+def test_the_home_page_has_no_developer_facing_text():
+    html = code_of(FRONTEND / "index.html").lower()  # comments are not shown to anyone
+    script = code_of(FRONTEND / "js" / "pages" / "index.js").lower()
+
+    for phrase in DEVELOPER_TEXT:
+        assert phrase not in html, phrase
+    assert "api-address" not in html and "api-address" not in script
+
+
+# --- regression (Phase 5 browser check, #6 and #7) -------------------------------------------------
+
+
+def test_pages_ask_who_is_logged_in_only_through_pageUser_so_a_network_error_never_means_logged_out():
+    """#6: `auth.currentUser()` throws for an unreachable API. Pages that turned the throw into
+    "no user" redirected to the login page. Only nav (shows links), login (form explains) and
+    auth.js itself (pageUser) may call it directly."""
+    allowed = {"nav.js", "login.js", "auth.js"}
+    offenders = [
+        path.name
+        for path in (FRONTEND / "js").rglob("*.js")
+        if path.name not in allowed and re.search(r"\.currentUser\(", code_of(path))
+    ]
+
+    assert offenders == []
+    for name in ("booking.js", "bookings.js", "seats.js"):
+        assert "pageUser(" in code_of(FRONTEND / "js" / "pages" / name), name
+    assert "pageUser(" in code_of(FRONTEND / "js" / "admin.js")
+
+
+def test_booking_pages_show_the_screening_date_not_only_the_time():
+    """#7: a booking is for a day, not just for a clock time."""
+    for name in ("booking.js", "bookings.js"):
+        code = code_of(FRONTEND / "js" / "pages" / name)
+        assert "formatDateTimeRange(" in code, name
+        assert "formatTimeRange(" not in code, name
+
+
+def test_the_booking_page_asks_the_server_again_when_the_countdown_ends():
+    """#3: reaching zero must not leave a stale BOOKED / Pay Now on screen."""
+    code = code_of(FRONTEND / "js" / "pages" / "booking.js")
+
+    assert "createCountdown(" in code and "confirmExpiry(" in code
+    assert "payButton.disabled = true" in code
+
+
+def _css_block(css, selector):
+    match = re.search(re.escape(selector) + r"\s*\{([^}]*)\}", css)
+    assert match, selector
+    return match.group(1)
+
+
+def test_the_seat_grid_can_shrink_to_fit_a_375px_phone():
+    """#5: ten fixed 2.2rem seats plus gaps made a 432px grid that overflowed a 375px card.
+    Layout cannot be measured here, so this guards the rules that make it shrink (the real
+    check is done in a browser)."""
+    css = code_of(FRONTEND / "css" / "style.css")
+    grid, row, button = _css_block(css, ".seat-grid"), _css_block(css, ".seat-row"), _css_block(css, ".seat-btn")
+
+    assert "max-width: 100%" in grid
+    assert "display: grid" in row and "repeat(10, minmax(0," in row
+    assert "width: 100%" in button and "aspect-ratio: 1" in button and "min-width: 0" in button
+    assert not re.search(r"(^|\n)\s*width:\s*2\.2rem", button)  # no fixed seat width
+
+    # The narrow-screen override has the same specificity as the base rule, so it must come after.
+    narrow = css.index("@media (max-width: 480px) {\n  .seat-row")
+    assert narrow > css.index(".seat-row {") and narrow > css.index(".seat-btn {")
+
+
+def test_the_admin_screenings_page_locks_edit_through_screeningEditLock():
+    """B: started screenings (and screenings with bookings) get a disabled Edit button."""
+    code = code_of(FRONTEND / "js" / "pages" / "admin_screenings.js")
+
+    assert "screeningEditLock(" in code and "disabled: lock.disabled" in code and "title: lock.title" in code
+    assert "has_bookings ?" not in code  # the old inline D2-only check is gone

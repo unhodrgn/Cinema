@@ -3,8 +3,10 @@
 No login is needed for any of it (D4). Needs a disposable PostgreSQL (explicit TEST_DB_PORT).
 """
 
+import datetime as dt
 import re
 import uuid
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -99,11 +101,11 @@ def test_the_movie_list_needs_no_login_and_has_the_six_attributes(client):
 
     assert response.status_code == 200
     movies = response.get_json()["movies"]
-    assert [m["title"] for m in movies][:5] == [f"Phim {n}" for n in range(1, 6)]
+    assert [m["title"] for m in movies][:5] == ["Skyline Rescue", "Paper Lanterns", "Dinner for Eight", "Cold Signal", "Little Cloud"]
     first = movies[0]
     assert set(first) == {"movie_id", "title", "genre", "duration_minutes", "rating", "synopsis", "release_date"}
     assert first["genre"] == "Action" and first["duration_minutes"] == 120 and first["rating"] == "ALL"
-    assert first["synopsis"] == "Demo movie 1" and first["release_date"] == "2026-09-01"
+    assert first["synopsis"].startswith("A rescue pilot") and first["release_date"] == (dt.datetime.now(ZoneInfo("Asia/Seoul")).date() - dt.timedelta(days=90)).isoformat()
     assert "Set-Cookie" not in response.headers and response.headers["Cache-Control"] == "no-store"
 
 

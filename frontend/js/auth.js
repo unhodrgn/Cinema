@@ -8,6 +8,7 @@
 // if it is one of the known pages below.
 
 import { getApi, setUnauthorizedHandler } from "./api.js";
+import { describeError, showMessage } from "./ui.js";
 
 export const LOGIN_PAGE = "/login.html";
 export const REGISTER_PAGE = "/register.html";
@@ -123,6 +124,22 @@ export function createAuth({
   }
 
   return { login, register, logout, currentUser, handleUnauthorized };
+}
+
+/**
+ * The user for a page that needs a login: `{ user, failed }`.
+ *  - no token or a 401 -> `{ user: null, failed: false }`: the caller sends the browser to login;
+ *  - the API cannot be reached (or answers 5xx) -> the reason is shown in `messageBox` (when one
+ *    is given) and `{ user: null, failed: true }`: the caller just stops. Not knowing who the user is must never
+ *    look like "logged out", so there is no redirect and the token is kept.
+ */
+export async function pageUser(auth, messageBox) {
+  try {
+    return { user: await auth.currentUser(), failed: false };
+  } catch (error) {
+    if (messageBox) showMessage(messageBox, "error", describeError(error));
+    return { user: null, failed: true };
+  }
 }
 
 let sharedAuth = null;

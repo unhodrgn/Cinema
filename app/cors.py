@@ -11,7 +11,7 @@ with ``fetch``. The browser therefore enforces CORS. This module implements the 
 * ``Vary: Origin`` is added whenever an allow-list exists, so caches never mix the answers.
 * A preflight (``OPTIONS`` with ``Access-Control-Request-Method``) is granted only if the
   origin is allowed, the URL matches a real route, the requested method is one of
-  ``GET, POST, PUT`` and that route accepts it, and the requested headers are limited to
+  ``GET, POST, PUT`` and at least one rule for that URL accepts it, and the requested headers are limited to
   ``Authorization`` and ``Content-Type``. Anything else falls through to Flask's normal
   handling, which carries no permission, so the browser blocks the real request.
 * ``Access-Control-Allow-Credentials`` is never sent: authentication is a Bearer token in
@@ -22,7 +22,7 @@ With an empty allow-list (the default) no CORS header is ever added: same-origin
 
 from urllib.parse import urlsplit
 
-from flask import g, request
+from flask import current_app, g, request
 
 ALLOWED_METHODS = ("GET", "POST", "PUT")
 ALLOWED_HEADERS = ("Authorization", "Content-Type")
@@ -98,8 +98,10 @@ def _preflight_is_acceptable():
     method = (request.headers.get("Access-Control-Request-Method") or "").strip().upper()
     if method not in ALLOWED_METHODS:
         return False
-    rule = request.url_rule  # None when no route matched: unknown paths get no permission
-    if rule is None or method not in rule.methods:
+    # Every rule that matches the path counts: a URL served by separate GET and POST rules
+    # (``@bp.get`` + ``@bp.post``) must accept a preflight for either method. ``request.url_rule``
+    # is only the FIRST matching rule, so it is not enough. Unknown paths give an empty list.
+    if method not in current_app.create_url_adapter(request).allowed_methods():
         return False
     requested = request.headers.get("Access-Control-Request-Headers", "")
     allowed = {name.lower() for name in ALLOWED_HEADERS}

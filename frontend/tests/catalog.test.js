@@ -41,8 +41,8 @@ beforeEach(() => {
 });
 afterEach(() => { globalThis.document = original; });
 
-const MOVIE = { movie_id: 3, title: "Phim 3", genre: "Comedy", duration_minutes: 140, rating: "15",
-  synopsis: "Demo movie 3", release_date: "2026-10-01" };
+const MOVIE = { movie_id: 3, title: "Dinner for Eight", genre: "Comedy", duration_minutes: 140, rating: "15",
+  synopsis: "A dinner party spirals out of control.", release_date: "2026-10-01" };
 const HOSTILE = '<img src=x onerror=alert(1)><script>alert(2)</script>';
 
 test("movie links are built only from usable ids", () => {
@@ -64,8 +64,8 @@ test("a movie card links to its page and shows the synopsis as text", () => {
 
   const link = card.find((n) => n.tag === "a");
   assert.equal(link.attributes.href, "/movie.html?id=3");
-  assert.equal(link.textContent, "Phim 3");
-  assert.ok(card.textContent.includes("Demo movie 3"));
+  assert.equal(link.textContent, "Dinner for Eight");
+  assert.ok(card.textContent.includes("A dinner party spirals out of control."));
   assert.ok(card.textContent.includes("Comedy · Rated 15 · 140 min"));
 });
 
@@ -89,18 +89,18 @@ test("a movie with a bad id is shown without a link instead of a dangerous one",
   const card = movieCard({ ...MOVIE, movie_id: "1;alert(1)" });
 
   assert.equal(card.find((n) => n.tag === "a"), null);
-  assert.ok(card.textContent.includes("Phim 3"));
+  assert.ok(card.textContent.includes("Dinner for Eight"));
 });
 
 test("movie details show the six attributes and 'Not given' for empty ones", () => {
   const nodes = movieDetails({ ...MOVIE, genre: null, rating: null, synopsis: null, release_date: null });
   const text = nodes.map((n) => n.textContent).join("|");
 
-  assert.ok(text.includes("Phim 3") && text.includes("140 min"));
+  assert.ok(text.includes("Dinner for Eight") && text.includes("140 min"));
   assert.equal((text.match(/Not given/g) ?? []).length, 4); // genre, rating, release date, synopsis
 });
 
-const SCREENING = { showtime_id: 9, movie_id: 3, title: "Phim 3", room_id: 2, room_name: "Phòng 2",
+const SCREENING = { showtime_id: 9, movie_id: 3, title: "Dinner for Eight", room_id: 2, room_name: "Hall 2",
   starts_at: "2026-11-25T19:00:00+09:00", ends_at: "2026-11-25T21:20:00+09:00", ticket_price: "12000.00",
   has_started: false };
 
@@ -108,9 +108,9 @@ test("a screening row shows the time range, room and price per seat", () => {
   const row = screeningRow(SCREENING);
 
   assert.ok(row.textContent.includes("19:00 - 21:20"));
-  assert.ok(row.textContent.includes("Phòng 2"));
-  assert.ok(row.textContent.includes("Price per seat: 12,000"));
-  assert.ok(!row.textContent.includes("Phim 3"), "the movie is named only in the all-movies view");
+  assert.ok(row.textContent.includes("Hall 2"));
+  assert.ok(row.textContent.includes("Price per seat: ₩12,000"));
+  assert.ok(!row.textContent.includes("Dinner for Eight"), "the movie is named only in the all-movies view");
   assert.ok(!row.textContent.includes("Already started"));
 });
 
@@ -119,7 +119,7 @@ test("the all-movies view names the movie as a link", () => {
 
   const link = row.find((n) => n.tag === "a");
   assert.equal(link.attributes.href, "/movie.html?id=3");
-  assert.equal(link.textContent, "Phim 3");
+  assert.equal(link.textContent, "Dinner for Eight");
 });
 
 test("a started screening is marked, from the server's flag only", () => {

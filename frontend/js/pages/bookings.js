@@ -2,8 +2,8 @@
 // Displays bookings with status badges, seats (for BOOKED only), and payment/cancellation actions.
 
 import { getApi } from "../api.js";
-import { getAuth, loginUrl } from "../auth.js";
-import { formatMoney, formatTimeRange } from "../format.js";
+import { getAuth, loginUrl, pageUser } from "../auth.js";
+import { formatDateTimeRange, formatMoney } from "../format.js";
 import { initNav } from "../nav.js";
 import { seatLabel } from "../seats.js";
 import { clear, el, showMessage } from "../ui.js";
@@ -11,16 +11,10 @@ import { clear, el, showMessage } from "../ui.js";
 async function main() {
   await initNav(document.getElementById("site-nav"));
 
-  const auth = getAuth();
-  let user = null;
-  try {
-    user = await auth.currentUser();
-  } catch {
-    user = null;
-  }
-
   const messageBox = document.getElementById("message");
   const container = document.getElementById("bookings-container");
+  const { user, failed } = await pageUser(getAuth(), messageBox);
+  if (failed) return;
 
   if (!user) {
     globalThis.location.assign(loginUrl("/bookings.html"));
@@ -81,7 +75,7 @@ async function main() {
       el("dt", { text: "Booking ID" }),
       el("dd", { text: String(b.booking_id) }),
       el("dt", { text: "Screening" }),
-      el("dd", { text: `${formatTimeRange(b.starts_at, b.ends_at)} · ${b.room_name}` }),
+      el("dd", { text: `${formatDateTimeRange(b.starts_at, b.ends_at)} · ${b.room_name}` }),
       el("dt", { text: "Total Amount" }),
       el("dd", { text: formatMoney(b.total_amount) }),
       el("dt", { text: "Booked At" }),

@@ -17,6 +17,7 @@ import pytest
 import disposable_db
 from app import create_app, passwords, security
 from helpers import ApiClient
+from time_travel import create_spare_room_screening
 
 FRONTEND = "http://localhost:8080"
 HASH = passwords.hash_password("test-password-123")
@@ -96,13 +97,18 @@ def public_client(app):
 
 
 @pytest.fixture(scope="module")
-def future_screenings(public_client):
-    """Retrieve screenings that are strictly in the future (has_started is False)."""
-    resp = public_client.get("/api/screenings")
-    screenings = resp.get_json()["screenings"]
-    future = [s for s in screenings if not s["has_started"]]
-    assert len(future) >= 2, "Need at least 2 future screenings for testing"
-    return future
+def future_screenings(booking_db):
+    """Two screenings created here, 1.5 and 2 days ahead, each in its own new 50-seat room.
+
+    Independent of the seed data and of the time of day: the API's default "today" list is
+    empty late in the evening (the seed's last slot is 19:00). A new room cannot overlap
+    any other screening.
+    """
+    conn = booking_db.connect()
+    try:
+        return [create_spare_room_screening(conn, starts_in_hours=hours) for hours in (36, 48)]
+    finally:
+        conn.close()
 
 
 # --- T4: Seat Availability ---

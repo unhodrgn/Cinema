@@ -6,7 +6,7 @@ import json as jsonlib
 def future_showtime_id(connection, min_hours=2):
     """A seeded screening that starts more than ``min_hours`` ahead and has no booking.
 
-    The seed covers 7 days from the day it ran, so there is always one tomorrow; the
+    The seed covers 14 days from the day it ran, so there is always one tomorrow; the
     margin keeps the test valid at any time of day. Ends the read-only transaction.
     """
     with connection.cursor() as cur:

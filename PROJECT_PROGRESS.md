@@ -33,11 +33,12 @@
 - [x] Phase 4 T4 — seat availability API and frontend seat picker *(verified 20/11 — see section 4A)*
 - [x] Phase 4 T5 — booking creation and simulated payment API and pages *(verified 20/11 — see section 4A)*
 - [x] Phase 4 T6 — customer booking history, details and cancellation API and pages *(verified 20/11 — see section 4A)*
-- [ ] Phase 4 T7 — admin movie and screening API and pages *(implemented and covered by automated tests 20/11; **not ticked until the real-browser check in T9** — see section 4A)*
-- [ ] Phase 4 T8 — admin booking list (view only) API and page *(implemented and covered by automated tests 20/11; **not ticked until the real-browser check in T9** — see section 4A)*
-- [ ] Phase 4 T9–T11 — frontend validation pass, integration/E2E/security suite, deployment and separation demo *(not started)*
+- [x] Phase 4 T7 — admin movie and screening API and pages *(verified 23/11: automated tests + real-browser check on :8080 — see section 4A)*
+- [x] Phase 4 T8 — admin booking list (view only) API and page *(verified 23/11: automated tests + real-browser check on :8080 — see section 4A)*
+- [x] Phase 4 T9 — frontend integration and validation pass *(done 23/11 in a real browser; limits: responsive layout checked by simulation only, light theme simulated, native `confirm()` dialog not exercised — see section 4A)*
+- [ ] Phase 4 T10–T11 — integration/E2E/security suite, deployment and separation demo *(not started)*
 - [ ] Backend implementation
-- [ ] Frontend implementation
+- [ ] Frontend implementation *(all pages built and checked in a browser 23/11; layout on a real phone and the real light theme are still to be checked, section 6.3)*
 - [ ] Database–application integration
 - [ ] System testing and bug fixing
 - [ ] Final documentation
@@ -205,7 +206,7 @@ Authentication is a **signed Bearer token** (no cookies, no CSRF, no cross-origi
   - [x] Frontend: `login.html`, `register.html`, `js/auth.js` (token in `sessionStorage` via `api.js`, logout clears it first, 401 → login page, `?next=` accepted only for an allow-list of known pages), `js/nav.js`, `js/forms.js`; text-only rendering (no `innerHTML`)
   - [x] `scripts/set_demo_passwords.py`: setup-only tool for the seeded accounts, explicit `SETUP_DB_*` settings (no `DB_*` fallback, no defaults), prompt or `SETUP_NEW_PASSWORD`, one transaction, never prints a password or hash; creates no roles and changes no permissions
   - [x] Corrections to the T1 draft of the contract: logout is **public** (B03 CM-02: logging out while not logged in is not an error), policy `authenticated` for `/me`, error code `invalid_credentials` (B03 CM-01)
-- [x] **T3 — Catalog API (movies, schedules) + pages** *(verified 20/11/2026; real-browser check of the pages is part of T9)*
+- [x] **T3 — Catalog API (movies, schedules) + pages** *(verified 20/11/2026; real-browser check done 23/11/2026, T9)*
   - [x] Public, no login (D4): `GET /api/movies`, `/api/movies/{id}`, `/api/screenings?movie_id&date`, `/api/screenings/{id}`; the six approved movie attributes (B03 "duration" = `duration_minutes`); schedule = screenings that **start** on one calendar day of the cinema's time zone (half-open `[00:00, next 00:00)`, default day = today decided by the database); strict `YYYY-MM-DD`; unknown movie 404, bad parameters 400 with `fields`; `has_started` from the database clock (display only; BR-12 stays enforced by the database)
   - [x] New `app/params.py` (id guard + query readers). A huge path id is harmless in a comparison but makes a bigint *function* call (`pay_booking`, `cancel_booking`) fail, so every id above the bigint range is a 404 up front (checked against the real database)
   - [x] Pages: `movies.html`, `movie.html?id=`, `screenings.html?date=`, `js/format.js` (money as an exact decimal string, times shown exactly as the API wrote them: no `Date`/`Intl`, so the display cannot depend on the browser's time zone), `js/catalog.js` (text-only builders, links only from validated ids); nav links; home-page links; next-page allow-list extended
@@ -225,22 +226,34 @@ Authentication is a **signed Bearer token** (no cookies, no CSRF, no cross-origi
   - [x] `GET /api/bookings/{id}` (policy `customer`), returns booking detail, runs expiry first, enforces ownership (404 for others)
   - [x] `POST /api/bookings/{id}/cancel` (policy `customer`), calls `cancel_booking()`, preserves parent record and `PAID` payment_status (D1), deletes seat rows (seats released!)
   - [x] Frontend: `bookings.html`, `js/pages/bookings.js`, status badges, details view, cancellation button
-- [ ] **T7 — Admin movie and screening API + pages** *(implemented and automatically tested 20/11/2026; the top-level box stays open until the real-browser check, which is part of T9)*
+- [x] **T7 — Admin movie and screening API + pages** *(verified 20/11/2026 by automated tests; real-browser check done 23/11/2026 after the CORS fix)*
   - [x] `app/admin.py`: `GET/POST /api/admin/movies`, `GET/PUT /api/admin/movies/{id}`, `GET/POST /api/admin/screenings`, `GET/PUT /api/admin/screenings/{id}` (all `Policy.ADMIN`, registered in `app/api.py`); movie input follows the schema limits (title ≤ 200, genre ≤ 100, rating ≤ 50, duration 1–300); `release_date` must be exactly `YYYY-MM-DD` (shared `strict_iso_date` in `app/params.py`, also used by the catalog's date query)
   - [x] Screening input: price is a finite number from 0 to 99999999.99 with at most two decimals (`Infinity`, `NaN`, `1e999`, too large or over-precise values are `400`, never `500`); timestamps in the years 1900–2200 (technical limits, not business rules); a time without an offset is the cinema's local time; `ends_at` defaults to start + movie duration; D2 relies on the database trigger (`UC001` → `409 screening_has_bookings`, also for CANCELLED and EXPIRED bookings; an identical save of a booked screening is not a modification); overlap on the `EXCLUDE` constraint (`23P01` → `409 screening_overlap`, back-to-back screenings allowed); `PUT` is a full replace (documented)
-  - [x] `tests/test_admin_api.py` — **136 tests** against PostgreSQL: CRUD, boundaries, validation, `401`/`403`, `404` (including huge ids), D2 for BOOKED / CANCELLED / EXPIRED, overlap on create and update, atomicity (a failed save changes nothing), price snapshot after a price change
-  - [x] Frontend: `admin-movies.html` + `js/pages/admin_movies.js`, `admin-screenings.html` + `js/pages/admin_screenings.js` (movie filter, add, edit; the Edit button is disabled for a screening that has bookings), shared helpers in `js/admin.js` (`requireAdmin`, `dataTable`, `badge`, `toInputDateTime`); no inline styles (classes in `css/style.css`), text-only rendering; static CSP tests pass
+  - [x] `tests/test_admin_api.py` — **143 tests** (136 at first; 23/11: +2 friendly-message tests, +5 started-screening tests) against PostgreSQL: CRUD, boundaries, validation, `401`/`403`, `404` (including huge ids), D2 for BOOKED / CANCELLED / EXPIRED, overlap on create and update, atomicity (a failed save changes nothing), price snapshot after a price change
+  - [x] Frontend: `admin-movies.html` + `js/pages/admin_movies.js`, `admin-screenings.html` + `js/pages/admin_screenings.js` (movie filter, add, edit; the Edit button is disabled for a screening that has bookings or has already started), shared helpers in `js/admin.js` (`requireAdmin`, `dataTable`, `badge`, `toInputDateTime`); no inline styles (classes in `css/style.css`), text-only rendering; static CSP tests pass
   - [x] Contract sections 11.5–11.6 updated; `tests/test_frontend_node.py` now runs every `tests/*.test.js` (it had skipped `seats.test.js`)
-  - [ ] Real-browser check of the two admin pages (T9)
-- [ ] **T8 — Admin booking list (view only) API + page** *(implemented and automatically tested 20/11/2026; the top-level box stays open until the real-browser check, which is part of T9)*
+  - [x] Real-browser check of the two admin pages (23/11/2026, real :8080 after the CORS fix: create and edit movies and screenings, validation messages, `409` overlap, back-to-back screenings, D2 lock)
+  - [x] 23/11/2026: **a screening that has started can no longer be edited** (decided: like a real cinema): `PUT` answers `409 screening_has_started` ("This screening has already started and can't be edited."), checked against the database clock before the D2 rule; the Edit button is disabled with a tooltip (`screeningEditLock()` in `js/admin.js`); admin validation messages no longer show raw field names (`app/admin.py`)
+- [x] **T8 — Admin booking list (view only) API + page** *(verified 20/11/2026 by automated tests; real-browser check done 23/11/2026)*
   - [x] `GET /api/admin/bookings` in `app/admin.py` (filters `status` — case-insensitive —, `screening_id`, `user_id`; runs `expire_overdue_bookings(cur)` first and the expiry is committed; seats listed only for `BOOKED` bookings); contract section 11.7
   - [x] `tests/test_admin_bookings_api.py` — **34 tests** against PostgreSQL: bookings of all customers, fields, no password data, PAID / CANCELLED / EXPIRED states (cancelled and expired list no seats, D1/D3), a PAID booking never expires, ordering, every filter and their combinations, bad filters `400`, expiry on read (committed, seats released), view-only (`405` for writes), listing changes nothing. Mutation check: three deliberate bugs in `admin_list_bookings` were all caught (6 failing tests)
   - [x] Frontend: `admin-bookings.html`, `js/pages/admin_bookings.js`, pure helpers in `js/admin_bookings.js`; `frontend/tests/admin.test.js` (16 Node tests for `admin.js` and `admin_bookings.js`, including hostile text rendered as text)
   - [x] The weakened contract test was restored to a meaningful check (`test_endpoints_still_planned_in_section_12_do_not_exist_yet`)
-  - [ ] Real-browser check of the page (T9)
-- [ ] T9 — Frontend integration and validation pass
+  - [x] Real-browser check of the page (23/11/2026: list, ₩ totals, status and payment badges, every filter, a bad filter)
+- [x] T9 — Frontend integration and validation pass *(done 23/11/2026, see "Verification of T9" below)*
 - [ ] T10 — Integration, end-to-end and security suite
 - [ ] T11 — Deployment, separation demo and release readiness
+
+**Verification of T9 (23/11/2026) — real-browser pass on `http://localhost:8080`** (temporary PostgreSQL 18.6 on `127.0.0.1:54329`, API on :5000, frontend on :8080; the development database was not touched; screenshots in `D:\dev\project\Cinema-screenshots\phase5\`, 79 files).
+- **Found and fixed:**
+  - *Blockers:* every admin write (`POST`/`PUT` movies and screenings) and `GET /api/bookings` (My Bookings) failed in a browser. Cause: the CORS preflight looked only at the first rule matching a URL (`request.url_rule`), but those URLs have separate GET and POST rules. Fix in `app/cors.py` (`allowed_methods()` over all matching rules); 72 new preflight tests (every route × every method, disallowed origin, method, header and path); 5 of them fail on the old code.
+  - *Major:* the countdown ending at 0 left a stale BOOKED / Pay Now (`js/deadline.js` now re-asks the API and shows EXPIRED, no backend change); a seat taken by someone else gave no message and stayed selected (message, seat removed, total recalculated, map refreshed); the 10-seat grid overflowed a 375px card (grid layout, shrinks to fit).
+  - *Minor:* an unreachable API is no longer treated as "logged out" (`pageUser()` in `js/auth.js`: only no token / `401` goes to login; also the navbar, which now shows a neutral "Account unavailable"); the screening date is shown in booking details and My Bookings; friendly validation messages on the admin forms; developer text removed from the home page.
+  - *Decided and done:* all user-facing content in English (`database/seed.sql` rewritten: English titles, `Hall 1`–`Hall 5`; every price shown with ₩); the seed schedule is relative to the day it is loaded (14 days, 280 screenings, no hard-coded dates; release dates relative too); started screenings are locked for editing.
+- **Passed in the browser:** navigation and nav states per role; login / register validation and messages; access restrictions (anonymous → login with `next`, a customer gets `404` on another customer's booking and is refused on admin pages, malicious `next` ignored, corrupted token cleared); catalog and schedule (today and +7 days); seat selection kept across login; booking, simulated payment, the real 10-minute expiry (checked twice), pay-after-deadline, cancel PAID (D1) and cancel unpaid; admin movies, screenings (`409` overlap, D2 lock, started lock) and bookings (filters); API-down behaviour on public and logged-in pages; no console or CSP errors; text rendered as text (hostile title).
+- **Test results:** pytest **1275 passed, 2 skipped** (the two symbolic-link skips) with `TEST_DB_PORT=54329`; Node **109/109**; `database/tests/run_all.sh` all passed (integrity tests incl. the new 280 screenings / 14 days, reconciliation 31 MATCH, concurrency 16/16). The full pytest run was made before the last navbar fix (frontend only); the 178 frontend-related Python tests were re-run afterwards.
+- **Limits of this check (still open):** responsive layout was checked at 375 / 768 / 1280 by forcing the page width (the window could not be resized; no real phone); the light theme was simulated by setting its colour variables (the browser was in dark mode); the native `confirm()` dialog of the cancel buttons was bypassed, not clicked.
+- **Known minor items left as they are:** registering while logged in sends the user to the home page without the "account created" message; a customer who opens an admin URL sees the page frame with a refusal message (data and forms are hidden); the Available / Occupied legend swatches are faint in the light theme; the frontend server's own `404` page is plain text.
 
 **Verification of T1 (20/11/2026, PostgreSQL 18.6, disposable server on `127.0.0.1:54329`, explicit `TEST_DB_PORT`):**
 all tests **639 passed, 2 skipped** (the 2 skips need permission to create symbolic links, which this account lacks; the same traversal protection was verified with a directory junction) · without `TEST_DB_PORT`: 563 passed, 78 skipped, no connection attempted · frontend JavaScript (Node test runner): 26/26 · `pip check`: no broken requirements · `requirements.txt` unchanged. Real-process checks: frontend and API as two OS processes on ports 8080 and 5000, each stopped and restarted alone; API stays up and answers `503` on `/health/db` when its database is unreachable; frontend calls `/health` across origins; allowed and denied CORS origins; JSON 404/405. No connection was made to the development database (tests used port 54329; the process tests used a closed port).
@@ -256,7 +269,7 @@ all tests **938 passed, 2 skipped** (same two symbolic-link skips) · without `T
 **State of the working tree at the project review (20/11/2026, PostgreSQL 18.6, disposable server on `127.0.0.1:54329`, explicit `TEST_DB_PORT`; T4–T9 files are still uncommitted):**
 Python tests **999 passed, 6 failed, 2 skipped** · without `TEST_DB_PORT`: 712 passed, 3 failed, 292 skipped · frontend JavaScript (Node): **69/69** · `tests/test_booking_flow.py` (T4–T6) passes, so T4–T6 stay verified. The 6 failures:
 - 3 × `tests/test_frontend_static.py` — real defects of the unfinished T7 frontend (inline `style=` attributes; `admin-screenings.html` references the missing `admin_screenings.js`)
-- 2 × tampered-token tests (`test_security.py::test_a_tampered_token_is_rejected`, `test_auth_api.py::test_a_tampered_token_is_401_invalid_token`) — flaky: the test changes only the last base64 character of the signature, which can leave the decoded signature unchanged; they passed on 3 re-runs. To fix in T9
+- 2 × tampered-token tests (`test_security.py::test_a_tampered_token_is_rejected`, `test_auth_api.py::test_a_tampered_token_is_401_invalid_token`) — flaky: the test changes only the last base64 character of the signature, which can leave the decoded signature unchanged; they passed on 3 re-runs. To fix in T9 *(Fixed 23/11/2026: both tests now replace the whole signature; 50/50 passes each in a loop.)*
 - 1 × `test_setup_script.py::test_a_role_without_update_permission_cannot_change_anything` — caused by the throw-away server used for the review (a password-less role under SCRAM authentication gives no SQLSTATE); not a project defect, expected to pass on the original test server
 The disposable server was stopped afterwards; the development database (port 5432) was not touched.
 
@@ -267,7 +280,7 @@ all Python tests **1196 passed, 1 failed, 2 skipped** · the one failure is the 
 - *(Fixed 20/11 in T8)* `tests/test_api_contract.py::test_planned_endpoints_are_not_implemented_yet` had been weakened (`if not planned: return`); it is now `test_endpoints_still_planned_in_section_12_do_not_exist_yet` and asserts that section 12 states "all Phase 4 endpoints implemented" when it lists none
 - *(Fixed 20/11 in T7)* `release_date` accepted the compact form `20261120` (found by the new tests); now exactly `YYYY-MM-DD`
 - *(Decision)* no `22003` / `22P02` entries were added to `app/errors.py`: that map is checked against the database contract of Member A, so numeric limits are validated in the application instead
-- `README.md` still says "Flask application and web frontend: Not started" and the features are marked "Planned"; the empty placeholders `app/app.py`, `app/templates/`, `app/static/` are still tracked
+- `README.md` still says "Flask application and web frontend: Not started" and the features are marked "Planned"; the empty placeholders `app/app.py`, `app/templates/`, `app/static/` are still tracked *(The three empty placeholders were removed on 23/11/2026; the README rewrite is still open.)*
 - Nothing of T4–T8 is committed yet (12 modified and 12 new files)
 
 **Network separation status.** Tier 1 (separate processes, one machine) is built and verified. Tier 2 (browser on a second device) is prepared by configuration only (`FRONTEND_HOST`, `API_BASE_URL`, `CORS_ALLOWED_ORIGINS`, `flask run --host`; see the API contract, section 13) and has **not yet been rehearsed on a second device**. Tier 3 (database on another machine) is not prepared and needs the Phase 3 Task 7 role. No PostgreSQL or firewall setting was changed; the development PostgreSQL was observed listening on all interfaces (`0.0.0.0:5432`): check it before using a shared network.
@@ -302,10 +315,10 @@ all Python tests **1196 passed, 1 failed, 2 skipped** · the one failure is the 
 - [x] Retrieve screening schedules *(T3)*
 - [x] Retrieve screening details *(T3)*
 - [x] Retrieve available seats *(T4)*
-- [x] Admin: Add movie *(T7 API, automated tests; page check in T9)*
-- [x] Admin: Update movie *(T7 API, automated tests; page check in T9)*
-- [x] Admin: Add screening *(T7 API, automated tests; page check in T9)*
-- [x] Admin: Update screening *(T7 API, automated tests incl. D2 and overlap; page check in T9)*
+- [x] Admin: Add movie *(T7 API, automated tests; page checked in a browser 23/11)*
+- [x] Admin: Update movie *(T7 API, automated tests; page checked in a browser 23/11)*
+- [x] Admin: Add screening *(T7 API, automated tests; page checked in a browser 23/11)*
+- [x] Admin: Update screening *(T7 API, automated tests incl. D2 and overlap; page checked in a browser 23/11)*
 
 ### 5.3 Booking & Payment
 
@@ -326,7 +339,7 @@ all Python tests **1196 passed, 1 failed, 2 skipped** · the one failure is the 
 
 ### 5.4 Admin Functions
 
-- [x] View all bookings *(T8 API, automated tests; page check in T9)*
+- [x] View all bookings *(T8 API, automated tests; page checked in a browser 23/11)*
 - [x] Restrict admin-only functions *(every admin route is `Policy.ADMIN`; anonymous `401` tested on all nine routes; the access matrix derives the check from the route-policy registry)*
 - [x] Prevent customer access to admin functions *(customer `403` tested on all nine admin routes, and a denied write changes nothing)*
 
@@ -358,21 +371,21 @@ all Python tests **1196 passed, 1 failed, 2 skipped** · the one failure is the 
 
 ### 6.2 Admin Interface
 
-- [ ] Admin dashboard *(not planned as a separate page: the navigation links to the three admin pages)*
-- [ ] Movie management page *(`admin-movies.html` built and tested with Node and the static rules; ticked after the real-browser check, T9)*
-- [ ] Screening management page *(`admin-screenings.html`, same status)*
-- [ ] Booking management page *(`admin-bookings.html`, same status)*
+- [x] Admin dashboard — **N/A** *(decided 23/11/2026: no separate page; the navigation links to the three admin pages)*
+- [x] Movie management page *(`admin-movies.html`, checked in a browser 23/11)*
+- [x] Screening management page *(`admin-screenings.html`, checked in a browser 23/11, incl. the started-screening and D2 locks)*
+- [x] Booking management page *(`admin-bookings.html`, checked in a browser 23/11)*
 
 ### 6.3 UI Validation
 
-- [ ] Validate navigation between pages
-- [ ] Validate forms and user input
-- [ ] Display success and error messages
-- [ ] Display booking and payment statuses
-- [ ] Validate responsive layout
-- [ ] Verify customer/admin access restrictions
+- [x] Validate navigation between pages *(23/11)*
+- [x] Validate forms and user input *(23/11)*
+- [x] Display success and error messages *(23/11, incl. API unreachable and seat conflicts)*
+- [x] Display booking and payment statuses *(23/11, all five combinations; real 10-minute expiry)*
+- [ ] Validate responsive layout *(checked 23/11 at 375 / 768 / 1280 by simulation only; confirm on a real phone and in the real light theme)*
+- [x] Verify customer/admin access restrictions *(23/11)*
 
-**Status:** In progress — all customer pages done and verified; the three admin pages are built and tested with Node and the static rules (real-browser check pending, T9); section 6.3 (UI validation) not started
+**Status:** In progress — all pages done and checked in a real browser on 23/11/2026 (T9); only the real-device / real-light-theme check of the responsive layout remains in section 6.3
 
 ---
 
@@ -504,9 +517,9 @@ all Python tests **1196 passed, 1 failed, 2 skipped** · the one failure is the 
 | 1. Requirements & Business Analysis | Completed | Member A + B |
 | 2. Database Design & Implementation | Implemented & verified — awaiting Member A's review | Member A (+ B for reconciliation) |
 | 3. Flask Application Foundation | In progress — core implemented and verified; app DB role (needs A) and documentation sync pending | Member B |
-| 4A. Application Features (REST API + independent frontend, T1–T11) | In progress — **T1 through T6 done and verified (20/11)**; **T7–T8 implemented and automatically tested (20/11), real-browser check pending (T9)**; T9–T11 not started | Member B |
+| 4A. Application Features (REST API + independent frontend, T1–T11) | In progress — **T1 through T9 done and verified (T7–T9 on 23/11)**; T10–T11 not started | Member B |
 | 4. Backend Implementation | API complete and automatically tested (delivered through 4A); integration and security suite (T10) pending | Member B |
-| 5. Frontend Implementation | In progress — customer pages done; admin pages built, browser check and UI validation (T9) pending | Member B |
+| 5. Frontend Implementation | In progress — all pages done and checked in a browser (23/11); responsive check on a real device pending | Member B |
 | 6. Database–Application Integration | Not Started | Member B |
 | 7. System Testing | Not Started | Member A + B |
 | 8. Documentation & Presentation | Not Started | Member A + B |
@@ -516,14 +529,16 @@ all Python tests **1196 passed, 1 failed, 2 skipped** · the one failure is the 
 
 **None for Flask development.** The database now satisfies D1–D6 and passed all executed tests (see 3.3). The original handover in `CinemaDB_FINAL_PostgreSQL_Handover/` is outdated — do not code against it; use `database/schema.sql` and the integration contract.
 
-**Next priority:** finish Phase 4 T7–T8 (see the plan below), and in parallel get Member A's review of the canonical database, confirmation of the driver and approval of the application database role (Phase 3 Task 7), then the Phase 3 documentation sync.
+**Next priority:** T10 (end-to-end and security suite) and T11 (deployment, demo passwords, rehearsal on a second device); in parallel get Member A's review of the canonical database, confirmation of the driver and approval of the application database role (Phase 3 Task 7), then the Phase 3 documentation sync (README, `database/README.md` and `docs/database/database_test_documentation.md` still describe the old seed: 140 screenings over 7 days).
 
 **Update 20/11/2026:** Phase 4 **T1** (architecture split, REST foundation, test harness), **T2** (auth API + login/register pages), **T3** (public catalog API + pages), **T4** (seat availability API + seat picker), **T5** (booking creation + simulated payment), and **T6** (booking history + cancellation) are all completed and verified. **T7 and T8 (admin) are implemented and covered by automated tests** (136 + 34 API tests, 16 Node tests); they are ticked at task level only after the real-browser check in T9 — see section 4A.
 
+**Update 23/11/2026:** placeholders removed, flaky token tests fixed, **T7, T8 and T9 verified** by a real-browser pass; two blockers (CORS preflight for admin writes and My Bookings) and several major/minor findings were fixed with regression tests (section 4A, "Verification of T9"). Content decisions made: **UI fully in English**, prices shown in **₩**, seed data in English and relative to the load date, **started screenings locked for editing**, **no admin dashboard (N/A)**. Test totals: pytest 1275 passed / 2 skipped, Node 109/109, database scripts all passed.
+
 **Next steps (plan agreed after the 20/11 review, deadline 29/11):**
-1. ~~Finish T7~~ and ~~Finish T8~~ — done 20/11 (automated verification; browser check moves to T9)
-2. Phase 3 Task 8 / hygiene (next): remove the empty placeholders (`app/app.py`, `app/templates/`, `app/static/`), rewrite `README.md`, add the driver decision record and hygiene tests; fix the two flaky token tests (change the whole signature instead of one character)
-3. T9: real-browser validation pass of every page (navigation, forms, messages, responsive layout, access restrictions, no CSP errors in the console); then tick T7, T8 and section 6.2
+1. ~~Finish T7~~ and ~~Finish T8~~ — done 20/11 (automated) and 23/11 (real-browser check)
+2. Phase 3 Task 8 / hygiene: ~~remove the empty placeholders~~ (done 23/11) and ~~fix the two flaky token tests~~ (done 23/11); still open: rewrite `README.md`, driver decision record, hygiene tests
+3. ~~T9: real-browser validation pass~~ — done 23/11 (T7, T8 and section 6.2 ticked); remaining: the responsive layout on a real phone and the real light theme
 4. T10: end-to-end and security suite (TC01–TC15 of `chia_viec.md`, D1–D6 through the application, concurrent booking)
 5. T11 and documentation: demo passwords, rehearsal on a second device, SQL scripts for the demo, README sync, remove empty placeholders; in parallel get Member A's review, driver confirmation and the application database role
 6. Slides (including the required "why a team project in the age of AI" page), rehearsal, clean-environment check, packaging, submission
@@ -542,7 +557,11 @@ all Python tests **1196 passed, 1 failed, 2 skipped** · the one failure is the 
 | PostgreSQL 14–17 compatibility | Member A / B | Tested on 18.6 only |
 | Does the instructor accept process-level separation on one machine, or must the browser device / database be separate hardware? | Project owner (ask the instructor) | Frontend, API and PostgreSQL are separate processes on separate ports and network-connected; separate containers or processes on one machine do **not** by themselves mean separate hardware. A browser on a second device is a configuration change (API contract, section 13); a database on another machine needs the Task 7 role and is not prepared |
 | Password / account-ID policy for registration | Project owner | None approved (BR-DL-001 section 6). T2 applies only technical bounds: account ID 1–60 characters (matching `users.username`) with no control characters, password 1–256 characters (limits the hashing work). Change only if the owner approves a policy |
-| Language of the user interface (T2 onwards) | Project owner | Not specified; API messages and the T2 pages are English |
+| Language of the user interface | Project owner | **Decided 23/11/2026: fully English** (UI, API messages and seed data). Closed |
+| Admin dashboard | Project owner | **Decided 23/11/2026: not built, N/A** — the navigation links to the three admin pages. Closed |
+| Editing a screening that has started | Project owner | **Decided and implemented 23/11/2026:** locked (`409 screening_has_started`), in addition to the D2 rule. Closed |
+| Currency and demo seed | Project owner | **Decided 23/11/2026:** prices shown with ₩; the seed is English and relative to the day it is loaded (14 days). Demo data therefore lasts only until load date + 13: load the seed into a new database shortly before the demo. Closed |
+| Checks not yet done | Member B | Responsive layout on a real phone, the real light theme, and the native `confirm()` dialog of the cancel buttons (T9 limits); minor items left open: register while logged in, customer sees the admin page frame, faint legend swatches in light theme, plain-text `404` |
 | Bearer-token limits (accepted 20/11) | Project owner | Tokens last 8 h by default (configurable) and cannot be revoked on the server; logout only discards the token in the browser (API contract, section 6) |
 
 **Reminder for Phase 4:** Flask must call `expire_overdue_bookings()` (request-time expiry) before seat availability, booking history and admin booking lists; `create_booking`, `pay_booking` and `cancel_booking` already expire what they need. Nothing expires by itself.
@@ -579,6 +598,11 @@ Use this section to record significant project changes.
 | 20/11/2026 | Project review: full test run on a disposable PostgreSQL 18.6 (999 passed, 6 failed, 2 skipped; Node 69/69). T4–T6 confirmed verified. T7/T8 found partially implemented (admin API in `app/admin.py` and `admin-movies` page written, but no admin API tests, `admin_screenings.js` and the admin bookings page missing, admin pages violate the CSP) — recorded as in progress, not ticked. Continuation plan added to section 11 | Completed |
 
 | 20/11/2026 | Phase 4 T7 and T8 implemented and automatically tested: admin movie / screening / booking-list API hardened (price and timestamp limits, strict `release_date`), `tests/test_admin_api.py` (136) and `tests/test_admin_bookings_api.py` (34), pages `admin-movies`, `admin-screenings`, `admin-bookings` with shared `js/admin.js` and `js/admin_bookings.js`, 16 new Node tests, contract sections 11.5–11.7 updated, weakened contract test restored, Node test runner now picks up every `tests/*.test.js`. Python 1196 passed / 1 environment-related failure / 2 skipped; Node 85/85. Real-browser check outstanding (T9) | Completed (browser check pending) |
+| 23/11/2026 | Cleanup and baseline: removed the 18 empty placeholder files (`app/app.py`, `app/templates/`, `app/static/`), fixed the two flaky token tests (50/50 each), disposable PostgreSQL 18.6 on 54329 with API and frontend as separate processes; baseline pytest 1190 passed / 7 errors (a time-of-day dependency in `tests/test_booking_flow.py`, fixed) / 2 skipped, Node 85/85 | Completed |
+| 23/11/2026 | T9 real-browser pass of all pages (customer and admin, access control, expiry, console, API down): 2 blockers (CORS preflight for admin writes and My Bookings), 3 major, several minor findings; 79 screenshots saved outside the repo | Completed |
+| 23/11/2026 | Fixes with regression tests: CORS preflight over all matching rules (+72 tests), countdown re-fetch (`js/deadline.js`), seat-conflict handling, seat grid at 375px, `pageUser()` (network error is not "logged out"), screening date, friendly admin messages, home page text. Verified again on :8080 without any proxy | Completed |
+| 23/11/2026 | Decisions implemented: UI fully English (English seed, ₩ on every price), seed relative to the load date (14 days, 280 screenings), started screenings locked (`409 screening_has_started`), admin dashboard N/A; contract updated; database scripts all passed. pytest 1275 passed / 2 skipped, Node 103/103 | Completed |
+| 23/11/2026 | Navbar with an unreachable API shows a neutral "Account unavailable" for a logged-in user instead of Log in / Register (+6 Node tests, checked in the browser). Node 109/109 | Completed |
 
 Add a new row whenever a major milestone is completed.
 

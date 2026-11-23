@@ -349,7 +349,7 @@ def test_real_database_errors_map_to_the_contract_response(
             "SELECT (SELECT count(*) FROM users), (SELECT count(*) FROM movies), "
             "(SELECT count(*) FROM showtimes), (SELECT count(*) FROM bookings)"
         )
-        assert cur.fetchone() == (3, 5, 140, 0)
+        assert cur.fetchone() == (3, 5, 280, 0)
     assert app_sessions(db_app.config["DB_APPLICATION_NAME"], expect_none=True) == []
 
 

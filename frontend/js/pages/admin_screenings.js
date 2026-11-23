@@ -5,7 +5,7 @@
 // the same room answers 409. The Edit button is disabled for a screening that has bookings.
 
 import { getApi } from "../api.js";
-import { badge, dataTable, requireAdmin, toInputDateTime } from "../admin.js";
+import { badge, dataTable, requireAdmin, screeningEditLock, toInputDateTime } from "../admin.js";
 import { formatDateTime, formatMoney } from "../format.js";
 import { initNav } from "../nav.js";
 import { clear, el, setFieldError, showMessage } from "../ui.js";
@@ -129,17 +129,15 @@ async function main() {
             {
               header: "Actions",
               className: "cell-actions",
-              cell: (s) =>
-                el("button", {
+              cell: (s) => {
+                const lock = screeningEditLock(s);
+                return el("button", {
                   className: "button button-secondary",
-                  attrs: {
-                    type: "button",
-                    disabled: s.has_bookings,
-                    title: s.has_bookings ? "This screening has bookings and cannot be modified (D2)." : null,
-                  },
+                  attrs: { type: "button", disabled: lock.disabled, title: lock.title },
                   text: "Edit",
                   on: { click: () => startEdit(s) },
-                }),
+                });
+              },
             },
           ],
           screenings,

@@ -2,15 +2,17 @@
 // preserves selection on login redirect, and proceeds to booking creation when authenticated.
 
 import { getApi } from "../api.js";
-import { getAuth, loginUrl } from "../auth.js";
+import { getAuth, loginUrl, pageUser } from "../auth.js";
 import { formatMoney, formatTimeRange } from "../format.js";
 import { initNav } from "../nav.js";
 import {
   calculateTotal,
+  dropUnavailable,
   formatSelectedSeats,
   groupSeatsByRow,
   parseSelectedSeats,
   seatLabel,
+  takenSeatsMessage,
 } from "../seats.js";
 import { clear, el, showMessage } from "../ui.js";
 
@@ -40,6 +42,8 @@ async function main() {
   let allSeats = [];
   const seatMap = new Map(); // seat_id -> seat object
 
+  /** Reload the seat map. Seats of the selection that are no longer free are dropped from it.
+   *  Returns `{ ok, removed }`: whether the map was loaded and the labels that were dropped. */
   async function loadData() {
     clear(messageBox);
     try {
@@ -50,13 +54,16 @@ async function main() {
       for (const s of allSeats) {
         seatMap.set(s.seat_id, s);
       }
+      const removed = dropUnavailable(selectedSeats, allSeats);
       renderScreeningInfo();
       renderSeatGrid();
       updateSummary();
       pickerCard.hidden = false;
+      return { ok: true, removed };
     } catch (err) {
       pickerCard.hidden = true;
       showMessage(messageBox, "error", err.message || "Failed to load seats.");
+      return { ok: false, removed: [] };
     }
   }
 
@@ -141,7 +148,7 @@ async function main() {
   function updateSummary() {
     if (selectedSeats.size === 0) {
       selectedListSpan.textContent = "None";
-      totalPriceSpan.textContent = "0";
+      totalPriceSpan.textContent = formatMoney("0");
       bookButton.disabled = true;
       return;
     }
@@ -165,13 +172,8 @@ async function main() {
       return;
     }
 
-    const auth = getAuth();
-    let user = null;
-    try {
-      user = await auth.currentUser();
-    } catch {
-      user = null;
-    }
+    const { user, failed } = await pageUser(getAuth(), messageBox);
+    if (failed) return;
 
     const seatIds = Array.from(selectedSeats);
     const returnDestination = `/seats.html?screening_id=${screeningId}&selected=${formatSelectedSeats(seatIds)}`;
@@ -199,9 +201,12 @@ async function main() {
       globalThis.location.assign(`/booking.html?id=${booking.booking_id}`);
     } catch (err) {
       bookButton.disabled = false;
-      showMessage(messageBox, "error", err.message || "Failed to create booking.");
-      // If seats became unavailable, reload seat data to show updated state
-      await loadData();
+      // Refresh the seat map (this also drops seats that were taken from the selection and
+      // recalculates the total), THEN explain: loading clears the message box.
+      const { ok, removed } = await loadData();
+      if (ok) {
+        showMessage(messageBox, "error", takenSeatsMessage(removed) || err.message || "Failed to create booking.");
+      }
     }
   });
 
