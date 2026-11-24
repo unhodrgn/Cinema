@@ -1,40 +1,40 @@
 # Cinema Reservation System
 
-Ứng dụng đặt vé cho một rạp chiếu phim. Khách có thể xem lịch chiếu, chọn ghế, đặt vé, thanh toán mô phỏng và xem hoặc hủy vé. Admin quản lý phim và suất chiếu, đồng thời tra cứu booking theo trạng thái, mã suất và mã khách hàng.
+A ticket booking application for a single cinema. Customers can browse showtimes, select seats, book tickets, complete simulated payments, and view or cancel tickets. Admins manage movies and showtimes, and look up bookings by status, showtime ID, and customer ID.
 
-PostgreSQL giữ ghế trong 10 phút khi chờ thanh toán, lưu giá tại thời điểm đặt và ngăn hai khách giữ cùng một ghế. Admin có thể xóa suất tương lai chưa từng có booking. Xóa phim cũng xóa các suất đủ điều kiện của phim đó. Suất đã bắt đầu hoặc có lịch sử booking được bảo vệ.
+PostgreSQL holds seats for 10 minutes while awaiting payment, stores the price at the time of booking, and prevents two customers from holding the same seat. Admins can delete future showtimes that have never had a booking. Deleting a movie also deletes eligible showtimes for that movie. Showtimes that have already started or have booking history are protected.
 
-| Thành phần | Công nghệ |
+| Component | Technology |
 |---|---|
 | Frontend | React, TypeScript, Vite |
 | API | Python 3.12, Flask, psycopg2 |
-| Database | PostgreSQL 18, SQL migrations, extension `btree_gist` |
-| Kiểm thử | pytest, Node test runner, SQL, Playwright |
-| Vận hành local | Docker Compose v2 hoặc chạy trực tiếp trên máy |
+| Database | PostgreSQL 18, SQL migrations, `btree_gist` extension |
+| Testing | pytest, Node test runner, SQL, Playwright |
+| Local operation | Docker Compose v2 or running directly on the host |
 
-[Docker Compose](#chạy-bằng-docker-compose) · [Chạy trực tiếp](#chạy-trực-tiếp-trên-máy) · [Kiểm thử](#kiểm-thử) · [Khắc phục lỗi](#khắc-phục-lỗi-thường-gặp)
+[Docker Compose](#run-with-docker-compose) · [Run Directly](#run-directly-on-the-host) · [Testing](#testing) · [Troubleshooting](#troubleshooting)
 
-## Chạy bằng Docker Compose
+## Run with Docker Compose
 
-Docker đóng gói sẵn Python, Node.js và PostgreSQL. Chạy các lệnh từ thư mục gốc chứa `docker-compose.yml`.
+Docker bundles Python, Node.js, and PostgreSQL. Run all commands from the root directory containing `docker-compose.yml`.
 
-### 1. Cài và mở Docker Desktop
+### 1. Install and open Docker Desktop
 
-| Hệ điều hành | Cài đặt |
+| Operating System | Installation |
 |---|---|
-| macOS | Chọn bộ cài Apple Silicon hoặc Intel theo kiến trúc máy. Mở Docker Desktop và chờ engine sẵn sàng. [Docker Desktop cho macOS](https://docs.docker.com/desktop/setup/install/mac-install/) |
-| Windows | Cài Docker Desktop với backend WSL 2 theo tài liệu chính thức. Mở Docker Desktop ở chế độ Linux containers và chạy lệnh bằng PowerShell. [Docker Desktop cho Windows](https://docs.docker.com/desktop/setup/install/windows-install/) |
+| macOS | Choose the Apple Silicon or Intel installer matching your machine's architecture. Open Docker Desktop and wait for the engine to be ready. [Docker Desktop for macOS](https://docs.docker.com/desktop/setup/install/mac-install/) |
+| Windows | Install Docker Desktop with the WSL 2 backend according to the official documentation. Open Docker Desktop in Linux containers mode and run commands using PowerShell. [Docker Desktop for Windows](https://docs.docker.com/desktop/setup/install/windows-install/) |
 
-Kiểm tra engine và Compose. Lệnh thứ hai phải in `linux`.
+Verify the engine and Compose. The second command must print `linux`.
 
 ```sh
 docker compose version
 docker info --format '{{.OSType}}'
 ```
 
-### 2. Cấu hình môi trường
+### 2. Configure environment
 
-Nếu chưa có `.env`, sao chép file mẫu.
+If `.env` does not exist yet, copy the example file.
 
 **macOS — Terminal**
 
@@ -48,64 +48,64 @@ test -f .env || cp backend/.env.example .env
 if (-not (Test-Path -LiteralPath .env)) { Copy-Item backend/.env.example .env }
 ```
 
-Với cấu hình mới, chạy lệnh sau để sinh `SECRET_KEY` và `DB_PASSWORD`. Lệnh chạy được trên cả macOS và Windows.
+For a new setup, run the following command to generate `SECRET_KEY` and `DB_PASSWORD`. This command works on both macOS and Windows.
 
 ```sh
 docker run --rm python:3.12-slim-bookworm python -c "import secrets; print('SECRET_KEY=' + secrets.token_hex(32)); print('DB_PASSWORD=' + secrets.token_hex(32))"
 ```
 
-Mở `.env` bằng trình soạn thảo và điền hai giá trị vừa sinh vào các khóa tương ứng. Nếu dùng volume PostgreSQL đã khởi tạo, `DB_PASSWORD` cần khớp mật khẩu của role `cinema_api` trong volume đó. API Compose kết nối nội bộ tới `db:5432/cinema`.
+Open `.env` in an editor and fill in the two generated values for their corresponding keys. If using an already initialized PostgreSQL volume, `DB_PASSWORD` must match the password of the `cinema_api` role in that volume. The Compose API connects internally to `db:5432/cinema`.
 
-### 3. Khởi động và nạp dữ liệu demo
+### 3. Start and load demo data
 
-Dùng cùng lệnh trên hai hệ điều hành.
+Use the same commands on both operating systems.
 
 ```sh
 docker compose up --build -d --wait
 docker compose ps
 ```
 
-Lần đầu Docker cần tải image và build. Compose áp schema và cấp quyền khi tạo volume trống. Khi các dịch vụ đã báo `healthy`, nếu database mới tạo và đang trống, nạp demo **một lần**.
+On the first run, Docker needs to pull images and build. Compose applies the schema and grants permissions when creating an empty volume. Once all services report `healthy`, if the database was newly created and is empty, load the demo data **once**.
 
 ```sh
 docker compose exec -T db psql -X -v ON_ERROR_STOP=1 -U cinema_owner -d cinema -f /opt/cinema/demo.sql
 ```
 
-Seed tạo 6 phim, 5 phòng, 250 ghế và 280 suất trong 14 ngày tính từ ngày nạp theo giờ Seoul. Khi các suất demo đã qua, tạo suất tương lai trong **Screenings (Admin)**.
+The seed creates 6 movies, 5 rooms, 250 seats, and 280 showtimes over 14 days starting from the load date in Seoul time. Once the demo showtimes have passed, create future showtimes in **Screenings (Admin)**.
 
-### 4. Mở ứng dụng
+### 4. Open the application
 
-| Địa chỉ | Dùng để |
+| Address | Purpose |
 |---|---|
-| [http://localhost:8080](http://localhost:8080) | Mở giao diện |
-| [Movies (Admin)](http://localhost:8080/admin-movies.html) | Quản lý phim |
-| [Screenings (Admin)](http://localhost:8080/admin-screenings.html) | Quản lý suất chiếu |
-| [All Bookings](http://localhost:8080/admin-bookings.html) | Tra cứu booking |
-| [http://localhost:5000/health](http://localhost:5000/health) | Kiểm tra API đang phản hồi |
-| [http://localhost:5000/health/db](http://localhost:5000/health/db) | Kiểm tra kết nối PostgreSQL |
+| [http://localhost:8080](http://localhost:8080) | Open the UI |
+| [Movies (Admin)](http://localhost:8080/admin-movies.html) | Manage movies |
+| [Screenings (Admin)](http://localhost:8080/admin-screenings.html) | Manage showtimes |
+| [All Bookings](http://localhost:8080/admin-bookings.html) | Look up bookings |
+| [http://localhost:5000/health](http://localhost:5000/health) | Check if the API is responding |
+| [http://localhost:5000/health/db](http://localhost:5000/health/db) | Check PostgreSQL connection |
 
-| Tài khoản demo | Tên đăng nhập | Mật khẩu |
+| Demo account | Username | Password |
 |---|---|---|
 | Admin | `admin` | `admin1234` |
-| Khách hàng | `customer1` hoặc `customer2` | `customer1234` |
+| Customer | `customer1` or `customer2` | `customer1234` |
 
-Để thử luồng chính, đăng nhập khách hàng, chọn một suất tương lai, đặt ghế và thanh toán mô phỏng. Sau đó đăng nhập admin để tra cứu vé trong **All Bookings**.
+To test the main flow, log in as a customer, select a future showtime, book seats, and complete the simulated payment. Then log in as admin to look up the ticket in **All Bookings**.
 
-### Lệnh hằng ngày
+### Daily commands
 
-| Tác vụ | Lệnh |
+| Task | Command |
 |---|---|
-| Build lại và khởi động sau khi sửa mã nguồn | `docker compose up --build -d --wait` |
-| Áp dụng cấu hình `.env` mới | `docker compose up -d --wait` |
-| Chỉ chạy API và database | `docker compose up -d --wait api` |
-| Chỉ chạy frontend khi API đã có | `docker compose up -d --wait --no-deps frontend` |
-| Theo dõi log | `docker compose logs -f api db frontend` |
-| Kiểm tra đối tượng SQL cần thiết | `docker compose exec -T api python -m scripts.check_schema` |
-| Dừng stack và giữ volume | `docker compose down` |
+| Rebuild and start after editing source code | `docker compose up --build -d --wait` |
+| Apply new `.env` configuration | `docker compose up -d --wait` |
+| Run only the API and database | `docker compose up -d --wait api` |
+| Run only the frontend when the API is already up | `docker compose up -d --wait --no-deps frontend` |
+| Follow logs | `docker compose logs -f api db frontend` |
+| Verify required SQL objects | `docker compose exec -T api python -m scripts.check_schema` |
+| Stop stack and keep volumes | `docker compose down` |
 
-Với volume tạo trước chức năng **Delete**, áp dụng migration quyền để role runtime có thể xóa phim và suất. [Hướng dẫn PostgreSQL](database/README.md#quyền-xóa-phim-trên-database-hiện-hữu)
+For volumes created before the **Delete** feature, apply the permission migration so the runtime role can delete movies and showtimes. [PostgreSQL Guide](database/README.md#quyền-xóa-phim-trên-database-hiện-hữu)
 
-**Đổi cổng.** Ví dụ sau dùng cổng 8081 cho frontend và 5001 cho API. Đặt cả bốn dòng vào `.env`, chạy `docker compose up -d --wait` và mở `http://localhost:8081`.
+**Change ports.** The example below uses port 8081 for the frontend and 5001 for the API. Put all four lines in `.env`, run `docker compose up -d --wait`, and open `http://localhost:8081`.
 
 ```dotenv
 FRONTEND_PORT=8081
@@ -114,15 +114,15 @@ API_BASE_URL=http://localhost:5001
 CORS_ALLOWED_ORIGINS=http://localhost:8081
 ```
 
-**Truy cập từ mạng LAN.** Đặt `CINEMA_BIND_HOST=0.0.0.0`. Dùng IP LAN của máy chạy ứng dụng trong `API_BASE_URL` và `CORS_ALLOWED_ORIGINS` cùng các cổng tương ứng. Áp dụng cấu hình bằng `docker compose up -d --wait` rồi mở địa chỉ frontend từ thiết bị thứ hai. PostgreSQL Compose sử dụng mạng nội bộ.
+**Access from LAN.** Set `CINEMA_BIND_HOST=0.0.0.0`. Use the LAN IP of the host machine in `API_BASE_URL` and `CORS_ALLOWED_ORIGINS` with the corresponding ports. Apply the configuration with `docker compose up -d --wait`, then open the frontend address from a second device. Compose PostgreSQL uses the internal network.
 
-## Chạy trực tiếp trên máy
+## Run Directly on the Host
 
-Cách này chạy Flask và Vite trong hai terminal để có thể sửa mã và chạy lại từng dịch vụ. Dùng Python 3.12, Node.js 24 và PostgreSQL 18 như các image của dự án.
+This approach runs Flask and Vite in two terminals so you can edit code and restart each service individually. Use Python 3.12, Node.js 24, and PostgreSQL 18, matching the project images.
 
-### macOS — cài công cụ
+### macOS — install tools
 
-Cài Homebrew rồi chạy các lệnh sau trong Terminal. Có thể thêm dòng `export PATH` vào `.zshrc` để dùng Node.js và PostgreSQL trong các phiên sau. [Homebrew](https://brew.sh/) · [Python 3.12](https://formulae.brew.sh/formula/python@3.12) · [Node.js 24](https://formulae.brew.sh/formula/node@24) · [PostgreSQL 18](https://formulae.brew.sh/formula/postgresql@18)
+Install Homebrew and run the following commands in Terminal. You can add the `export PATH` line to `.zshrc` to use Node.js and PostgreSQL in future sessions. [Homebrew](https://brew.sh/) · [Python 3.12](https://formulae.brew.sh/formula/python@3.12) · [Node.js 24](https://formulae.brew.sh/formula/node@24) · [PostgreSQL 18](https://formulae.brew.sh/formula/postgresql@18)
 
 ```sh
 brew install python@3.12 node@24 postgresql@18
@@ -135,13 +135,13 @@ psql --version
 pg_isready -h 127.0.0.1 -p 5432
 ```
 
-### Windows — cài công cụ
+### Windows — install tools
 
-1. Cài Python Install Manager, rồi chạy `py install 3.12` nếu máy chưa có Python 3.12. [Cài Python trên Windows](https://docs.python.org/3/using/windows.html#installing-runtimes)
-2. Cài Node.js 24 bằng Windows Installer. Dùng `npm.cmd` trong PowerShell. [Node.js Downloads](https://nodejs.org/en/download)
-3. Cài PostgreSQL 18, chọn **PostgreSQL Server** và **Command Line Tools**. Ghi nhớ mật khẩu tài khoản setup `postgres` và cổng đã chọn. Kiểm tra dịch vụ PostgreSQL đang chạy trong **Services**. [PostgreSQL Windows installers](https://www.postgresql.org/download/windows/)
+1. Install Python Install Manager, then run `py install 3.12` if the machine does not have Python 3.12 yet. [Install Python on Windows](https://docs.python.org/3/using/windows.html#installing-runtimes)
+2. Install Node.js 24 using the Windows Installer. Use `npm.cmd` in PowerShell. [Node.js Downloads](https://nodejs.org/en/download)
+3. Install PostgreSQL 18, selecting **PostgreSQL Server** and **Command Line Tools**. Note the `postgres` setup account password and chosen port. Verify the PostgreSQL service is running in **Services**. [PostgreSQL Windows installers](https://www.postgresql.org/download/windows/)
 
-Mở PowerShell mới. Nếu `psql` chưa có trong PATH, sửa đường dẫn dưới đây theo vị trí cài đặt.
+Open a new PowerShell window. If `psql` is not in PATH yet, adjust the path below to match your installation location.
 
 ```powershell
 $env:Path = "C:\Program Files\PostgreSQL\18\bin;$env:Path"
@@ -152,13 +152,13 @@ psql --version
 pg_isready -h 127.0.0.1 -p 5432
 ```
 
-### Chuẩn bị database và cấu hình
+### Prepare database and configuration
 
-Ví dụ sau dành cho server local và **database mới** tên `cinema_demo`. Chạy `createdb` và baseline một lần từ root. Với database đã có dữ liệu, thực hiện backup, restore lên bản sao và đối chiếu schema trước khi kết nối ứng dụng. [Quy trình dùng database hiện hữu](database/README.md#database-đã-có-dữ-liệu)
+The following example is for a local server and a **new database** named `cinema_demo`. Run `createdb` and the baseline once from the root. For a database that already contains data, perform a backup, restore onto a copy, and compare schemas before connecting the application. [Workflow for an existing database](database/README.md#database-đã-có-dữ-liệu)
 
 **macOS — Terminal**
 
-Với PostgreSQL mới cài bằng Homebrew, dùng role setup của tài khoản macOS hiện tại.
+With PostgreSQL freshly installed via Homebrew, use the setup role of the current macOS account.
 
 ```sh
 createdb cinema_demo
@@ -169,7 +169,7 @@ psql -X -v ON_ERROR_STOP=1 -d cinema_demo
 
 **Windows — PowerShell**
 
-Dùng tài khoản setup `postgres` và nhập mật khẩu khi được hỏi.
+Use the `postgres` setup account and enter the password when prompted.
 
 ```powershell
 createdb -h 127.0.0.1 -p 5432 -U postgres cinema_demo
@@ -178,7 +178,7 @@ psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 5432 -U postgres -d cinema_demo -f ba
 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 5432 -U postgres -d cinema_demo
 ```
 
-Trong phiên `psql` vừa mở, cấp quyền cho role chạy API. `\password` hỏi mật khẩu hai lần. Nếu role `cinema_api` đã tồn tại, bắt đầu từ dòng `GRANT` và dùng mật khẩu đang có của role đó.
+In the `psql` session just opened, grant permissions to the API runtime role. `\password` prompts for the password twice. If the `cinema_api` role already exists, start from the `GRANT` lines and use that role's existing password.
 
 ```sql
 CREATE ROLE cinema_api LOGIN;
@@ -194,7 +194,7 @@ GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO cinema_api;
 \q
 ```
 
-Nếu chưa có `.env`, dùng lệnh sao chép mẫu ở phần Docker. Điền `DB_PASSWORD` với mật khẩu đã đặt cho `cinema_api`. Sinh `SECRET_KEY` bằng `python3.12 -c "import secrets; print(secrets.token_hex(32))"` trên macOS hoặc `py -3.12 -c "import secrets; print(secrets.token_hex(32))"` trên Windows.
+If `.env` does not exist yet, use the copy command from the Docker section. Fill in `DB_PASSWORD` with the password set for `cinema_api`. Generate `SECRET_KEY` using `python3.12 -c "import secrets; print(secrets.token_hex(32))"` on macOS or `py -3.12 -c "import secrets; print(secrets.token_hex(32))"` on Windows.
 
 ```dotenv
 SECRET_KEY=
@@ -208,9 +208,9 @@ CORS_ALLOWED_ORIGINS=http://localhost:8080
 APP_TIMEZONE=Asia/Seoul
 ```
 
-### Khởi động Flask và Vite
+### Start Flask and Vite
 
-Nếu đang chạy stack Compose ở cổng 5000 hoặc 8080, dừng stack trước khi dùng cùng cổng cho Flask và Vite. Mở hai terminal tại root.
+If the Compose stack is running on port 5000 or 8080, stop the stack before using the same ports for Flask and Vite. Open two terminals at the root.
 
 **macOS — Terminal 1, Flask**
 
@@ -247,35 +247,35 @@ npm.cmd --prefix frontend ci
 npm.cmd --prefix frontend run dev
 ```
 
-Mở [http://localhost:8080](http://localhost:8080). Vite phục vụ `/config.js` theo `API_BASE_URL` trong `.env` ở root. Dùng `Ctrl+C` trong từng terminal để dừng Flask hoặc Vite.
+Open [http://localhost:8080](http://localhost:8080). Vite serves `/config.js` based on `API_BASE_URL` in the root `.env`. Use `Ctrl+C` in each terminal to stop Flask or Vite.
 
-**Thử bản build.** Dừng Vite để giải phóng cổng 8080. Từ root, chạy `npm --prefix frontend run build` rồi `.venv/bin/python frontend/server.py` trên macOS. Trên Windows, chạy `npm.cmd --prefix frontend run build` rồi `.\.venv\Scripts\python.exe frontend/server.py`. Static server đọc `API_BASE_URL`, `FRONTEND_HOST` và `FRONTEND_PORT` từ môi trường tiến trình. Để thử giao diện HTML dự phòng, build bằng `build:legacy` rồi đặt `CINEMA_LEGACY_UI=1` cho tiến trình frontend.
+**Test the production build.** Stop Vite to free port 8080. From the root, run `npm --prefix frontend run build` followed by `.venv/bin/python frontend/server.py` on macOS. On Windows, run `npm.cmd --prefix frontend run build` followed by `.\.venv\Scripts\python.exe frontend/server.py`. The static server reads `API_BASE_URL`, `FRONTEND_HOST`, and `FRONTEND_PORT` from the process environment. To test the fallback HTML UI, build with `build:legacy` and set `CINEMA_LEGACY_UI=1` for the frontend process.
 
-## Kiểm thử
+## Testing
 
-### Chạy toàn bộ trên macOS hoặc Windows
+### Run full suite on macOS or Windows
 
-Chạy từ root với Docker Desktop đang mở.
+Run from the root with Docker Desktop open.
 
 ```sh
 docker compose --profile test run --build --rm verify
 docker compose --profile test stop test-db
 ```
 
-Runner build frontend và chạy pytest, JavaScript unit test, SQL integrity, reconciliation, kiểm tra đặt ghế đồng thời và các luồng Playwright qua API thật. Profile `test` tự cấp PostgreSQL riêng trên mạng nội bộ `verification`. Mã thoát `0` cho biết toàn bộ bộ kiểm thử đã đạt. Lệnh thứ hai dừng riêng PostgreSQL test.
+The runner builds the frontend and executes pytest, JavaScript unit tests, SQL integrity, reconciliation, concurrent seat booking checks, and Playwright flows against the real API. The `test` profile provisions its own PostgreSQL instance on the internal `verification` network. An exit code of `0` indicates the entire test suite passed. The second command stops only the test PostgreSQL container.
 
-### Chạy nhanh unit test frontend
+### Quick frontend unit test run
 
 | macOS | Windows PowerShell |
 |---|---|
 | `npm --prefix frontend ci` | `npm.cmd --prefix frontend ci` |
 | `npm --prefix frontend test` | `npm.cmd --prefix frontend test` |
 
-Chạy `ci` khi mới checkout hoặc khi lockfile thay đổi.
+Run `ci` on a fresh checkout or whenever the lockfile changes.
 
-### Debug test trực tiếp
+### Debug tests directly
 
-Dành cho máy đã chuẩn bị Python, Node.js, `psql` và PostgreSQL test riêng. Đặt `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_ADMIN_USER` và `TEST_DB_ADMIN_PASSWORD` theo server test. `TEST_DB_PORT` là biến bắt buộc. Role test cần quyền tạo database, extension và role tạm.
+For machines with Python, Node.js, `psql`, and a dedicated test PostgreSQL instance prepared. Set `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_ADMIN_USER`, and `TEST_DB_ADMIN_PASSWORD` according to your test server. `TEST_DB_PORT` is required. The test role needs permissions to create databases, extensions, and temporary roles.
 
 **macOS — Terminal**
 
@@ -295,39 +295,39 @@ Pop-Location
 .\.venv\Scripts\python.exe backend/tests/verify.py
 ```
 
-Chạy riêng pytest bằng `-m pytest -ra backend/tests`, bộ SQL bằng `backend/tests/run_database.py`, hoặc Playwright bằng `backend/tests/run_browser.py` với interpreter của venv. Trước khi chạy pytest hoặc Playwright riêng, chuẩn bị bản build bằng `npm run build` và `npm run build:legacy` trong `frontend/`. [Chi tiết các ca kiểm thử PostgreSQL](docs/database/database_test_documentation.md)
+Run pytest individually with `-m pytest -ra backend/tests`, the SQL suite with `backend/tests/run_database.py`, or Playwright with `backend/tests/run_browser.py` using the venv interpreter. Before running pytest or Playwright individually, prepare the builds with `npm run build` and `npm run build:legacy` inside `frontend/`. [PostgreSQL test case details](docs/database/database_test_documentation.md)
 
-## Khắc phục lỗi thường gặp
+## Troubleshooting
 
-| Triệu chứng | Cách kiểm tra |
+| Symptom | How to check |
 |---|---|
-| Docker không kết nối được engine | Mở Docker Desktop và chạy lại `docker info --format '{{.OSType}}'`. Trên Windows, kiểm tra chế độ Linux containers. |
-| Database dừng với `Set DB_PASSWORD in the project .env` | Điền `DB_PASSWORD` tại root và chạy lại lệnh khởi động. Xem `docker compose logs --tail 80 db api` để biết lỗi còn lại. |
-| API báo sai mật khẩu sau khi đổi `.env` | Dùng lại mật khẩu PostgreSQL của volume hoặc đổi mật khẩu role `cinema_api` trong PostgreSQL rồi cập nhật `.env`. |
-| Giao diện mở nhưng phim không tải | Mở `/health/db` của API. Sau đó đối chiếu `API_BASE_URL` với địa chỉ API và `CORS_ALLOWED_ORIGINS` với origin frontend đang mở. |
-| Cổng 5000 hoặc 8080 đang được dùng | Với Compose, dùng cấu hình đổi cổng ở trên. Khi chạy trực tiếp, chỉnh `--port` của Flask hoặc chạy `npm exec -- vite --host 127.0.0.1 --port 8081` từ `frontend/` với `npm.cmd` trên Windows. Cập nhật các origin tương ứng. |
-| Seed từ chối vì database đã có dữ liệu | Dùng dữ liệu hiện có hoặc thêm suất trong **Screenings (Admin)**. Seed cần schema đã khởi tạo và các bảng nghiệp vụ còn trống. |
-| Bản cập nhật báo lỗi khi dùng **Delete** trên volume cũ | Cấp quyền cho role runtime theo migration. [Hướng dẫn PostgreSQL](database/README.md#quyền-xóa-phim-trên-database-hiện-hữu) |
+| Docker cannot connect to the engine | Open Docker Desktop and re-run `docker info --format '{{.OSType}}'`. On Windows, check Linux containers mode. |
+| Database stops with `Set DB_PASSWORD in the project .env` | Fill in `DB_PASSWORD` at the root and re-run the start command. Check `docker compose logs --tail 80 db api` for any remaining errors. |
+| API reports wrong password after changing `.env` | Reuse the PostgreSQL password from the volume or change the `cinema_api` role password in PostgreSQL and update `.env`. |
+| UI opens but movies do not load | Open the API's `/health/db`. Then compare `API_BASE_URL` with the API address and `CORS_ALLOWED_ORIGINS` with the frontend origin being opened. |
+| Port 5000 or 8080 is already in use | With Compose, use the port-change configuration above. When running directly, adjust Flask's `--port` or run `npm exec -- vite --host 127.0.0.1 --port 8081` from `frontend/` using `npm.cmd` on Windows. Update the corresponding origins. |
+| Seed refuses because the database already has data | Use the existing data or add showtimes in **Screenings (Admin)**. The seed requires an initialized schema and empty business tables. |
+| Update reports an error when using **Delete** on an old volume | Grant permissions to the runtime role according to the migration. [PostgreSQL Guide](database/README.md#quyền-xóa-phim-trên-database-hiện-hữu) |
 
-## Cấu trúc dự án
+## Project Structure
 
 ```text
 backend/
-  app/          Flask factory, API, cấu hình, validation và nghiệp vụ
-  migrations/   Schema PostgreSQL và quyền truy cập của role ứng dụng
-  seeds/        Dữ liệu demo
-  scripts/      Công cụ setup và kiểm tra schema
-  tests/        Pytest, SQL, kiểm tra đồng thời và trình chạy Playwright
+  app/          Flask factory, API, configuration, validation, and business logic
+  migrations/   PostgreSQL schema and application role permissions
+  seeds/        Demo data
+  scripts/      Setup tools and schema verification
+  tests/        Pytest, SQL, concurrency checks, and Playwright runner
 frontend/
-  src/          React pages, components và features
-  public/       Poster, font và giấy phép font
-  js/           Module JavaScript dùng chung
-  legacy/       Giao diện HTML dự phòng
-  tests/        Unit test frontend
-  e2e/          Kiểm thử trình duyệt
-database/       Hướng dẫn PostgreSQL
-docs/           Hợp đồng API, mô hình dữ liệu và quy tắc nghiệp vụ
+  src/          React pages, components, and features
+  public/       Posters, fonts, and font licenses
+  js/           Shared JavaScript modules
+  legacy/       Fallback HTML UI
+  tests/        Frontend unit tests
+  e2e/          Browser tests
+database/       PostgreSQL guide
+docs/           API contract, data model, and business rules
 docker-compose.yml
 ```
 
-[Hợp đồng REST API](docs/api/api_contract.md) · [Quy tắc nghiệp vụ](docs/business/business_rules_decision_log.md) · [Mô hình dữ liệu](docs/database/physical_data_model.md) · [Hợp đồng PostgreSQL–Flask](docs/database/postgresql_flask_integration_contract.md) · [Tiến độ migration](docs/project/Project_progress.md)
+[REST API Contract](docs/api/api_contract.md) · [Business Rules](docs/business/business_rules_decision_log.md) · [Physical Data Model](docs/database/physical_data_model.md) · [PostgreSQL–Flask Integration Contract](docs/database/postgresql_flask_integration_contract.md) · [Migration Progress](docs/project/Project_progress.md)
