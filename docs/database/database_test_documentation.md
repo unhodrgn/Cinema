@@ -1,6 +1,6 @@
 # Database Test Documentation
 
-Covers the canonical database (`database/schema.sql`, `database/seed.sql`). Everything below was executed; the results are copied from real runs on 2026-11-20 against **PostgreSQL 18.6** (Windows). Other PostgreSQL versions (14–17) were **not** tested.
+Covers the canonical database (`backend/migrations/0001_baseline.sql`, `backend/seeds/demo.sql`). Everything below was executed; the results are copied from real runs on 2026-11-20 against **PostgreSQL 18.6** (Windows). Other PostgreSQL versions (14–17) were **not** tested.
 
 ## 1. Safety rules
 
@@ -13,26 +13,15 @@ Covers the canonical database (`database/schema.sql`, `database/seed.sql`). Ever
 | File | Kind | Content |
 |---|---|---|
 | `database/tests/run_all.sh` | runner | schema → seed → integrity → probes → concurrency on a disposable DB |
-| `database/tests/integrity_tests.sql` | SQL, one rolled-back transaction | 177 checks: seed, D1–D6, DB-02/03, seats, rollback, constraints, trigger-order regression |
-| `database/tests/reconciliation_probes.sql` | SQL, rolled back | 31 probes with the audit's P-numbers; fails on any MISMATCH |
-| `database/tests/test_concurrency.py` | Python (psycopg2), real sessions | 16 checks, scenarios C1–C6 |
+| `backend/tests/sql/integrity_tests.sql` | SQL, one rolled-back transaction | 177 checks: seed, D1–D6, DB-02/03, seats, rollback, constraints, trigger-order regression |
+| `backend/tests/sql/reconciliation_probes.sql` | SQL, rolled back | 31 probes with the audit's P-numbers; fails on any MISMATCH |
+| `backend/tests/test_booking_concurrency.py` | Python (psycopg2), real sessions | 16 checks, scenarios C1–C6 |
 
 ## 3. How to run
 
-```bash
-# connection through the libpq environment, e.g. a throwaway server on port 54329
-export PGHOST=127.0.0.1 PGPORT=54329 PGUSER=<owner role>        # PGPASSWORD if needed
-python -m pip install psycopg2-binary                           # for test_concurrency.py
-bash database/tests/run_all.sh                                  # KEEP_DB=1 keeps the database
+From the repository root, run `docker compose --profile test run --build --rm verify` for the full application, frontend and database suites. With a disposable native PostgreSQL server and an explicit `TEST_DB_PORT`, run `python backend/tests/run_database.py` for SQL and concurrency only. The runner applies the canonical baseline and seed, checks the integrity summary and reconciliation P16, and then runs concurrency on that database. Supply `--keep-db` to inspect it afterwards. The legacy Bash entry point forwards to this runner.
 
-# or step by step on an empty database:
-createdb cinema_verify
-psql -X -v ON_ERROR_STOP=1 -d cinema_verify -f database/schema.sql
-psql -X -v ON_ERROR_STOP=1 -d cinema_verify -f database/seed.sql
-psql -X -v ON_ERROR_STOP=1 -d cinema_verify -f database/tests/integrity_tests.sql
-psql -X -v ON_ERROR_STOP=1 -d cinema_verify -f database/tests/reconciliation_probes.sql
-PGDATABASE=cinema_verify python database/tests/test_concurrency.py
-```
+Current seed counts are 3 users, 6 movies, 5 rooms, 250 seats and 280 screenings across 14 days. Results in section 4 describe the historical November 20 seed.
 
 ## 4. Results (final run of `run_all.sh`)
 

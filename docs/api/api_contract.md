@@ -1,7 +1,7 @@
 # REST API Contract
 
 **Project:** 영화관 예매 및 좌석 관리 시스템 (Cinema Reservation System)
-**Status:** foundation (T1), authentication (T2) and the public catalog (T3) are implemented. Only the endpoints in section 11 exist. The endpoints in section 12 are planned for T4–T8 and may be refined there; everything else in this document is already implemented and tested.
+**Status:** The catalog, authentication, seats, bookings, simulated payments and administration endpoints in section 11 are implemented. The Flask modules under `backend/app/api/v1/` serve the existing `/api` URLs.
 **Authority:** B01–B05 and BR-DL-001 (D1–D6) for business rules; [`postgresql_flask_integration_contract.md`](../database/postgresql_flask_integration_contract.md) for the database. This document defines only how the independent frontend and the backend talk to each other. It changes no business rule.
 
 ---
@@ -27,9 +27,9 @@ The three layers are separate processes with separate configuration. PostgreSQL 
 ## 2. Conventions
 
 * **Base URL:** the API origin, e.g. `http://localhost:5000`. All API paths start with `/api`; the two health endpoints are at `/health` and `/health/db`. There is no version segment.
-* **Methods:** `GET`, `POST`, `PUT`. There is no `DELETE`: the approved scope has no delete function for movies or screenings (B03 A-01, A-02), and no refund or other removal workflow. (Decision D2 is a different rule: it forbids *editing* a screening that any booking references.)
+* **Methods:** `GET`, `POST`, `PUT`, `DELETE`. Admin movie and screening resources support `DELETE` under the screening history rules in §11.5–11.6.
 * **Paths:** lower-case nouns, integer ids, no trailing slash (`/api/movies/3`). Actions that are not CRUD use a verb sub-path (`/api/bookings/{id}/pay`).
-* **Encoding:** UTF-8 JSON. Responses are `Content-Type: application/json`.
+* **Encoding:** UTF-8 JSON. Responses with a body use `Content-Type: application/json`.
 * **Names:** JSON fields use the physical column names where one exists (`username`, `user_id`, `showtime_id`, `ticket_price`, …) in `snake_case`.
 * **Caching:** every response carries `Cache-Control: no-store`.
 * **Security headers on every response:** `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`.
@@ -97,6 +97,8 @@ Validation errors add a `fields` object (field name → fixed message):
 | 409 | `seat_unavailable` | Seat already reserved, including a lost race (`UC002`) |
 | 409 | `screening_started` | Screening already started (`UC004`) |
 | 409 | `screening_has_started` | An administrator tried to edit a screening that has already started (database clock); not a database rule |
+| 409 | `movie_delete_blocked` | At least one screening for the movie has started or has a booking record |
+| 409 | `screening_delete_blocked` | The screening has started or has a booking record |
 | 409 | `cancellation_closed` | Screening started, no cancellation (`UC005`) |
 | 409 | `invalid_booking_state` | Not possible in the booking's state (`UC006`) |
 | 409 | `screening_overlap` | Overlaps another screening in the room (`23P01`) |
@@ -150,7 +152,7 @@ Other HTTP statuses use `http_error` (4xx) or `server_error` (5xx) with a fixed 
 
 The password hash is never serialized, and passwords, hashes and tokens are never written to the log.
 
-**Demo account passwords.** The three seeded accounts keep password hashes whose plaintext nobody knows. `scripts/set_demo_passwords.py` sets known passwords for existing accounts. It is a setup tool, not part of the API: it needs a database role that may `UPDATE users` (the API's role is only granted `INSERT` on `users`, integration contract section 8), connects with explicit `SETUP_DB_*` settings and never falls back to the API's `DB_*` credentials, never prints a password or hash, and changes nothing if any named account does not exist.
+**Demo account passwords.** Demo credentials for a freshly seeded database are listed in the root README. `backend/scripts/set_demo_passwords.py` rotates passwords for existing accounts. It is a setup tool, not part of the API: it needs a database role that may `UPDATE users` (the API's role is only granted `INSERT` on `users`, integration contract section 8), connects with explicit `SETUP_DB_*` settings and never falls back to the API's `DB_*` credentials, never prints a password or hash, and changes nothing if any named account does not exist.
 
 ### 6.2 Corrections to the T1 draft of this document
 
@@ -178,7 +180,7 @@ The frontend is another origin (another port, or another machine), so browsers e
 * `CORS_ALLOWED_ORIGINS` lists **exact** origins, comma-separated: `http://localhost:8080,http://192.168.0.10:8080`. `*`, paths, queries and credentials in the URL are rejected at startup. Scheme, host and port must all match (`http://localhost:8080` is not `http://localhost` or `http://127.0.0.1:8080`).
 * Empty (the default) means no cross-origin access at all.
 * An allowed origin gets `Access-Control-Allow-Origin: <that origin>` on **every** response, error responses included. Any other origin gets no CORS header. `Vary: Origin` is always present when a list is configured.
-* **Preflight** (`OPTIONS` with `Access-Control-Request-Method`) is answered `204` with `Allow-Methods: GET, POST, PUT`, `Allow-Headers: Authorization, Content-Type`, `Max-Age: 600` only if the origin is allowed, the path is a real route that accepts the requested method, the method is one of those three and the requested headers are limited to those two. Otherwise it gets no CORS header and the browser blocks the request.
+* **Preflight** (`OPTIONS` with `Access-Control-Request-Method`) is answered `204` with `Allow-Methods: GET, POST, PUT, DELETE`, `Allow-Headers: Authorization, Content-Type` and `Max-Age: 600`. The origin, requested method for the route and requested headers must all be allowed.
 * `Access-Control-Allow-Credentials` is never sent (no cookies).
 * CORS is a browser-side protection, not authentication: the server still answers other origins, it only withholds the permission to read the answer.
 
@@ -188,7 +190,7 @@ The frontend is another origin (another port, or another machine), so browsers e
 
 ## 10. Frontend rules
 
-* All backend access goes through `frontend/js/api.js`. It only sends requests whose path starts with `/api` or `/health`, to the configured origin; sends no cookies; refuses redirects; and clears the token when the server answers `401` to a request that carried one.
+* React pages use the shared HTTP transport in `frontend/js/api.js`, with typed request helpers in `frontend/src/services/apiClient.ts`. It only sends requests whose path starts with `/api` or `/health`, to the configured origin; sends no cookies; refuses redirects; and clears the token when the server answers `401` to a request that carried one.
 * The API address comes from `/config.js`, which the frontend server generates from `API_BASE_URL`; it is not a file in the repository.
 * The frontend contains no business rules. Anything it shows before the server has answered (for example an estimated total) is labelled as an estimate; the authoritative values come from the API.
 
@@ -216,10 +218,12 @@ The frontend is another origin (another port, or another machine), so browsers e
 | GET | `/api/admin/movies/{id}` | admin | `200 {"movie": {...}}`; `404` if unknown |
 | POST | `/api/admin/movies` | admin | `201 {"movie": {...}}`, section 11.5 |
 | PUT | `/api/admin/movies/{id}` | admin | `200 {"movie": {...}}`, section 11.5 |
+| DELETE | `/api/admin/movies/{id}` | admin | `204` on deletion, `409 movie_delete_blocked` if history prevents deletion |
 | GET | `/api/admin/screenings` | admin | `200 {"screenings": [...], "rooms": [...]}`, section 11.6 |
 | GET | `/api/admin/screenings/{id}` | admin | `200 {"screening": {...}}`; `404` if unknown |
 | POST | `/api/admin/screenings` | admin | `201 {"screening": {...}}`, section 11.6 |
 | PUT | `/api/admin/screenings/{id}` | admin | `200 {"screening": {...}}`, section 11.6 |
+| DELETE | `/api/admin/screenings/{id}` | admin | `204` on deletion, `409 screening_delete_blocked` if history prevents deletion |
 | GET | `/api/admin/bookings` | admin | `200 {"bookings": [...]}`, section 11.7 |
 | GET | `/health/db` | public | `200 {"status": "ok", "database": "ok"}`; `503 {"status": "unavailable", "database": "unavailable"}` if PostgreSQL cannot be reached or does not answer correctly. No host, port, name, user, version or error text. |
 
@@ -310,6 +314,11 @@ A path id that is not a positive integer, or is larger than the database can hol
 * Fails with `404` if movie does not exist.
 * Requires `Policy.ADMIN`.
 
+**`DELETE /api/admin/movies/{id}`** removes a movie and its upcoming, unbooked screenings in one transaction.
+
+* Requires `Policy.ADMIN` and returns `204` with an empty body on success or `404` for an unknown movie.
+* Returns `409 movie_delete_blocked` if any screening has already started or has a booking of any status. The transaction preserves the movie and all its screenings in this case.
+
 ### 11.6 Admin Screening Management (T7, admin, A-02)
 
 **`GET /api/admin/screenings?movie_id=`** returns screenings (optionally filtered by movie) and the list of rooms.
@@ -342,6 +351,11 @@ A path id that is not a positive integer, or is larger than the database can hol
 * Fails with `404` if screening does not exist.
 * Requires `Policy.ADMIN`.
 
+**`DELETE /api/admin/screenings/{id}`** removes an upcoming screening with no booking history and frees its time slot.
+
+* Requires `Policy.ADMIN`. Returns `204` on success or `404` for an unknown screening.
+* Returns `409 screening_delete_blocked` for a screening that has started or has a booking of any status.
+
 ### 11.7 Admin Booking List (T8, admin, A-03)
 
 **`GET /api/admin/bookings?status=&screening_id=&user_id=`** view-only list of all bookings across all customers and statuses.
@@ -362,14 +376,14 @@ All Phase 4 planned endpoints (T1–T8) are implemented and documented in Sectio
 | Process | Default port | Configuration (environment variables) |
 |---|---|---|
 | Frontend server | 8080 | `FRONTEND_HOST` (default `127.0.0.1`), `FRONTEND_PORT`, `API_BASE_URL` (the API address **as the browser reaches it**) |
-| Backend API | 5000 | `flask --app app run --host … --port …` (or `FLASK_RUN_HOST` / `FLASK_RUN_PORT`); `SECRET_KEY`, `DB_*`, `CORS_ALLOWED_ORIGINS`, `AUTH_TOKEN_MAX_AGE_SECONDS`, `APP_TIMEZONE` |
+| Backend API | 5000 | `flask --app app.main:create_app run --host … --port …` (or `FLASK_RUN_HOST` / `FLASK_RUN_PORT`); `SECRET_KEY`, `DB_*`, `CORS_ALLOWED_ORIGINS`, `AUTH_TOKEN_MAX_AGE_SECONDS`, `APP_TIMEZONE` |
 | PostgreSQL | 5432 | Not changed by this work. Reachable from the API process only. |
 
-Start (three independent terminals; any one can be stopped and started again alone):
+Compose starts the three services with `docker compose up --build`. For independent processes, build the frontend first with `npm --prefix frontend ci` and `npm --prefix frontend run build`, then start each service separately:
 
 ```bash
 python frontend/server.py                      # frontend, FRONTEND_PORT / API_BASE_URL from the environment
-flask --app app run --port 5000                # API
+(cd backend && python -m flask --app app.main:create_app run --port 5000)
 # PostgreSQL: the existing database service
 ```
 
@@ -379,7 +393,7 @@ flask --app app run --port 5000                # API
 
 ```text
 FRONTEND_HOST=0.0.0.0   FRONTEND_PORT=8080   API_BASE_URL=http://192.168.0.10:5000
-flask --app app run --host 0.0.0.0 --port 5000
+flask --app app.main:create_app run --host 0.0.0.0 --port 5000
 CORS_ALLOWED_ORIGINS=http://192.168.0.10:8080
 ```
 
@@ -387,4 +401,4 @@ The device then opens `http://192.168.0.10:8080`. The operating system's firewal
 
 ## 14. What is deliberately not here
 
-No cookies or sessions, no CSRF tokens (nothing is sent automatically by the browser), no server-side token revocation, no rate limiting, no HTTPS termination (use a reverse proxy or a TLS-capable server for that), no refund, no delete endpoints. The remaining business endpoints are T4–T8.
+No cookies or sessions, no CSRF tokens (nothing is sent automatically by the browser), no server-side token revocation, no rate limiting, no HTTPS termination (use a reverse proxy or a TLS-capable server for that) and no refund. Admin deletion endpoints are listed in §11.5–11.6.

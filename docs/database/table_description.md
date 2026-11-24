@@ -1,6 +1,6 @@
 # 테이블 기술서 (Table Description)
 
-**기준:** `database/schema.sql` (PostgreSQL 14+, 18.6에서 검증). 업무 규칙은 BR-DL-001(D1~D6)과 B01~B05를 따른다.
+**기준:** `backend/migrations/0001_baseline.sql` (PostgreSQL 14+, 18.6에서 검증). 업무 규칙은 BR-DL-001(D1~D6)과 B01~B05를 따른다.
 **논리 명칭 ↔ 물리 테이블:** USERS=`users`, MOVIES=`movies`, ROOMS=`theater_rooms`, SEATS=`seats`, SCREENINGS=`showtimes`, BOOKINGS=`bookings`, BOOKING_SEATS=`booking_seats`.
 
 모든 기본키(`*_id`)는 `bigint GENERATED ALWAYS AS IDENTITY`이다.

@@ -1,0 +1,93 @@
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: cinema
+      POSTGRES_USER: cinema_owner
+      CINEMA_APP_PASSWORD: ${DB_PASSWORD:-}
+    # Bootstrap-only owner password. Local administration uses the container's Unix socket.
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        : "$${CINEMA_APP_PASSWORD:?Set DB_PASSWORD in the project .env}"
+        export POSTGRES_PASSWORD=$$(head -c 48 /dev/urandom | base64)
+        exec docker-entrypoint.sh postgres
+    volumes:
+      - cinema_data:/var/lib/postgresql
+      - ./backend/migrations/0001_baseline.sql:/docker-entrypoint-initdb.d/10-schema.sql:ro
+      - ./backend/migrations/compose-role.sql:/docker-entrypoint-initdb.d/20-runtime-role.sql:ro
+      - ./backend/migrations/0002_movie_delete_permissions.sql:/docker-entrypoint-initdb.d/30-movie-delete-permissions.sql:ro
+      - ./backend/seeds/demo.sql:/opt/cinema/demo.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U cinema_owner -d cinema && psql -U cinema_owner -d cinema -Atqc \"SELECT EXISTS (SELECT FROM pg_roles WHERE rolname='cinema_api')\" | grep -qx t"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  api:
+    build: {context: ., dockerfile: backend/Dockerfile, target: runtime}
+    depends_on:
+      db: {condition: service_healthy}
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: cinema
+      DB_USER: cinema_api
+      DB_PASSWORD: ${DB_PASSWORD:-}
+      SECRET_KEY: ${SECRET_KEY:-}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:8080}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Seoul}
+      DB_CONNECT_TIMEOUT: ${DB_CONNECT_TIMEOUT:-5}
+      AUTH_TOKEN_MAX_AGE_SECONDS: ${AUTH_TOKEN_MAX_AGE_SECONDS:-28800}
+    ports: ["${CINEMA_BIND_HOST:-127.0.0.1}:${API_PORT:-5000}:5000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:5000/health/db', timeout=3).read()"]
+      interval: 5s
+      timeout: 4s
+      retries: 15
+
+  frontend:
+    build: {context: ., dockerfile: frontend/Dockerfile}
+    environment:
+      FRONTEND_HOST: 0.0.0.0
+      API_BASE_URL: ${API_BASE_URL:-http://localhost:5000}
+      CINEMA_LEGACY_UI: ${CINEMA_LEGACY_UI:-0}
+    ports: ["${CINEMA_BIND_HOST:-127.0.0.1}:${FRONTEND_PORT:-8080}:8080"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8080/index.html', timeout=3).read()"]
+      interval: 5s
+      timeout: 4s
+      retries: 15
+
+  test-db:
+    profiles: [test]
+    image: postgres:18
+    environment:
+      POSTGRES_USER: cinema_test_owner
+      POSTGRES_PASSWORD: cinema-disposable-test-only
+    networks: [verification]
+    tmpfs: [/var/lib/postgresql]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "cinema_test_owner"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  verify:
+    profiles: [test]
+    build: {context: ., dockerfile: backend/Dockerfile, target: verify}
+    depends_on:
+      test-db: {condition: service_healthy}
+    networks: [verification]
+    environment:
+      TEST_DB_HOST: test-db
+      TEST_DB_PORT: 5432
+      TEST_DB_ADMIN_USER: cinema_test_owner
+      TEST_DB_ADMIN_PASSWORD: cinema-disposable-test-only
+      CINEMA_TEST_ENV_FILE: /dev/null
+
+volumes:
+  cinema_data:
+networks:
+  verification: {internal: true}

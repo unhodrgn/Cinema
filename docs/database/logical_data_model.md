@@ -1,6 +1,6 @@
 # 논리적 데이터 모델 (Logical Data Model)
 
-**기준:** `database/schema.sql`. 표기: PK 밑줄 대신 **PK**, 외래키는 FK, 후보키는 UK.
+**기준:** `backend/migrations/0001_baseline.sql`. 표기: PK 밑줄 대신 **PK**, 외래키는 FK, 후보키는 UK.
 
 ## 1. 릴레이션 스키마
 

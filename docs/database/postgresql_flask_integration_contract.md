@@ -1,7 +1,7 @@
 # PostgreSQL ↔ Flask Integration Contract
 
 **Project:** 영화관 예매 및 좌석 관리 시스템 (Cinema Reservation System)
-**Applies to:** `database/schema.sql` and `database/seed.sql` (canonical) · verified on PostgreSQL 18.6
+**Applies to:** `backend/migrations/0001_baseline.sql` and `backend/seeds/demo.sql` (canonical) · verified on PostgreSQL 18.6
 **Authority:** B01–B05 and BR-DL-001 (D1–D6). This contract implements them; it changes none of them.
 **Supersedes:** `CinemaDB_FINAL_PostgreSQL_Handover/docs/05_Integration_Contract_KO.md` (kept unchanged as history; outdated — it still describes `CONFIRMED`, `paid_at` auto-payment and no expiry).
 
@@ -172,7 +172,7 @@ Read `e.pgcode` (psycopg2). The custom `UC…` codes are stable; do not match on
 | `23503` | unknown user / seat / screening / movie / room id | 400 |
 | `23514` | CHECK violation (invalid role, duration, row/number, price < 0, `ends_at <= starts_at`) | validation message |
 | `23P01` | screening overlaps another in the same room (BR-04; real `[start,end)` intervals, **no buffer**) | show conflict, ask for another time |
-| `23001` | deleting a row that is referenced (user, screening…) — not an application feature | internal error |
+| `23001` | unexpected attempt to remove a referenced row | internal error |
 
 Enforced by the database (do not duplicate as the only guard, but still validate for UX): role/status domains, seat ↔ room ownership, one active booking per seat per screening (race-safe: the screening row is locked), no overlap, no booking/cancel after start, atomic booking + seats, price snapshot = screening price, `total_amount` = sum of snapshots (immutable, kept after cancel/expiry), D1/D2/D3 transitions.
 
@@ -183,20 +183,22 @@ Enforced by the database (do not duplicate as the only guard, but still validate
 | Authentication (D4, BR-05) | session login; browsing/availability public; require login for confirm/pay/cancel; **no GUEST account**; check `role` |
 | Registration (D5) | only account ID + password. `INSERT INTO users(username, password_hash)` — **never pass `role`** (default `CUSTOMER`; the DB would accept `ADMIN`, so public registration must not allow it). Hash with a one-way password hash (e.g. Werkzeug `generate_password_hash`), never plaintext |
 | Ownership (BR-09) | pass `session user_id` to `pay_booking`/`cancel_booking` and filter history by it |
-| Authorisation (BR-13) | movies/screenings add/edit and A-03 only for `ADMIN` |
+| Authorisation (BR-13) | movies and screenings add/edit/delete and A-03 only for `ADMIN` |
 | Expiry invocation | per §3.3 |
 | Admin screening add | `INSERT INTO showtimes(movie_id, room_id, starts_at, ends_at, ticket_price)`; `ends_at` may be omitted (defaults to start + movie duration, stored) |
 | Admin screening edit | `UPDATE showtimes SET …` only; the database rejects with `UC001` if any booking row exists, any status. Catch it; optionally pre-check `NOT EXISTS (SELECT 1 FROM bookings WHERE showtime_id=…)` for UX |
 | Admin movie edit | `UPDATE movies`; changing `duration_minutes` is allowed and never moves existing screenings (their `ends_at` is stored) |
+| Admin movie deletion | Lock the movie and its screenings, then remove the movie and its upcoming unbooked screenings in one transaction. Preserve all rows if any screening has started or has any booking history. |
+| Admin screening deletion | Lock the screening row against concurrent reservations. Remove the screening only if its start time is in the future and no booking references it. |
 | Time | convert Seoul-local input to `timestamptz` explicitly; never compare with the Flask host clock — the database decides every deadline; show times in `Asia/Seoul` |
 | SQL safety | parameter binding only |
-| Demo accounts | `admin_demo`, `customer_demo`, `customer_demo2` exist with Member A's password hashes; **their plaintext passwords are not documented and unverified** — set known passwords (hash with Werkzeug) before demonstrating a login |
+| Demo accounts | The demo seed creates `admin`, `customer1` and `customer2`. Demo login details and password rotation instructions are in the root README. |
 
 ## 8. PostgreSQL connection requirements
 
 * PostgreSQL **14+** (verified on 18.6 only). Extension `btree_gist` is required by `schema.sql` (shipped with PostgreSQL; creating it needs a role allowed to — the database owner can since PG 13).
-* Driver: **not yet decided** (B01 §7.1). The examples above use `psycopg2` (also what the tests use); `psycopg2-binary` is the recommended dependency. `requirements.txt` is intentionally unchanged until the team confirms.
+* Driver: Flask uses psycopg2 and parameterized SQL. Dependencies are pinned in `backend/requirements.txt`.
 * Configuration through environment variables (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`); `.env` is git-ignored; never commit credentials.
-* The four functions and all triggers run **with the caller's privileges** (they are not `SECURITY DEFINER`), so the Flask database role needs table privileges as well as `EXECUTE`: `SELECT` on all tables, `INSERT` on `users`, `INSERT/UPDATE` on `bookings`, `INSERT/DELETE` on `booking_seats` (the cancel/expiry triggers delete seat rows), `INSERT/UPDATE` on `movies` and `showtimes`. Triggers guard every direct write, but restricting Flask to the functions alone would need `SECURITY DEFINER` — an open deployment decision for Member A that is **not** implemented. This repository's schema creates no roles; use a non-owner, non-superuser role for the application. The owner role is for setup and tests only.
-* Create the database empty, then: `psql -X -v ON_ERROR_STOP=1 -d <db> -f database/schema.sql` and `… -f database/seed.sql` (once). Tests: `bash database/tests/run_all.sh` on a **disposable** database only.
-* Timestamps are `timestamptz`; the seed uses 7 consecutive `Asia/Seoul` days starting on the day it is run.
+* The functions and triggers run with the caller's privileges. The Flask runtime role needs `EXECUTE`, `SELECT` on all application tables, `INSERT` on `users`, `INSERT/UPDATE` on `bookings`, `INSERT/DELETE` on `booking_seats` and `INSERT/UPDATE/DELETE` on `movies` and `showtimes`. The baseline creates no roles. Fresh Compose volumes apply `backend/migrations/compose-role.sql` and `backend/migrations/0002_movie_delete_permissions.sql`. Use a non-owner, non-superuser application role for an externally managed database. Use the owner role for setup and tests.
+* Create the database empty, then: `psql -X -v ON_ERROR_STOP=1 -d <db> -f backend/migrations/0001_baseline.sql` and `… -f backend/seeds/demo.sql` (once). Tests: `bash database/tests/run_all.sh` on a **disposable** database only.
+* Timestamps are `timestamptz`; the seed uses 14 consecutive `Asia/Seoul` days starting on the day it is run.

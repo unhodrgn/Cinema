@@ -1,6 +1,6 @@
 # 물리적 데이터 모델 (Physical Data Model)
 
-**DBMS:** PostgreSQL 14+ (18.6에서 검증) · **확장:** `btree_gist` · **DDL:** `database/schema.sql` · **시드:** `database/seed.sql`
+**DBMS:** PostgreSQL 14+ (18.6에서 검증) · **확장:** `btree_gist` · **DDL:** `backend/migrations/0001_baseline.sql` · **시드:** `backend/seeds/demo.sql`
 컬럼별 타입·제약은 `table_description.md`, 도메인은 `domain_definition.md`에 있다. 이 문서는 구현 구조를 요약한다.
 
 ## 1. 물리 ERD

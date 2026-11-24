@@ -1,5 +1,7 @@
 # Handover Reconciliation Report — Member A PostgreSQL Handover vs. B01–B05 / D1–D6
 
+The paths quoted in this report refer to the November 20 handover. The current SQL baseline, demo seed and verification commands are listed in the [PostgreSQL guide](../../database/README.md).
+
 **Project:** 영화관 예매 및 좌석 관리 시스템 (Cinema Reservation System)
 **Prepared by:** Member B (Application Lead)
 **Date:** 2026-11-20 (KST)

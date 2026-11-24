@@ -2,8 +2,23 @@
   "name": "cinema-frontend",
   "private": true,
   "type": "module",
-  "description": "Independent frontend. No dependencies: this file only lets Node's built-in test runner load the ES modules.",
+  "description": "Cinema Reservation browser application",
   "scripts": {
-    "test": "node --test tests/"
+    "test": "node --test \"tests/*.test.js\"",
+    "dev": "vite --host 127.0.0.1 --port 8080",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run typecheck && vite build",
+    "build:legacy": "node scripts/build-legacy.js"
+  },
+  "dependencies": {
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "5.9.3",
+    "vite": "7.3.8"
   }
 }

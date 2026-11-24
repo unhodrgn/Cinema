@@ -1,6 +1,6 @@
 # 도메인 정의서 (Domain Definition)
 
-**기준:** `database/schema.sql`. 승인되지 않은 값 목록(장르, 관람 등급)은 정의하지 않는다 (BR-DL-001 §6).
+**기준:** `backend/migrations/0001_baseline.sql`. 승인되지 않은 값 목록(장르, 관람 등급)은 정의하지 않는다 (BR-DL-001 §6).
 
 | 도메인 | 적용 컬럼 | PostgreSQL 타입 | 허용 범위 / 형식 | 검증 수단 |
 |---|---|---|---|---|

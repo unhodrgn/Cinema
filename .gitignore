@@ -35,3 +35,10 @@ htmlcov/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Frontend dependencies and local design-tool state
+node_modules/
+dist-legacy/
+frontend/.impeccable/hook.cache.json
+frontend/.impeccable/hook.pending.json
+frontend/.impeccable/config.local.json

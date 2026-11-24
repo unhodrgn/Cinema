@@ -1,41 +1,37 @@
-# database/ — canonical PostgreSQL database
+# PostgreSQL cho Cinema
 
-Status: **verified** against D1–D6 on PostgreSQL 18.6 (see `docs/database/database_test_documentation.md`). Not yet tested on PostgreSQL 14–17.
+SQL chuẩn nằm tại [baseline 0001](../backend/migrations/0001_baseline.sql). [Seed demo](../backend/seeds/demo.sql) và [quyền cho volume Compose mới](../backend/migrations/compose-role.sql) có vòng đời riêng. PostgreSQL cần extension `btree_gist`. Phiên bản dùng để kiểm chứng migration là PostgreSQL 18.
 
-| File | Purpose |
-|---|---|
-| `schema.sql` | Canonical schema: 7 tables, constraints, triggers, 4 operations for Flask. Apply **once** to a new empty database. Needs the `btree_gist` extension. |
-| `seed.sql` | Canonical seed (demo data): 3 accounts, 5 movies, 5 rooms, 250 seats, 140 screenings over 7 `Asia/Seoul` days from the day it runs. Apply after `schema.sql`, once. |
-| `tests/run_all.sh` | Creates a disposable database, runs everything below, drops it. |
-| `tests/integrity_tests.sql` | 177 checks for D1–D6 and retained rules (rolled back). |
-| `tests/reconciliation_probes.sql` | 31 probes keyed to the audit's P-numbers (rolled back; fails on any mismatch). |
-| `tests/test_concurrency.py` | Real multi-session race tests (psycopg2). Needs a fresh DB with no bookings. |
+## Tạo database mới
 
-`CinemaDB_FINAL_PostgreSQL_Handover/` (Member A's delivery) is kept **unchanged** as the historical reference. `schema.sql` and `seed.sql` here are derived from it and corrected as documented in `docs/database/handover_reconciliation_report.md`; do not edit the handover folder or maintain a second schema.
+Để chạy bằng Compose, làm theo [README gốc](../README.md). Để tự quản lý server, dùng role setup có quyền tạo DB và extension. Ví dụ sau dành cho database mới tên `cinema_demo`, chạy từ root bằng client PostgreSQL:
 
-## Setup
-
-```bash
-createdb cinema_demo                                   # new, empty database
-psql -X -v ON_ERROR_STOP=1 -d cinema_demo -f database/schema.sql
-psql -X -v ON_ERROR_STOP=1 -d cinema_demo -f database/seed.sql
+```sh
+createdb cinema_demo
+psql -X -v ON_ERROR_STOP=1 -d cinema_demo -f backend/migrations/0001_baseline.sql
+psql -X -v ON_ERROR_STOP=1 -d cinema_demo -f backend/seeds/demo.sql
 ```
-Connection via the libpq variables (`PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`). Never commit credentials.
 
-## Verify (disposable database only)
+Đặt `PGHOST`, `PGPORT`, `PGUSER` và credential libpq cho phiên setup. API dùng role runtime riêng. Xem danh sách quyền trong [hợp đồng DB](../docs/database/postgresql_flask_integration_contract.md). Có thể chạy lại công cụ đổi mật khẩu bằng `python backend/scripts/set_demo_passwords.py --username admin` với các biến `SETUP_DB_*` riêng.
 
-```bash
-python -m pip install psycopg2-binary
-bash database/tests/run_all.sh
+## Database đã có dữ liệu
+
+1. Tạo backup bằng công cụ PostgreSQL và restore vào DB riêng. Cấu hình kết nối của terminal kiểm tra trỏ vào bản sao.
+2. Từ `backend/` chạy `python -m scripts.check_schema`. Công cụ sử dụng session read-only, kiểm tra bảng, hàm, trigger đang bật, index, constraint có tên, extension và cột poster.
+3. Đối chiếu định nghĩa bằng `pg_dump --schema-only --no-owner --no-privileges` của bản sao và một DB mới tạo từ 0001 trên cùng major version. Kiểm tra riêng các khác biệt. Preflight chỉ kiểm tra inventory; sự tồn tại của một tên hàm chưa xác minh nội dung hàm.
+4. Khi schema khớp, có thể dùng bản ứng dụng mới với DB hiện hữu. Nếu thiếu đối tượng, chuẩn bị migration tăng dần riêng và kiểm chứng trên bản sao trước. Baseline có các lệnh tạo bảng một lần. Seed dành cho database trống.
+
+## Quyền xóa phim trên database hiện hữu
+
+Database Compose mới tự áp dụng [migration quyền xóa phim](../backend/migrations/0002_movie_delete_permissions.sql). Với volume Compose đã có, chạy từ root để cập nhật quyền của role `cinema_api` bằng tài khoản chủ database:
+
+```powershell
+Get-Content -Raw backend/migrations/0002_movie_delete_permissions.sql |
+  docker compose exec -T db psql -X -v ON_ERROR_STOP=1 -U cinema_owner -d cinema
 ```
-Never run the tests or the seed against a shared or demo database: the concurrency test leaves bookings behind, and (D2) a screening that has any booking record can never be edited again.
 
-## For Flask
+Với PostgreSQL tự quản lý, chủ database cấp quyền `DELETE` trên `movies` và `showtimes` cho role chạy Flask. Lệnh cấp quyền có thể chạy lại.
 
-Read `docs/database/postgresql_flask_integration_contract.md`. In short: call `create_booking`, `pay_booking`, `cancel_booking` and `expire_overdue_bookings()` (request-time expiry; nothing runs automatically); use physical table names; handle the `UC…` SQLSTATEs.
+## Kiểm chứng độc lập
 
-## Open items
-
-* Demo account password hashes come from Member A; their plaintext is undocumented and unverified.
-* Database driver choice (`psycopg2` recommended) and `requirements.txt` are not settled; `requirements.txt` is unchanged.
-* Application-role privileges / `SECURITY DEFINER` is a deployment decision, not implemented.
+Từ root chạy `docker compose --profile test run --build --rm verify`. Nếu đã có server test riêng, dùng `python backend/tests/run_database.py`. Lệnh Bash cũ `bash database/tests/run_all.sh` vẫn gọi cùng runner. Cần chỉ định port test hoặc `PGPORT` tường minh khi dùng wrapper này. Cả integrity và reconciliation chạy bằng `psql`; concurrency commit vào database riêng của runner. [Tài liệu kiểm thử](../docs/database/database_test_documentation.md)

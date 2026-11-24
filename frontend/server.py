@@ -39,7 +39,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
-ROOT = Path(__file__).resolve().parent
+BUILD_DIRECTORY = "dist-legacy" if os.environ.get("CINEMA_LEGACY_UI") == "1" else "dist"
+ROOT = Path(__file__).resolve().parent / BUILD_DIRECTORY
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8080
@@ -294,6 +295,9 @@ def main():
         settings = read_settings()
     except SettingsError as error:
         print(f"frontend server: invalid configuration: {error}", file=sys.stderr)
+        return 2
+    if not (ROOT / INDEX_FILE).is_file():
+        print(f"Missing frontend build: {ROOT}. Run npm run build or npm run build:legacy.", file=sys.stderr)
         return 2
     try:
         server = create_server(settings)
