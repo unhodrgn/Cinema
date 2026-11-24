@@ -1,8 +1,8 @@
 """Set known passwords for existing accounts (setup only, never part of the running API).
 
-The seeded accounts (``admin_demo``, ``customer_demo``, ``customer_demo2``) keep password
-hashes whose plaintext nobody knows. Before a login demo, run this once to give them
-passwords you know. It needs a database role that may UPDATE ``users``; the role the API
+The seeded accounts (``admin``, ``customer1``, ``customer2``) come with alphanumeric demo
+passwords hashed in ``database/seed.sql``. Run this script whenever you want to replace
+their passwords. It needs a database role that may UPDATE ``users``; the role the API
 runs as does not and must not have that permission (integration contract, section 8).
 
 Connection: explicit ``SETUP_DB_*`` environment variables ONLY. There is no fallback to
@@ -18,7 +18,7 @@ reads the API's configuration or ``.env``. Set them in the terminal that runs th
 The new password is asked for with a hidden prompt (twice). For automation it can be given
 in ``SETUP_NEW_PASSWORD`` instead; never put a password on the command line or in a file.
 
-    python scripts/set_demo_passwords.py --username admin_demo --username customer_demo
+    python scripts/set_demo_passwords.py --username admin --username customer1
 
 It prints the target and asks you to type the database name to confirm (``--yes`` skips the
 question). Only ``users.password_hash`` of the named, EXISTING accounts is updated, in one

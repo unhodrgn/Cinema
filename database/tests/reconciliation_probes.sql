@@ -56,8 +56,8 @@ DECLARE
  v_base timestamptz := date_trunc('hour', now()) + interval '60 days';
  col text;
 BEGIN
- SELECT user_id INTO v_cust  FROM users WHERE username='customer_demo';
- SELECT user_id INTO v_cust2 FROM users WHERE username='customer_demo2';
+ SELECT user_id INTO v_cust  FROM users WHERE username='customer1';
+ SELECT user_id INTO v_cust2 FROM users WHERE username='customer2';
  SELECT user_id INTO v_admin FROM users WHERE role='ADMIN' LIMIT 1;
  SELECT movie_id, duration_minutes INTO v_movie1, v_dur FROM movies ORDER BY movie_id LIMIT 1;
  SELECT movie_id INTO v_movie2 FROM movies ORDER BY movie_id OFFSET 1 LIMIT 1;
@@ -164,7 +164,7 @@ ROLLBACK;
 \set ON_ERROR_STOP off
 BEGIN;
 INSERT INTO bookings(user_id,showtime_id,total_amount)
-  SELECT (SELECT user_id FROM users WHERE username='customer_demo'),
+  SELECT (SELECT user_id FROM users WHERE username='customer1'),
          (SELECT showtime_id FROM showtimes WHERE starts_at > now()+interval '2 days' ORDER BY starts_at DESC LIMIT 1), 12000;
 COMMIT;
 \set ON_ERROR_STOP on

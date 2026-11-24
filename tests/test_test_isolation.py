@@ -49,7 +49,7 @@ def database_exists(settings, name):
 
 
 def customer_id(connection):
-    return scalar(connection, "SELECT user_id FROM users WHERE username = 'customer_demo'")
+    return scalar(connection, "SELECT user_id FROM users WHERE username = 'customer1'")
 
 
 def book(connection, user_id, showtime_id, seat_ids):

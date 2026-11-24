@@ -62,7 +62,7 @@ CREATE FUNCTION pg_temp.seat(p_show bigint, p_row char, p_num integer) RETURNS b
  SELECT se.seat_id FROM showtimes s JOIN seats se ON se.room_id = s.room_id
  WHERE s.showtime_id = p_show AND se.seat_row = p_row AND se.seat_number = p_num $$;
 
-CREATE FUNCTION pg_temp.cust(p_name text DEFAULT 'customer_demo') RETURNS bigint LANGUAGE sql AS $$
+CREATE FUNCTION pg_temp.cust(p_name text DEFAULT 'customer1') RETURNS bigint LANGUAGE sql AS $$
  SELECT user_id FROM users WHERE username = p_name $$;
 
 -- simulate elapsed time for a booking: shift booked_at and expires_at together
@@ -142,7 +142,7 @@ END $t$;
 
 -- ================================================================ D1 cancellation
 DO $t$
-DECLARE c1 bigint := pg_temp.cust(); c2 bigint := pg_temp.cust('customer_demo2');
+DECLARE c1 bigint := pg_temp.cust(); c2 bigint := pg_temp.cust('customer2');
         s bigint := pg_temp.mk_show(2, 10000); b bigint; b2 bigint; b3 bigint; res text;
 BEGIN
  b := create_booking(c1, s, ARRAY[pg_temp.seat(s,'A',1), pg_temp.seat(s,'A',2)]);
@@ -248,7 +248,7 @@ BEGIN
  PERFORM pg_temp.ok((SELECT count(*) FROM booking_seats WHERE booking_id=b) = 2, 'D3 paid booking keeps its seats');
  PERFORM pg_temp.expect_err(format($$SELECT pay_booking(%s, %s)$$, b, c1), 'UC006', 'D3 paying twice rejected');
  PERFORM pg_temp.expect_err(format($$UPDATE bookings SET payment_status='UNPAID' WHERE booking_id=%s$$, b), 'UC007', 'D3 PAID cannot revert to UNPAID');
- PERFORM pg_temp.expect_err(format($$SELECT pay_booking(%s, %s)$$, b, pg_temp.cust('customer_demo2')), 'UC011', 'BR-09 only the owner can pay');
+ PERFORM pg_temp.expect_err(format($$SELECT pay_booking(%s, %s)$$, b, pg_temp.cust('customer2')), 'UC011', 'BR-09 only the owner can pay');
  -- payment 1.5 seconds before the deadline (real clock) still succeeds
  b2 := create_booking(c1, s, ARRAY[pg_temp.seat(s,'B',1)]);
  PERFORM pg_temp.set_deadline(b2, clock_timestamp() + interval '1500 milliseconds');
@@ -294,12 +294,12 @@ BEGIN
  PERFORM pg_temp.ok(expire_overdue_bookings() = 0 AND expire_overdue_bookings(T) = 0, 'D3 further repeated calls stay no-ops');
  PERFORM pg_temp.ok((SELECT status FROM bookings WHERE booking_id=b_edge)='EXPIRED' AND (SELECT status FROM bookings WHERE booking_id=b_paid)='BOOKED' AND (SELECT status FROM bookings WHERE booking_id=b_live)='BOOKED', 'D3 repeated calls changed nothing');
  PERFORM pg_temp.ok((SELECT count(*) FROM bookings WHERE booking_id IN (b_live,b_edge,b_paid)) = 3, 'D3 no booking row was ever removed');
- PERFORM pg_temp.ok(create_booking(pg_temp.cust('customer_demo2'), s, ARRAY[pg_temp.seat(s,'A',2), pg_temp.seat(s,'A',3)]) IS NOT NULL, 'D3 seats of an expired booking can be booked again');
+ PERFORM pg_temp.ok(create_booking(pg_temp.cust('customer2'), s, ARRAY[pg_temp.seat(s,'A',2), pg_temp.seat(s,'A',3)]) IS NOT NULL, 'D3 seats of an expired booking can be booked again');
 END $t$;
 
 -- ================================================================ D3 expiration is on demand only
 DO $t$
-DECLARE c1 bigint := pg_temp.cust(); c2 bigint := pg_temp.cust('customer_demo2'); s bigint := pg_temp.mk_show(11); b_late bigint; b2 bigint; n int;
+DECLARE c1 bigint := pg_temp.cust(); c2 bigint := pg_temp.cust('customer2'); s bigint := pg_temp.mk_show(11); b_late bigint; b2 bigint; n int;
 BEGIN
  b_late := create_booking(c1, s, ARRAY[pg_temp.seat(s,'A',4)]);
  PERFORM pg_temp.backdate(b_late, interval '11 minutes');
@@ -412,7 +412,7 @@ END $t$;
 
 -- ================================================================ retained rules: seats, duplicates, rollback, constraints
 DO $t$
-DECLARE c1 bigint := pg_temp.cust(); c2 bigint := pg_temp.cust('customer_demo2');
+DECLARE c1 bigint := pg_temp.cust(); c2 bigint := pg_temp.cust('customer2');
         s bigint := pg_temp.mk_show(12); s_other bigint := pg_temp.mk_show(13, 12000, 2);
         other_room_seat bigint; b bigint; n_before int; a_seat bigint;
 BEGIN
@@ -449,7 +449,7 @@ BEGIN
      SET CONSTRAINTS ALL IMMEDIATE;
      ALTER TABLE bookings DISABLE TRIGGER USER;
      INSERT INTO bookings(user_id,showtime_id,total_amount,booked_at,expires_at)
-       SELECT user_id, (SELECT min(showtime_id) FROM showtimes), 0, now(), now() + interval '9 minutes' FROM users WHERE username='customer_demo';
+       SELECT user_id, (SELECT min(showtime_id) FROM showtimes), 0, now(), now() + interval '9 minutes' FROM users WHERE username='customer1';
    END $x$$q$, '23514', 'CHECK expires_at = booked_at + 10 minutes (even if the trigger were bypassed)');
 END $t$;
 

@@ -316,7 +316,7 @@ REAL_ERRORS = {
         "SELECT create_booking((SELECT min(user_id) FROM users WHERE role = 'CUSTOMER'), "
         "(SELECT min(showtime_id) FROM showtimes), '{}'::bigint[])"
     ),
-    "23505": "INSERT INTO users(username, password_hash) VALUES ('admin_demo', 'x')",
+    "23505": "INSERT INTO users(username, password_hash) VALUES ('admin', 'x')",
     "23503": (
         "INSERT INTO showtimes(movie_id, room_id, starts_at, ends_at, ticket_price) "
         "VALUES (999999, 1, now() + interval '30 days', now() + interval '31 days', 1)"

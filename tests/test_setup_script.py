@@ -79,7 +79,7 @@ def test_every_connection_setting_is_required_with_no_default(missing):
                     SETUP_NEW_PASSWORD="whatever")
     del env[missing]
 
-    result = run_script(["--username", "admin_demo", "--yes"], env)
+    result = run_script(["--username", "admin", "--yes"], env)
 
     assert result.returncode == 2
     assert missing in result.stderr
@@ -92,7 +92,7 @@ def test_the_runtime_credentials_are_never_used_as_a_fallback():
                     DB_PASSWORD="runtime-secret", PGHOST="127.0.0.1", PGPORT="1", PGUSER="runtime",
                     PGDATABASE="cinema_runtime", SETUP_NEW_PASSWORD="whatever")
 
-    result = run_script(["--username", "admin_demo", "--yes"], env)
+    result = run_script(["--username", "admin", "--yes"], env)
 
     assert result.returncode == 2
     assert "SETUP_DB_HOST" in result.stderr and "never falls back" in result.stderr
@@ -104,7 +104,7 @@ def test_an_invalid_port_is_refused(port):
     env = clean_env(SETUP_DB_HOST="127.0.0.1", SETUP_DB_PORT=port, SETUP_DB_NAME="x", SETUP_DB_USER="y",
                     SETUP_NEW_PASSWORD="whatever")
 
-    result = run_script(["--username", "admin_demo", "--yes"], env)
+    result = run_script(["--username", "admin", "--yes"], env)
 
     assert result.returncode == 2 and "SETUP_DB_PORT" in result.stderr
 
@@ -118,7 +118,7 @@ def test_at_least_one_username_is_required():
 def test_without_a_password_source_the_script_stops_instead_of_hanging():
     env = clean_env(SETUP_DB_HOST="127.0.0.1", SETUP_DB_PORT="1", SETUP_DB_NAME="x", SETUP_DB_USER="y")
 
-    result = run_script(["--username", "admin_demo", "--yes"], env)
+    result = run_script(["--username", "admin", "--yes"], env)
 
     assert result.returncode == 2
     assert "no password given" in result.stderr
@@ -129,7 +129,7 @@ def test_unusable_passwords_are_refused_before_any_connection(password, message)
     env = clean_env(SETUP_DB_HOST="127.0.0.1", SETUP_DB_PORT="1", SETUP_DB_NAME="x", SETUP_DB_USER="y",
                     SETUP_NEW_PASSWORD=password)
 
-    result = run_script(["--username", "admin_demo", "--yes"], env)
+    result = run_script(["--username", "admin", "--yes"], env)
 
     assert result.returncode == 2
     assert message in result.stderr
@@ -142,33 +142,33 @@ def test_unusable_passwords_are_refused_before_any_connection(password, message)
 def test_it_sets_known_passwords_that_then_work_through_the_api(fresh_db, fresh_app, fresh_connection):
     before = hashes(fresh_connection)
 
-    result = run_script(["--username", "admin_demo", "--username", "customer_demo", "--yes"],
+    result = run_script(["--username", "admin", "--username", "customer1", "--yes"],
                         setup_env(fresh_db, SETUP_NEW_PASSWORD=NEW_PASSWORD))
 
     assert result.returncode == 0, result.stderr
-    assert result.stdout.strip().endswith("Password updated for: admin_demo, customer_demo")
+    assert result.stdout.strip().endswith("Password updated for: admin, customer1")
     after = hashes(fresh_connection)
-    for name in ("admin_demo", "customer_demo"):
+    for name in ("admin", "customer1"):
         assert after[name][0] != before[name][0]
         assert after[name][0].startswith("pbkdf2:sha256:600000$")
         assert passwords.verify_password(after[name][0], NEW_PASSWORD)
         assert after[name][1] == before[name][1]  # the role is untouched
-    assert after["customer_demo2"] == before["customer_demo2"]  # not named: unchanged
+    assert after["customer2"] == before["customer2"]  # not named: unchanged
 
     api = ApiClient(fresh_app.test_client())
-    admin = api.post("/api/auth/login", json={"username": "admin_demo", "password": NEW_PASSWORD})
-    customer = api.post("/api/auth/login", json={"username": "customer_demo", "password": NEW_PASSWORD})
-    untouched = api.post("/api/auth/login", json={"username": "customer_demo2", "password": NEW_PASSWORD})
+    admin = api.post("/api/auth/login", json={"username": "admin", "password": NEW_PASSWORD})
+    customer = api.post("/api/auth/login", json={"username": "customer1", "password": NEW_PASSWORD})
+    untouched = api.post("/api/auth/login", json={"username": "customer2", "password": NEW_PASSWORD})
     assert admin.status_code == 200 and admin.get_json()["user"]["role"] == "ADMIN"
     assert customer.status_code == 200 and customer.get_json()["user"]["role"] == "CUSTOMER"
     assert untouched.status_code == 401
 
 
 def test_neither_the_password_nor_a_hash_is_ever_printed(fresh_db, fresh_connection):
-    result = run_script(["--username", "admin_demo", "--yes"], setup_env(fresh_db, SETUP_NEW_PASSWORD=NEW_PASSWORD))
+    result = run_script(["--username", "admin", "--yes"], setup_env(fresh_db, SETUP_NEW_PASSWORD=NEW_PASSWORD))
 
     assert result.returncode == 0
-    new_hash = hashes(fresh_connection)["admin_demo"][0]
+    new_hash = hashes(fresh_connection)["admin"][0]
     for stream in (result.stdout, result.stderr):
         assert NEW_PASSWORD not in stream and new_hash not in stream and "pbkdf2" not in stream
 
@@ -176,7 +176,7 @@ def test_neither_the_password_nor_a_hash_is_ever_printed(fresh_db, fresh_connect
 def test_an_unknown_account_changes_nothing_not_even_the_valid_ones(fresh_db, fresh_connection):
     before = hashes(fresh_connection)
 
-    result = run_script(["--username", "admin_demo", "--username", "nobody_here", "--yes"],
+    result = run_script(["--username", "admin", "--username", "nobody_here", "--yes"],
                         setup_env(fresh_db, SETUP_NEW_PASSWORD=NEW_PASSWORD))
 
     assert result.returncode == 1
@@ -187,7 +187,7 @@ def test_an_unknown_account_changes_nothing_not_even_the_valid_ones(fresh_db, fr
 def test_it_only_updates_existing_accounts_it_never_creates_or_promotes(fresh_db, fresh_connection):
     before = hashes(fresh_connection)
 
-    run_script(["--username", "customer_demo", "--yes"], setup_env(fresh_db, SETUP_NEW_PASSWORD=NEW_PASSWORD))
+    run_script(["--username", "customer1", "--yes"], setup_env(fresh_db, SETUP_NEW_PASSWORD=NEW_PASSWORD))
     after = hashes(fresh_connection)
 
     assert set(after) == set(before)
@@ -198,23 +198,23 @@ def test_confirmation_by_typing_the_database_name(fresh_db, fresh_connection):
     before = hashes(fresh_connection)
     env = setup_env(fresh_db, SETUP_NEW_PASSWORD=NEW_PASSWORD)
 
-    refused = run_script(["--username", "admin_demo"], env, input_text="some other database\n")
+    refused = run_script(["--username", "admin"], env, input_text="some other database\n")
     assert refused.returncode == 1 and "not confirmed" in refused.stderr
     assert hashes(fresh_connection) == before
-    no_answer = run_script(["--username", "admin_demo"], env)  # stdin closed: no answer
+    no_answer = run_script(["--username", "admin"], env)  # stdin closed: no answer
     assert no_answer.returncode == 1
     assert hashes(fresh_connection) == before
 
-    accepted = run_script(["--username", "admin_demo"], env, input_text=fresh_db.name + "\n")
+    accepted = run_script(["--username", "admin"], env, input_text=fresh_db.name + "\n")
     assert accepted.returncode == 0
-    assert hashes(fresh_connection)["admin_demo"][0] != before["admin_demo"][0]
+    assert hashes(fresh_connection)["admin"][0] != before["admin"][0]
     assert fresh_db.name in accepted.stdout  # the target is always shown before anything happens
 
 
 def test_a_database_failure_prints_only_the_sqlstate(fresh_db):
     env = setup_env(fresh_db, SETUP_NEW_PASSWORD=NEW_PASSWORD, SETUP_DB_PORT="1")  # nothing listens there
 
-    result = run_script(["--username", "admin_demo", "--yes"], env)
+    result = run_script(["--username", "admin", "--yes"], env)
 
     assert result.returncode == 1
     assert "database error" in result.stderr and "nothing was changed" in result.stderr
@@ -234,7 +234,7 @@ def test_a_role_without_update_permission_cannot_change_anything(fresh_db, fresh
     fresh_connection.commit()
     before = hashes(fresh_connection)
     try:
-        result = run_script(["--username", "admin_demo", "--yes"],
+        result = run_script(["--username", "admin", "--yes"],
                             setup_env(fresh_db, SETUP_NEW_PASSWORD=NEW_PASSWORD, SETUP_DB_USER=role))
         assert result.returncode == 1
         assert "42501" in result.stderr  # insufficient_privilege

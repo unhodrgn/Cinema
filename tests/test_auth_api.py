@@ -208,7 +208,7 @@ def test_a_duplicate_account_id_is_a_409_and_creates_nothing(client, owner):
 
 
 def test_the_seeded_account_ids_are_taken(client):
-    for name in ("admin_demo", "customer_demo", "customer_demo2"):
+    for name in ("admin", "customer1", "customer2"):
         assert register(client, name).status_code == 409
 
 
@@ -407,7 +407,7 @@ def test_login_with_missing_or_malformed_fields_is_a_validation_error(client, bo
     assert set(error_of(response)["fields"]) == fields
 
 
-@pytest.mark.parametrize("username", ["' OR '1'='1", "admin_demo'--", "%", "_", "ADMIN_DEMO", "admin_demo "])
+@pytest.mark.parametrize("username", ["' OR '1'='1", "admin'--", "%", "_", "ADMIN", "admin "])
 def test_login_does_not_match_account_ids_by_pattern_or_injection(client, username):
     assert login(client, username, "x").status_code == 401
 
@@ -418,9 +418,13 @@ def test_the_seeded_password_hashes_are_verifiable(client):
     for stored in hashes:
         assert passwords.verify_password(stored, "definitely not the password") is False  # parses, no error
     # Through the API: a seeded account with a wrong password is a clean 401, never a crash
-    for name in ("admin_demo", "customer_demo", "customer_demo2"):
+    for name in ("admin", "customer1", "customer2"):
         response = login(client, name, "definitely not the password")
         assert response.status_code == 401 and error_of(response)["code"] == "invalid_credentials"
+    # And the seeded demo accounts can log in directly with their alphanumeric demo passwords
+    for name, pw, role in (("admin", "admin1234", "ADMIN"), ("customer1", "customer1234", "CUSTOMER"), ("customer2", "customer1234", "CUSTOMER")):
+        response = login(client, name, pw)
+        assert response.status_code == 200 and response.get_json()["user"]["role"] == role
 
 
 def test_hashes_in_the_seeds_format_and_other_werkzeug_formats_authenticate(client, owner):

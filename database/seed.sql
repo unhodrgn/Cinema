@@ -12,10 +12,10 @@
 --     approves no genre or rating vocabulary. Screenings, prices, rooms, seats, accounts
 --     and bookings are demo data.
 --   * ticket_price 12000.00 is a demo price (D6 #6: no numeric price approved).
---   * the 3 accounts keep Member A's demo password HASHES. The plaintext
---     passwords were never documented by A and have not been verified, so none
---     are documented anywhere. Replace the hashes (Werkzeug
---     generate_password_hash) before demoing a login.
+--   * the 3 demo accounts (admin, customer1, customer2) store salted Werkzeug
+--     pbkdf2:sha256:600000 hashes for normal alphanumeric demo passwords
+--     (admin: admin1234, customer1/customer2: customer1234). Use
+--     scripts/set_demo_passwords.py to change them anytime.
 --
 -- Screening window: 14 consecutive Asia/Seoul calendar days (today .. today + 13) counted
 -- from the day the seed is executed, so the demo always has bookable screenings. There are no
@@ -26,9 +26,9 @@
 BEGIN;
 
 INSERT INTO users(username, password_hash, role) VALUES
- ('admin_demo',     'pbkdf2:sha256:600000$a54ec6ae2aeb6373$1f412da1184bfec47331b445d020c6d3a0cf95cdd50443bf7be7c3067aa69d10', 'ADMIN'),
- ('customer_demo',  'pbkdf2:sha256:600000$e5714680b2a12625$e0615cb2938c2dceae1fa1f7422c3c45db16eca464978e2c755fe32d8d10fe12', 'CUSTOMER'),
- ('customer_demo2', 'pbkdf2:sha256:600000$79a1d0adbb18490b$68288afaddc1fa4208923dd8c0d99edf65a4d794724b28a0a7215a664908d551', 'CUSTOMER');
+ ('admin',     'pbkdf2:sha256:600000$173528b654ee4462$d480b4f9fe069011000fc1e121ceed936139e5a23df83f25ecb24f5052ee2b7a', 'ADMIN'),
+ ('customer1', 'pbkdf2:sha256:600000$c2dcfc0b5cb72d2c$ba2bffe6f6ce01dc3fefcbe1a3e9c868666df4caf1bdb2ca94a7e91262cd1b02', 'CUSTOMER'),
+ ('customer2', 'pbkdf2:sha256:600000$f545d159cd8e6ced$349d9a1c35a07a870158bb5460acd39d37eb39610f0a42b04e87636d87568a55', 'CUSTOMER');
 
 INSERT INTO movies(title, genre, duration_minutes, rating, synopsis, release_date, poster_url) VALUES
  ('Jujutsu Kaisen 0', 'Animation', 105, '15',
