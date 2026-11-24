@@ -1,4 +1,4 @@
-"""Run the three database suites on a database provisioned by this process."""
+"""Run the database suites on a database provisioned by this process."""
 import argparse
 import os
 from pathlib import Path
@@ -9,7 +9,7 @@ import sys
 from dotenv import dotenv_values
 
 from disposable_db import (
-    DisposableDatabase, SCHEMA_PATH, SEED_PATH, read_forbidden_names, read_server_settings,
+    DisposableDatabase, CURRENT_SCHEMA_PATHS, SEED_PATH, read_forbidden_names, read_server_settings,
 )
 
 HERE = Path(__file__).resolve().parent
@@ -24,7 +24,8 @@ def main():
     database = DisposableDatabase(settings, forbidden_names=read_forbidden_names(os.environ, dotenv))
     try:
         database.create()
-        database.apply_sql_file(SCHEMA_PATH)
+        for migration in CURRENT_SCHEMA_PATHS:
+            database.apply_sql_file(migration)
         database.apply_sql_file(SEED_PATH)
         env = dict(os.environ, PGHOST=settings.host, PGPORT=str(settings.port),
                    PGDATABASE=database.name, PGCLIENTENCODING="UTF8")
@@ -33,6 +34,7 @@ def main():
         if settings.password:
             env["PGPASSWORD"] = settings.password
         checks = {
+            "money_domain.sql": [r"MONEY DOMAIN CHECKS PASSED"],
             "integrity_tests.sql": [r"ALL [1-9]\d* CHECKS PASSED"],
             "reconciliation_probes.sql": [r"SUMMARY: [1-9]\d* MATCH, 0 MISMATCH", r"\[P16\] MATCH\s+failed commit left 0 booking rows"],
         }

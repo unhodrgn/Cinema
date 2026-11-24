@@ -10,7 +10,7 @@ from threading import Thread
 from dotenv import dotenv_values
 from werkzeug.serving import make_server
 
-from disposable_db import SCHEMA_PATH, SEED_PATH, provision_database, read_forbidden_names, read_server_settings
+from disposable_db import CURRENT_SCHEMA_PATHS, SEED_PATH, provision_database, read_forbidden_names, read_server_settings
 from helpers import free_port, load_frontend_server
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -22,7 +22,7 @@ def main():
     dotenv = dotenv_values(os.environ.get("CINEMA_TEST_ENV_FILE", ROOT / ".env"))
     settings = read_server_settings(os.environ, dotenv)
     front = load_frontend_server()
-    with provision_database(settings, SCHEMA_PATH, SEED_PATH, read_forbidden_names(os.environ, dotenv)) as db:
+    with provision_database(settings, CURRENT_SCHEMA_PATHS, SEED_PATH, read_forbidden_names(os.environ, dotenv)) as db:
         api_port = free_port()
         static = front.create_server(front.Settings("127.0.0.1", 0, f"http://127.0.0.1:{api_port}"))
         origin = f"http://127.0.0.1:{static.server_port}"
