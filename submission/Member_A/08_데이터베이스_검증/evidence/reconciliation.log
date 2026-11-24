@@ -1,0 +1,54 @@
+Pager usage is off.
+SET
+BEGIN
+CREATE TABLE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P01] MATCH    column movies.genre present
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P01] MATCH    column movies.rating present
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P01] MATCH    column movies.release_date present
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P01] MATCH    column showtimes.ends_at present
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P01] MATCH    column bookings.expires_at present
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P01] MATCH    column bookings.payment_status present
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P01] MATCH    column bookings.total_amount present
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P02] MATCH    booking status = BOOKED/CANCELLED/EXPIRED, payment status = UNPAID/PAID
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P02b] MATCH    expiry/create/pay/cancel operations exist (4 of 4)
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P02c] MATCH    no scheduler extension (pg_cron) - expiry is request-time only
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P03] MATCH    new booking is BOOKED + UNPAID, paid_at NULL, expires_at = booked_at + 10 min
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P03b] MATCH    payment can be recorded later (UNPAID -> PAID before expires_at)
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P04] MATCH    snapshot must equal screening price (UC009); total_amount = sum of snapshots
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P05] MATCH    ticket_price UPDATE rejected when a booking exists
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P06a] MATCH    starts_at UPDATE rejected
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P06b] MATCH    movie_id UPDATE rejected
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P06d] MATCH    ends_at UPDATE rejected
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P06e] MATCH    room_id UPDATE rejected
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P06c] MATCH    starts_at UPDATE rejected with only CANCELLED bookings
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P06f] MATCH    ticket_price UPDATE rejected with an EXPIRED booking too
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P07] MATCH    cancel: parent kept, status CANCELLED, payment_status PAID preserved, total kept, seat rows 0
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P08] MATCH    cancelled booking cannot be reactivated
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P09] MATCH    seat of another room rejected
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P10] MATCH    duplicate active seat rejected
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P11a] MATCH    genuinely overlapping screening rejected
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P11b] MATCH    back-to-back screening accepted (no 15-minute buffer)
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P12] MATCH    movie duration editable; stored screening end time unchanged
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P13] MATCH    GUEST role rejected
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P14] INFO     DB accepts role=ADMIN inserts; Flask registration MUST NOT pass a role (default CUSTOMER) - application responsibility
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P15] INFO     seeded screenings already started today at run time: 0 (seed is relative to the execution day)
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P17] MATCH    payment at/after expires_at rejected; booking expires; seats released
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P18] MATCH    repeated expiration calls are no-ops (idempotent)
+psql:database/tests/reconciliation_probes.sql:151: NOTICE:  [P19] MATCH    expired booking keeps parent + UNPAID, seat rows deleted
+DO
+psql:database/tests/reconciliation_probes.sql:159: NOTICE:  SUMMARY: 31 MATCH, 0 MISMATCH
+DO
+ROLLBACK
+[P16] expecting an ERROR below (BOOKED booking without seats must fail at COMMIT):
+BEGIN
+INSERT 0 1
+psql:database/tests/reconciliation_probes.sql:169: ERROR:  A BOOKED booking must contain at least one seat
+CONTEXT:  PL/pgSQL function booking_check_consistency() line 10 at RAISE
+                      result
+--------------------------------------------------
+ [P16] MATCH    failed commit left 0 booking rows
+(1 row)

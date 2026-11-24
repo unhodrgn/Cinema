@@ -1,0 +1,231 @@
+2026-11-20 19:48:46 UTC
+Standalone submission package (database baseline: 121854a0e006d824dd4aba7274deec7524da9694)
+psql (PostgreSQL) 18.7 (Postgres.app)
+The files belonging to this database system will be owned by user "[local OS account redacted]".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory [temporary socket directory]/pg ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Asia/Seoul
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    pg_ctl -D [temporary socket directory]/pg -l logfile start
+
+waiting for server to start.... done
+server started
+BEGIN
+CREATE EXTENSION
+REVOKE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+COMMIT
+BEGIN
+INSERT 0 3
+INSERT 0 5
+INSERT 0 5
+INSERT 0 250
+INSERT 0 140
+COMMIT
+    entity     | actual | expected
+---------------+--------+----------
+ users         |      3 |        3
+ movies        |      5 |        5
+ theater_rooms |      5 |        5
+ seats         |    250 |      250
+ showtimes     |    140 |      140
+(5 rows)
+
+    day     | screenings
+------------+------------
+ 2026-11-21 |         20
+ 2026-11-22 |         20
+ 2026-11-23 |         20
+ 2026-11-24 |         20
+ 2026-11-25 |         20
+ 2026-11-26 |         20
+ 2026-11-27 |         20
+(7 rows)
+
+CREATE ROLE
+BEGIN
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+COMMIT
+DO
+
+=== 01_inspect.sql ===
+DO
+                                                             version                                                             | encoding |  timezone
+---------------------------------------------------------------------------------------------------------------------------------+----------+------------
+ PostgreSQL 18.7 (Postgres.app) on aarch64-apple-darwin23.6.0, compiled by Apple clang version 15.0.0 (clang-1500.3.9.4), 64-bit | UTF8     | Asia/Seoul
+(1 row)
+
+  table_name
+---------------
+ booking_seats
+ bookings
+ movies
+ seats
+ showtimes
+ theater_rooms
+ users
+(7 rows)
+
+  table_name   | rows
+---------------+------
+ users         |    3
+ movies        |    5
+ theater_rooms |    5
+ seats         |  250
+ showtimes     |  140
+ bookings      |    0
+ booking_seats |    0
+(7 rows)
+
+              conname              |                                              definition
+-----------------------------------+-------------------------------------------------------------------------------------------------------
+ booking_seats_booking_showtime_fk | FOREIGN KEY (booking_id, showtime_id) REFERENCES bookings(booking_id, showtime_id) ON DELETE RESTRICT
+ booking_seats_showtime_seat_key   | UNIQUE (showtime_id, seat_id)
+ showtimes_no_room_overlap         | EXCLUDE USING gist (room_id WITH =, tstzrange(starts_at, ends_at, '[)'::text) WITH &&)
+(3 rows)
+
+
+=== 02_booking_lifecycle.sql ===
+DO
+CREATE VIEW
+CREATE VIEW
+BEGIN
+psql:database/demo/02_booking_lifecycle.sql:49: NOTICE:  PASS 성공 예매: BOOKED/UNPAID, 좌석 1건, 10분 기한
+psql:database/demo/02_booking_lifecycle.sql:49: NOTICE:  PASS 중복 좌석 거부: SQLSTATE UC002
+psql:database/demo/02_booking_lifecycle.sql:49: NOTICE:  PASS 취소: CANCELLED 이력 보존, 좌석 해제
+psql:database/demo/02_booking_lifecycle.sql:49: NOTICE:  PASS 같은 좌석 재예매
+psql:database/demo/02_booking_lifecycle.sql:49: NOTICE:  PASS 기한 경과 결제: EXPIRED/UNPAID, 좌석 해제
+DO
+ROLLBACK
+
+=== 03_exceptions.sql ===
+DO
+CREATE VIEW
+CREATE VIEW
+BEGIN
+psql:database/demo/03_exceptions.sql:29: NOTICE:  PASS 다른 상영관 좌석 거부: SQLSTATE UC003
+psql:database/demo/03_exceptions.sql:29: NOTICE:  PASS 같은 상영관의 중첩 일정 거부: SQLSTATE 23P01
+psql:database/demo/03_exceptions.sql:29: NOTICE:  PASS 잘못된 좌석 요청 후 부분 예매 0건
+DO
+ROLLBACK
+
+=== 04_permissions.sql ===
+DO
+CREATE VIEW
+CREATE VIEW
+BEGIN
+SET
+ application_role | can_book | can_delete_history | can_truncate_history
+------------------+----------+--------------------+----------------------
+ cinema_demo_app  | t        | f                  | f
+(1 row)
+
+ permitted_cancel
+------------------
+ CANCELLED
+(1 row)
+
+psql:database/demo/04_permissions.sql:21: NOTICE:  PASS 앱 역할의 직접 DELETE 거부: SQLSTATE 42501
+DO
+ROLLBACK
+
+=== Two-session lock observation ===
+ PASS B is waiting on A
+DO
+CREATE VIEW
+CREATE VIEW
+BEGIN
+ winner_booking_id
+-------------------
+                 6
+(1 row)
+
+세션 A: 잠금 유지 중. 세션 B가 대기한 뒤 이 세션에서 COMMIT;을 실행한다.
+ pg_sleep
+----------
+
+(1 row)
+
+COMMIT
+DO
+CREATE VIEW
+CREATE VIEW
+BEGIN
+psql:database/demo/05_concurrent_b.sql:16: NOTICE:  PASS 세션 B: SQLSTATE UC002
+DO
+ROLLBACK
+DO
+CREATE VIEW
+CREATE VIEW
+ parent_bookings | seat_allocations
+-----------------+------------------
+               1 |                1
+(1 row)
+
+psql:database/demo/05_concurrent_verify.sql:14: NOTICE:  PASS 동시 예매 후 예매 1건, 좌석 배정 1건
+DO
+
+ALL LIVE DEMONSTRATIONS PASSED
+waiting for server to shut down.... done
+server stopped
+Disposable database dropped; temporary cluster stopped at [temporary socket directory]

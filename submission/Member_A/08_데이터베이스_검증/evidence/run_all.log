@@ -1,0 +1,89 @@
+
+=== create disposable database cinema_test_20261121_014525_37859
+
+=== 1. schema.sql
+OK
+
+=== 2. seed.sql
+OK
+
+=== 3. integrity_tests.sql
+ ALL 199 CHECKS PASSED (transaction will be rolled back)
+exit=0
+
+=== 4. reconciliation_probes.sql
+psql:database/tests/reconciliation_probes.sql:159: NOTICE:  SUMMARY: 31 MATCH, 0 MISMATCH
+[P16] expecting an ERROR below (BOOKED booking without seats must fail at COMMIT):
+ [P16] MATCH    failed commit left 0 booking rows
+exit=0
+
+=== 5. test_concurrency.py
+Database: cinema_test_20261121_014525_37859; customers [2, 3]
+[PASS] C1 all 8 sessions finished (no deadlock / hang)
+[PASS] C1 exactly 1 booking wins, 7 rejected with UC002 (seat already reserved)  (wins=1 errs=['UC002', 'UC002', 'UC002', 'UC002', 'UC002', 'UC002', 'UC002'])
+[PASS] C1 exactly one active seat allocation in the database  (count=1)
+[PASS] C2 session B is BLOCKED on the lock while A has not committed
+[PASS] C2 after A commits, B is rejected with UC002  ([('err', 'UC002')])
+[PASS] C3 exactly one of two overlapping multi-seat bookings wins  ([('ok', 70), ('err', 'UC002')])
+[PASS] C3 loser left nothing behind (1 booking, 2 seat rows)  (bookings=1 seat_rows=2)
+[PASS] C4 40 payers + 2 expirers finished (no deadlock / hang)
+[PASS] C4 every booking ended in a VALID state (PAID+seat+paid_at<expires_at, or EXPIRED+UNPAID+no seats)  (invalid=[])
+[PASS] C4 outcome split under the race: PAID=26, EXPIRED=14
+[PASS] C4 the race was real: both outcomes occurred (payment won some, expiry won others)
+[PASS] C5 20 pay/cancel pairs finished (no deadlock / hang)
+[PASS] C5 every booking ended CANCELLED with no seats; PAID iff the payment won  (invalid=[])
+[PASS] C6 5 parallel expire_overdue_bookings() callers finished
+[PASS] C6 each overdue booking expired exactly once (sum of counts = 20)  (counts=[0, 0, 0, 20, 0]+0)
+[PASS] C6 all EXPIRED + UNPAID, all seat rows deleted
+[PASS] C7 READ COMMITTED rejects the second allocation  (UC002)
+[PASS] C7 READ COMMITTED loser left no booking or allocation
+[PASS] C7 REPEATABLE READ rejects the second allocation  (40001)
+[PASS] C7 REPEATABLE READ fresh-transaction retry sees the seat conflict
+[PASS] C7 REPEATABLE READ loser left no booking or allocation
+[PASS] C7 SERIALIZABLE rejects the second allocation  (40001)
+[PASS] C7 SERIALIZABLE fresh-transaction retry sees the seat conflict
+[PASS] C7 SERIALIZABLE loser left no booking or allocation
+[PASS] C8 pay_booking is waiting before the deadline
+[PASS] C8 pay_booking commits expiration after waiting  ([('ok', 'EXPIRED')])
+[PASS] C8 pay_booking retains expired history and releases the seat
+[PASS] C8 pay_booking released seat is bookable
+[PASS] C8 cancel_booking is waiting before the deadline
+[PASS] C8 cancel_booking commits expiration after waiting  ([('ok', 'EXPIRED')])
+[PASS] C8 cancel_booking retains expired history and releases the seat
+[PASS] C8 cancel_booking released seat is bookable
+[PASS] C9 availability waits on the relevant booking
+[PASS] C9 availability uses the state after acquiring the lock  ([('ok', True)])
+[PASS] C9 availability leaves a consistent parent and seat state
+[PASS] C9 create waits on the relevant booking
+[PASS] C9 create uses the state after acquiring the lock  ([('ok', 164)])
+[PASS] C9 create leaves a consistent parent and seat state
+[PASS] C9 paid waits on the relevant booking
+[PASS] C9 paid uses the state after acquiring the lock  ([('ok', False)])
+[PASS] C9 paid leaves a consistent parent and seat state
+[PASS] C9 timeout waits on the relevant booking
+[PASS] C9 lock timeout is retryable, no false availability  ([('err', '55P03')])
+[PASS] C9 new transaction resolves expiry after timeout
+[PASS] C9 timeout leaves a consistent parent and seat state
+[PASS] C10 READ COMMITTED editor waits for the first booking
+[PASS] C10 READ COMMITTED D2 protects the first booking  ([('err', 'UC001')])
+[PASS] C10 READ COMMITTED booked screening price stayed unchanged
+[PASS] C10 REPEATABLE READ editor waits for the first booking
+[PASS] C10 REPEATABLE READ D2 protects the first booking  ([('err', '40001')])
+[PASS] C10 REPEATABLE READ booked screening price stayed unchanged
+[PASS] C10 SERIALIZABLE editor waits for the first booking
+[PASS] C10 SERIALIZABLE D2 protects the first booking  ([('err', '40001')])
+[PASS] C10 SERIALIZABLE booked screening price stayed unchanged
+[PASS] C11 scoped reader waits on the first booking
+[PASS] C11 global expiry skips the locked row and processes the other
+[PASS] C11 scoped reader resolves the row skipped by global expiry  ([('ok', 50)])
+[PASS] C11 both expiration paths retained history and left no allocations
+
+RESULT: 58/58 checks passed
+exit=0
+
+=== 6. test_application_role.py
+[PASS] Application role can run approved operations and cannot write protected data directly.
+exit=0
+
+ALL DATABASE TESTS PASSED
+dropped cinema_test_20261121_014525_37859

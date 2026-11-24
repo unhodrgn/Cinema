@@ -1,0 +1,235 @@
+Pager usage is off.
+SET
+BEGIN
+CREATE TABLE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+psql:database/tests/integrity_tests.sql:121: NOTICE:  PASS SEED 3 accounts
+psql:database/tests/integrity_tests.sql:121: NOTICE:  PASS SEED 1 ADMIN + 2 CUSTOMER
+psql:database/tests/integrity_tests.sql:121: NOTICE:  PASS SEED 5 movies
+psql:database/tests/integrity_tests.sql:121: NOTICE:  PASS SEED 5 rooms
+psql:database/tests/integrity_tests.sql:121: NOTICE:  PASS SEED 250 seats
+psql:database/tests/integrity_tests.sql:121: NOTICE:  PASS SEED 50 seats per room
+psql:database/tests/integrity_tests.sql:121: NOTICE:  PASS SEED 140 screenings
+psql:database/tests/integrity_tests.sql:121: NOTICE:  PASS SEED 7 consecutive days
+psql:database/tests/integrity_tests.sql:121: NOTICE:  PASS SEED 20 screenings per day
+psql:database/tests/integrity_tests.sql:121: NOTICE:  PASS SEED every ends_at = starts_at + movie duration (DB-02)
+psql:database/tests/integrity_tests.sql:121: NOTICE:  PASS SEED movies carry all six D5 attributes
+psql:database/tests/integrity_tests.sql:121: NOTICE:  PASS SEED starts without bookings
+psql:database/tests/integrity_tests.sql:121: NOTICE:  PASS NO pg_cron / scheduler extension installed
+psql:database/tests/integrity_tests.sql:121: NOTICE:  PASS TRIGGER exists: trg_showtimes_default_end_time
+psql:database/tests/integrity_tests.sql:121: NOTICE:  PASS TRIGGER exists: trg_showtimes_protect_booked
+psql:database/tests/integrity_tests.sql:121: NOTICE:  PASS TRIGGER exists: trg_bookings_validate
+psql:database/tests/integrity_tests.sql:121: NOTICE:  PASS TRIGGER exists: trg_bookings_release_seats
+psql:database/tests/integrity_tests.sql:121: NOTICE:  PASS TRIGGER exists: trg_booking_seats_validate
+psql:database/tests/integrity_tests.sql:121: NOTICE:  PASS TRIGGER exists: trg_booking_seats_protect_delete
+psql:database/tests/integrity_tests.sql:121: NOTICE:  PASS TRIGGER exists: trg_bookings_z_consistency
+psql:database/tests/integrity_tests.sql:121: NOTICE:  PASS TRIGGER exists: trg_booking_seats_consistency
+psql:database/tests/integrity_tests.sql:121: NOTICE:  PASS FUNCTIONS exist: expire/create/pay/cancel
+DO
+psql:database/tests/integrity_tests.sql:141: NOTICE:  PASS D5 all six movie attributes can be stored and read back
+psql:database/tests/integrity_tests.sql:141: NOTICE:  PASS D5 release_date is a DATE
+psql:database/tests/integrity_tests.sql:141: NOTICE:  PASS D5 six movie columns present
+psql:database/tests/integrity_tests.sql:141: NOTICE:  PASS D5 no invented genre/rating restriction
+psql:database/tests/integrity_tests.sql:141: NOTICE:  PASS D5 role defaults to CUSTOMER (account ID + password only)
+psql:database/tests/integrity_tests.sql:141: NOTICE:  PASS D5 account ID is unique [23505: duplicate key value violates unique constraint "users_username_key"]
+psql:database/tests/integrity_tests.sql:141: NOTICE:  PASS D4 GUEST role rejected [23514: new row for relation "users" violates check constraint "users_role_check"]
+psql:database/tests/integrity_tests.sql:141: NOTICE:  PASS D4/BR-13 ADMIN account cannot own a booking [UC008: Only customers can book]
+DO
+psql:database/tests/integrity_tests.sql:175: NOTICE:  PASS D1 setup: booking holds 2 seat rows
+psql:database/tests/integrity_tests.sql:175: NOTICE:  PASS BR-09 another customer cannot cancel (not found for them) [UC011: Booking not found]
+psql:database/tests/integrity_tests.sql:175: NOTICE:  PASS D1 failed cancel leaves seats untouched
+psql:database/tests/integrity_tests.sql:175: NOTICE:  PASS D1 cancel_booking returns CANCELLED
+psql:database/tests/integrity_tests.sql:175: NOTICE:  PASS D1 status becomes CANCELLED
+psql:database/tests/integrity_tests.sql:175: NOTICE:  PASS D1 parent booking remains
+psql:database/tests/integrity_tests.sql:175: NOTICE:  PASS D1 all booking_seats rows deleted
+psql:database/tests/integrity_tests.sql:175: NOTICE:  PASS D1 payment_status preserved (UNPAID) on cancel
+psql:database/tests/integrity_tests.sql:175: NOTICE:  PASS D1/D6 total_amount retained, cancelled_at set
+psql:database/tests/integrity_tests.sql:175: NOTICE:  PASS D1 cancelled history is queryable without seat details
+psql:database/tests/integrity_tests.sql:175: NOTICE:  PASS D1 cancelling twice is rejected [UC006: Booking is CANCELLED and cannot be cancelled]
+psql:database/tests/integrity_tests.sql:175: NOTICE:  PASS D1 cancelled booking cannot be reactivated [UC007: Booking is CANCELLED and can no longer change]
+psql:database/tests/integrity_tests.sql:175: NOTICE:  PASS D1 cancelled booking cannot be paid [UC006: Booking is CANCELLED and cannot be paid]
+psql:database/tests/integrity_tests.sql:175: NOTICE:  PASS D1 released seat can be booked again
+psql:database/tests/integrity_tests.sql:175: NOTICE:  PASS D1 setup: pay before cancel
+psql:database/tests/integrity_tests.sql:175: NOTICE:  PASS D1 paid booking can be cancelled before start
+psql:database/tests/integrity_tests.sql:175: NOTICE:  PASS D1 payment_status stays PAID after cancel (no refund state)
+psql:database/tests/integrity_tests.sql:175: NOTICE:  PASS D1 paid-then-cancelled seats deleted
+psql:database/tests/integrity_tests.sql:175: NOTICE:  PASS D1 direct UPDATE cancel also deletes every seat row atomically
+psql:database/tests/integrity_tests.sql:175: NOTICE:  PASS D1 seat rows of a BOOKED booking cannot be deleted directly [UC007: Cancel or expire the booking before releasing its seats]
+DO
+psql:database/tests/integrity_tests.sql:194: NOTICE:  PASS setup: paid booking
+psql:database/tests/integrity_tests.sql:194: NOTICE:  PASS BR-10 cancel after screening start rejected [UC005: Cannot cancel after showtime starts]
+psql:database/tests/integrity_tests.sql:194: NOTICE:  PASS BR-10 rejected cancel is atomic (seats + status untouched)
+psql:database/tests/integrity_tests.sql:194: NOTICE:  PASS BR-12 booking a started screening rejected [UC004: Showtime has already started]
+psql:database/tests/integrity_tests.sql:194: NOTICE:  PASS D3 expiry runs AFTER the screening has started
+psql:database/tests/integrity_tests.sql:194: NOTICE:  PASS D3 expired booking after screening start: EXPIRED + UNPAID
+psql:database/tests/integrity_tests.sql:194: NOTICE:  PASS D3 expiry after screening start deleted seat rows
+psql:database/tests/integrity_tests.sql:194: NOTICE:  PASS D3 paid booking on a started screening untouched by expiry
+DO
+psql:database/tests/integrity_tests.sql:225: NOTICE:  PASS D2 screening without bookings is editable
+psql:database/tests/integrity_tests.sql:225: NOTICE:  PASS D2 setup: one BOOKED, one CANCELLED, one EXPIRED booking
+psql:database/tests/integrity_tests.sql:225: NOTICE:  PASS D2 movie change rejected (BOOKED) [UC001: Cannot modify a screening that has booking records]
+psql:database/tests/integrity_tests.sql:225: NOTICE:  PASS D2 room change rejected (BOOKED) [UC001: Cannot modify a screening that has booking records]
+psql:database/tests/integrity_tests.sql:225: NOTICE:  PASS D2 start-time change rejected (BOOKED) [UC001: Cannot modify a screening that has booking records]
+psql:database/tests/integrity_tests.sql:225: NOTICE:  PASS D2 end-time change rejected (BOOKED) [UC001: Cannot modify a screening that has booking records]
+psql:database/tests/integrity_tests.sql:225: NOTICE:  PASS D2 ticket_price change rejected (BOOKED) [UC001: Cannot modify a screening that has booking records]
+psql:database/tests/integrity_tests.sql:225: NOTICE:  PASS D2 combined change rejected (BOOKED) [UC001: Cannot modify a screening that has booking records]
+psql:database/tests/integrity_tests.sql:225: NOTICE:  PASS D2 movie change rejected (CANCELLED) [UC001: Cannot modify a screening that has booking records]
+psql:database/tests/integrity_tests.sql:225: NOTICE:  PASS D2 room change rejected (CANCELLED) [UC001: Cannot modify a screening that has booking records]
+psql:database/tests/integrity_tests.sql:225: NOTICE:  PASS D2 start-time change rejected (CANCELLED) [UC001: Cannot modify a screening that has booking records]
+psql:database/tests/integrity_tests.sql:225: NOTICE:  PASS D2 end-time change rejected (CANCELLED) [UC001: Cannot modify a screening that has booking records]
+psql:database/tests/integrity_tests.sql:225: NOTICE:  PASS D2 ticket_price change rejected (CANCELLED) [UC001: Cannot modify a screening that has booking records]
+psql:database/tests/integrity_tests.sql:225: NOTICE:  PASS D2 combined change rejected (CANCELLED) [UC001: Cannot modify a screening that has booking records]
+psql:database/tests/integrity_tests.sql:225: NOTICE:  PASS D2 movie change rejected (EXPIRED) [UC001: Cannot modify a screening that has booking records]
+psql:database/tests/integrity_tests.sql:225: NOTICE:  PASS D2 room change rejected (EXPIRED) [UC001: Cannot modify a screening that has booking records]
+psql:database/tests/integrity_tests.sql:225: NOTICE:  PASS D2 start-time change rejected (EXPIRED) [UC001: Cannot modify a screening that has booking records]
+psql:database/tests/integrity_tests.sql:225: NOTICE:  PASS D2 end-time change rejected (EXPIRED) [UC001: Cannot modify a screening that has booking records]
+psql:database/tests/integrity_tests.sql:225: NOTICE:  PASS D2 ticket_price change rejected (EXPIRED) [UC001: Cannot modify a screening that has booking records]
+psql:database/tests/integrity_tests.sql:225: NOTICE:  PASS D2 combined change rejected (EXPIRED) [UC001: Cannot modify a screening that has booking records]
+psql:database/tests/integrity_tests.sql:225: NOTICE:  PASS D2 no-op UPDATE of a booked screening is not treated as a modification
+psql:database/tests/integrity_tests.sql:225: NOTICE:  PASS D2 a booked screening cannot be deleted (FK RESTRICT) [23001: update or delete on table "showtimes" violates RESTRICT setting of foreign key constraint "bookings_showtime_id_fkey" on table "bookings"]
+DO
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS D3 new booking is BOOKED and UNPAID
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS D3 payment is NOT recorded automatically at creation
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS D3 expires_at is exactly booked_at + 10 minutes
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS D3 booked_at is the confirmation time
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS D3 a booking cannot be created in a non-BOOKED state [UC007: A new booking must be BOOKED and UNPAID]
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS D3 a booking cannot be created already PAID [UC007: A new booking must be BOOKED and UNPAID]
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS D3 booking status domain is exactly BOOKED / CANCELLED / EXPIRED
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS D3 payment status domain is UNPAID / PAID
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS D3 payment before expiration succeeds
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS D3 after payment: BOOKED + PAID + paid_at set
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS D3 paid booking keeps its seats
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS D3 paying twice rejected [UC006: Booking is already paid]
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS D3 PAID cannot revert to UNPAID [UC007: Illegal payment status transition PAID -> UNPAID]
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS BR-09 only the owner can pay [UC011: Booking not found]
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS D3 payment just before the deadline succeeds
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS D3 payment deadline comparison rejects the exact boundary
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS D3 payment at a reached deadline expires the booking
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS D3 rejected late payment leaves EXPIRED + UNPAID
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS D3 rejected late payment released the seats
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS D3 expired booking cannot be paid [UC006: Booking is EXPIRED and cannot be paid]
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS D3 expired booking cannot be cancelled [UC006: Booking is EXPIRED and cannot be cancelled]
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS D3 expired booking cannot be reactivated [UC007: Booking is EXPIRED and can no longer change]
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS D3 DB trigger rejects direct payment at/after expires_at [UC006: Payment window has elapsed]
+psql:database/tests/integrity_tests.sql:273: NOTICE:  PASS D3 payment after the deadline via pay_booking: rejected, booking expires
+DO
+psql:database/tests/integrity_tests.sql:301: NOTICE:  PASS D3 1 microsecond before expires_at: NOT expired
+psql:database/tests/integrity_tests.sql:301: NOTICE:  PASS D3 unpaid booking expires at the EXACT deadline (current_time >= expires_at)
+psql:database/tests/integrity_tests.sql:301: NOTICE:  PASS D3 expiration deletes every seat row (2 of 2)
+psql:database/tests/integrity_tests.sql:301: NOTICE:  PASS D3/D6 parent retained with total_amount after expiration
+psql:database/tests/integrity_tests.sql:301: NOTICE:  PASS D3 PAID booking past its deadline does not expire and keeps its seat
+psql:database/tests/integrity_tests.sql:301: NOTICE:  PASS D3 PAID booking cannot be expired even directly [UC007: Only unpaid bookings can expire]
+psql:database/tests/integrity_tests.sql:301: NOTICE:  PASS D3 live unpaid booking within its window is not expired
+psql:database/tests/integrity_tests.sql:301: NOTICE:  PASS D3 DB trigger rejects expiring before expires_at [UC006: Payment window has not elapsed]
+psql:database/tests/integrity_tests.sql:301: NOTICE:  PASS D3 repeated expiration call is a no-op (returns 0)
+psql:database/tests/integrity_tests.sql:301: NOTICE:  PASS D3 further repeated calls stay no-ops
+psql:database/tests/integrity_tests.sql:301: NOTICE:  PASS D3 repeated calls changed nothing
+psql:database/tests/integrity_tests.sql:301: NOTICE:  PASS D3 no booking row was ever removed
+psql:database/tests/integrity_tests.sql:301: NOTICE:  PASS D3 seats of an expired booking can be booked again
+DO
+psql:database/tests/integrity_tests.sql:321: NOTICE:  PASS D3 nothing expires by itself: an overdue booking stays BOOKED until the operation is called
+psql:database/tests/integrity_tests.sql:321: NOTICE:  PASS D3 expire_overdue_bookings() expires overdue unpaid bookings
+psql:database/tests/integrity_tests.sql:321: NOTICE:  PASS D3 overdue booking seat rows deleted
+psql:database/tests/integrity_tests.sql:321: NOTICE:  PASS D3 DB rejects direct cancel of an overdue unpaid booking [UC006: Payment window has elapsed; the booking must expire, not be cancelled]
+psql:database/tests/integrity_tests.sql:321: NOTICE:  PASS D3 cancel_booking on an overdue unpaid booking expires it instead
+psql:database/tests/integrity_tests.sql:321: NOTICE:  PASS D3 create_booking runs the expiry step first, so an overdue holder does not block the seat (D3 #10)
+psql:database/tests/integrity_tests.sql:321: NOTICE:  PASS D3 that overdue holder is EXPIRED afterwards
+DO
+psql:database/tests/integrity_tests.sql:364: NOTICE:  PASS D6 ticket price is stored per screening
+psql:database/tests/integrity_tests.sql:364: NOTICE:  PASS D6 every seat row snapshots its screening price (9500)
+psql:database/tests/integrity_tests.sql:364: NOTICE:  PASS D6 a different screening snapshots its own price (14000)
+psql:database/tests/integrity_tests.sql:364: NOTICE:  PASS D6 total = price x seats (3 x 9500 = 28500)
+psql:database/tests/integrity_tests.sql:364: NOTICE:  PASS D6 total = price x seats (2 x 14000 = 28000)
+psql:database/tests/integrity_tests.sql:364: NOTICE:  PASS D6 total equals the sum of seat snapshots
+psql:database/tests/integrity_tests.sql:364: NOTICE:  PASS D6 snapshot different from the screening price rejected [UC009: Price snapshot must equal the screening ticket price]
+psql:database/tests/integrity_tests.sql:364: NOTICE:  PASS D6 total_amount different from the sum of snapshots rejected at commit [UC009: total_amount (1.00) must equal the sum of seat price snapshots (9500.00)]
+psql:database/tests/integrity_tests.sql:364: NOTICE:  PASS D3/D6 a BOOKED booking without any seat rejected at commit (atomic creation) [UC010: A BOOKED booking must contain at least one seat]
+psql:database/tests/integrity_tests.sql:364: NOTICE:  PASS D6 adding a seat without updating total_amount rejected [UC009: total_amount (9500.00) must equal the sum of seat price snapshots (19000.00)]
+psql:database/tests/integrity_tests.sql:364: NOTICE:  PASS D6 omitted snapshot defaults to the screening price; direct insert path consistent
+psql:database/tests/integrity_tests.sql:364: NOTICE:  PASS D6 total_amount is immutable [UC007: Booking identity, timestamps and total_amount cannot be changed]
+psql:database/tests/integrity_tests.sql:364: NOTICE:  PASS D6 total_amount still available after cancellation (seat rows gone)
+psql:database/tests/integrity_tests.sql:364: NOTICE:  PASS D6 total_amount still available after expiration (seat rows gone)
+psql:database/tests/integrity_tests.sql:364: NOTICE:  PASS D6 single-seat total = unit price
+DO
+psql:database/tests/integrity_tests.sql:397: NOTICE:  PASS DB-02 omitted ends_at defaults to start + movie duration
+psql:database/tests/integrity_tests.sql:397: NOTICE:  PASS DB-02 ends_at must be later than starts_at [23514: new row for relation "showtimes" violates check constraint "showtimes_end_after_start"]
+psql:database/tests/integrity_tests.sql:397: NOTICE:  PASS DB-03 movie duration can be edited although the movie has screenings
+psql:database/tests/integrity_tests.sql:397: NOTICE:  PASS DB-03 stored ends_at of existing screenings does not change when duration changes
+psql:database/tests/integrity_tests.sql:397: NOTICE:  PASS DB-03 all existing screenings of the edited movie keep their original end times
+psql:database/tests/integrity_tests.sql:397: NOTICE:  PASS DB-03 a NEW screening defaults to the NEW duration
+psql:database/tests/integrity_tests.sql:397: NOTICE:  PASS DB-03 back-to-back screening (start = previous end) is allowed: no cleaning buffer
+psql:database/tests/integrity_tests.sql:397: NOTICE:  PASS DB-03 a 1-minute gap is allowed
+psql:database/tests/integrity_tests.sql:397: NOTICE:  PASS BR-04 overlapping screening in the same room rejected [23P01: conflicting key value violates exclusion constraint "showtimes_no_room_overlap"]
+psql:database/tests/integrity_tests.sql:397: NOTICE:  PASS BR-04 overlap by 1 minute at the start rejected [23P01: conflicting key value violates exclusion constraint "showtimes_no_room_overlap"]
+psql:database/tests/integrity_tests.sql:397: NOTICE:  PASS BR-04 screening enclosing another rejected [23P01: conflicting key value violates exclusion constraint "showtimes_no_room_overlap"]
+psql:database/tests/integrity_tests.sql:397: NOTICE:  PASS BR-04 same time in a DIFFERENT room is allowed
+psql:database/tests/integrity_tests.sql:397: NOTICE:  PASS BR-04 moving a screening into an occupied room slot rejected [23P01: conflicting key value violates exclusion constraint "showtimes_no_room_overlap"]
+DO
+psql:database/tests/integrity_tests.sql:414: NOTICE:  PASS ORDER cancel works with constraints IMMEDIATE
+psql:database/tests/integrity_tests.sql:414: NOTICE:  PASS ORDER expiry works with constraints IMMEDIATE
+psql:database/tests/integrity_tests.sql:414: NOTICE:  PASS ORDER seat rows deleted in both cases
+DO
+psql:database/tests/integrity_tests.sql:457: NOTICE:  PASS BR-07 seat of another room rejected [UC003: Seat belongs to another room]
+psql:database/tests/integrity_tests.sql:457: NOTICE:  PASS TX create_booking with one invalid seat fails as a whole [UC003: Seat belongs to another room]
+psql:database/tests/integrity_tests.sql:457: NOTICE:  PASS TX no partial booking row remains after the failure
+psql:database/tests/integrity_tests.sql:457: NOTICE:  PASS TX no partial seat row remains after the failure
+psql:database/tests/integrity_tests.sql:457: NOTICE:  PASS BR-08 same seat, same screening, other customer rejected [UC002: Seat already reserved for this showtime]
+psql:database/tests/integrity_tests.sql:457: NOTICE:  PASS BR-08 one taken seat rejects the whole multi-seat booking [UC002: Seat already reserved for this showtime]
+psql:database/tests/integrity_tests.sql:457: NOTICE:  PASS BR-08 rejected multi-seat booking left nothing behind
+psql:database/tests/integrity_tests.sql:457: NOTICE:  PASS BR-08 the untouched seat A2 is still bookable
+psql:database/tests/integrity_tests.sql:457: NOTICE:  PASS BR-08 the same seat position on ANOTHER screening is bookable
+psql:database/tests/integrity_tests.sql:457: NOTICE:  PASS seat lookup sanity
+psql:database/tests/integrity_tests.sql:457: NOTICE:  PASS FK booking_seats.seat_id must reference an existing seat [23503: Seat does not exist]
+psql:database/tests/integrity_tests.sql:457: NOTICE:  PASS FK bookings.showtime_id must reference an existing screening [23503: Screening does not exist]
+psql:database/tests/integrity_tests.sql:457: NOTICE:  PASS FK bookings.user_id must reference an existing user [23503: User does not exist]
+psql:database/tests/integrity_tests.sql:457: NOTICE:  PASS create_booking: unknown screening [UC011: Screening not found]
+psql:database/tests/integrity_tests.sql:457: NOTICE:  PASS create_booking: empty seat list rejected [UC010: At least one seat is required]
+psql:database/tests/integrity_tests.sql:457: NOTICE:  PASS create_booking: duplicate seat ids rejected [UC010: Seat list contains duplicates or NULL]
+psql:database/tests/integrity_tests.sql:457: NOTICE:  PASS CHECK duration_minutes >= 1 [23514: new row for relation "movies" violates check constraint "movies_duration_minutes_check"]
+psql:database/tests/integrity_tests.sql:457: NOTICE:  PASS CHECK seat_row in A..E [23514: new row for relation "seats" violates check constraint "seats_seat_row_check"]
+psql:database/tests/integrity_tests.sql:457: NOTICE:  PASS UNIQUE (room_id, seat_row, seat_number) [23505: duplicate key value violates unique constraint "seats_room_id_seat_row_seat_number_key"]
+psql:database/tests/integrity_tests.sql:457: NOTICE:  PASS UNIQUE room_name [23505: duplicate key value violates unique constraint "theater_rooms_room_name_key"]
+psql:database/tests/integrity_tests.sql:457: NOTICE:  PASS CHECK ticket_price >= 0 [23514: new row for relation "showtimes" violates check constraint "showtimes_ticket_price_check"]
+psql:database/tests/integrity_tests.sql:457: NOTICE:  PASS FK users referenced by bookings cannot be deleted (RESTRICT) [23001: update or delete on table "users" violates RESTRICT setting of foreign key constraint "bookings_user_id_fkey" on table "bookings"]
+psql:database/tests/integrity_tests.sql:457: NOTICE:  PASS CHECK expires_at = booked_at + 10 minutes (even if the trigger were bypassed) [23514: new row for relation "bookings" violates check constraint "bookings_expiry_is_10_minutes"]
+DO
+psql:database/tests/integrity_tests.sql:530: NOTICE:  PASS remediation: disposable database uses UTF8
+psql:database/tests/integrity_tests.sql:530: NOTICE:  PASS D6 maximum price for one seat is exact
+psql:database/tests/integrity_tests.sql:530: NOTICE:  PASS D1 active booking cannot be deleted [UC007: Booking history cannot be removed]
+psql:database/tests/integrity_tests.sql:530: NOTICE:  PASS D1 cancellation frees maximum-price seat
+psql:database/tests/integrity_tests.sql:530: NOTICE:  PASS D1 cancelled history cannot be deleted [UC007: Booking history cannot be removed]
+psql:database/tests/integrity_tests.sql:530: NOTICE:  PASS D2 cancelled history still locks the screening [UC001: Cannot modify a screening that has booking records]
+psql:database/tests/integrity_tests.sql:530: NOTICE:  PASS D6 maximum-price booking for two seats does not overflow
+psql:database/tests/integrity_tests.sql:530: NOTICE:  PASS D3 authoritative availability expires and releases both seats
+psql:database/tests/integrity_tests.sql:530: NOTICE:  PASS D3 and D6 expired history retains exact total
+psql:database/tests/integrity_tests.sql:530: NOTICE:  PASS D3 expired history cannot be deleted [UC007: Booking history cannot be removed]
+psql:database/tests/integrity_tests.sql:530: NOTICE:  PASS history cannot be truncated [UC007: Booking history cannot be removed]
+psql:database/tests/integrity_tests.sql:530: NOTICE:  PASS seat allocations cannot be truncated [UC007: Booking history cannot be removed]
+psql:database/tests/integrity_tests.sql:530: NOTICE:  PASS D6 maximum-price booking for all 50 seats is exact
+psql:database/tests/integrity_tests.sql:530: NOTICE:  PASS D6 each of 50 seat snapshots is exact
+psql:database/tests/integrity_tests.sql:530: NOTICE:  PASS BR-08 authoritative availability reads all allocations
+psql:database/tests/integrity_tests.sql:530: NOTICE:  PASS seat allocation rejects a mismatched screening id [23503: Seat allocation screening must match the booking]
+psql:database/tests/integrity_tests.sql:530: NOTICE:  PASS direct seat insert hits declarative uniqueness [23505: duplicate key value violates unique constraint "booking_seats_showtime_seat_key"]
+psql:database/tests/integrity_tests.sql:530: NOTICE:  PASS D6 database rejects NaN screening prices [23514: new row for relation "showtimes" violates check constraint "showtimes_ticket_price_check"]
+psql:database/tests/integrity_tests.sql:530: NOTICE:  PASS D6 database rejects infinite screening prices [22003: numeric field overflow]
+psql:database/tests/integrity_tests.sql:530: NOTICE:  PASS D6 database rejects NaN totals [23514: new row for relation "bookings" violates check constraint "bookings_total_amount_check"]
+psql:database/tests/integrity_tests.sql:530: NOTICE:  PASS D6 database rejects NaN seat snapshots [23514: Seat price must be finite and nonnegative]
+DO
+ checks_passed
+---------------
+           199
+(1 row)
+
+                         result
+---------------------------------------------------------
+ ALL 199 CHECKS PASSED (transaction will be rolled back)
+(1 row)
+
+ROLLBACK

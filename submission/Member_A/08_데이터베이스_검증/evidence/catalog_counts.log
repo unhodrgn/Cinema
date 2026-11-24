@@ -1,0 +1,103 @@
+              current_database              | encoding
+--------------------------------------------+----------
+ cinema_test_evidence_20261121_014540_37823 | UTF8
+(1 row)
+
+ business_table_count
+----------------------
+                    7
+(1 row)
+
+  table_name   | actual_rows | expected_rows
+---------------+-------------+---------------
+ users         |           3 |             3
+ movies        |           5 |             5
+ theater_rooms |           5 |             5
+ seats         |         250 |           250
+ showtimes     |         140 |           140
+ bookings      |           0 |             0
+ booking_seats |           0 |             0
+(7 rows)
+
+  table_name   |                 conname                 |                                                                 definition
+---------------+-----------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------
+ booking_seats | booking_seats_booking_id_not_null       | NOT NULL booking_id
+ booking_seats | booking_seats_booking_seat_id_not_null  | NOT NULL booking_seat_id
+ booking_seats | booking_seats_booking_seat_key          | UNIQUE (booking_id, seat_id)
+ booking_seats | booking_seats_booking_showtime_fk       | FOREIGN KEY (booking_id, showtime_id) REFERENCES bookings(booking_id, showtime_id) ON DELETE RESTRICT
+ booking_seats | booking_seats_pkey                      | PRIMARY KEY (booking_seat_id)
+ booking_seats | booking_seats_price_at_booking_check    | CHECK (((price_at_booking >= (0)::numeric) AND (price_at_booking < 'Infinity'::numeric)))
+ booking_seats | booking_seats_price_at_booking_not_null | NOT NULL price_at_booking
+ booking_seats | booking_seats_seat_id_fkey              | FOREIGN KEY (seat_id) REFERENCES seats(seat_id) ON DELETE RESTRICT
+ booking_seats | booking_seats_seat_id_not_null          | NOT NULL seat_id
+ booking_seats | booking_seats_showtime_id_not_null      | NOT NULL showtime_id
+ booking_seats | booking_seats_showtime_seat_key         | UNIQUE (showtime_id, seat_id)
+ booking_seats | trg_booking_seats_consistency           | TRIGGER DEFERRABLE INITIALLY DEFERRED
+ bookings      | bookings_booked_at_not_null             | NOT NULL booked_at
+ bookings      | bookings_booking_id_not_null            | NOT NULL booking_id
+ bookings      | bookings_cancelled_at_matches           | CHECK ((((status)::text = 'CANCELLED'::text) = (cancelled_at IS NOT NULL)))
+ bookings      | bookings_expires_at_not_null            | NOT NULL expires_at
+ bookings      | bookings_expiry_is_10_minutes           | CHECK ((expires_at = (booked_at + '00:10:00'::interval)))
+ bookings      | bookings_id_showtime_key                | UNIQUE (booking_id, showtime_id)
+ bookings      | bookings_paid_at_matches                | CHECK ((((payment_status)::text = 'PAID'::text) = (paid_at IS NOT NULL)))
+ bookings      | bookings_paid_never_expired             | CHECK ((NOT (((status)::text = 'EXPIRED'::text) AND ((payment_status)::text = 'PAID'::text))))
+ bookings      | bookings_payment_status_check           | CHECK (((payment_status)::text = ANY ((ARRAY['UNPAID'::character varying, 'PAID'::character varying])::text[])))
+ bookings      | bookings_payment_status_not_null        | NOT NULL payment_status
+ bookings      | bookings_pkey                           | PRIMARY KEY (booking_id)
+ bookings      | bookings_showtime_id_fkey               | FOREIGN KEY (showtime_id) REFERENCES showtimes(showtime_id) ON DELETE RESTRICT
+ bookings      | bookings_showtime_id_not_null           | NOT NULL showtime_id
+ bookings      | bookings_status_check                   | CHECK (((status)::text = ANY ((ARRAY['BOOKED'::character varying, 'CANCELLED'::character varying, 'EXPIRED'::character varying])::text[])))
+ bookings      | bookings_status_not_null                | NOT NULL status
+ bookings      | bookings_total_amount_check             | CHECK (((total_amount >= (0)::numeric) AND (total_amount < 'Infinity'::numeric)))
+ bookings      | bookings_total_amount_not_null          | NOT NULL total_amount
+ bookings      | bookings_user_id_fkey                   | FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE RESTRICT
+ bookings      | bookings_user_id_not_null               | NOT NULL user_id
+ bookings      | trg_bookings_z_consistency              | TRIGGER DEFERRABLE INITIALLY DEFERRED
+ movies        | movies_duration_minutes_check           | CHECK (((duration_minutes >= 1) AND (duration_minutes <= 300)))
+ movies        | movies_duration_minutes_not_null        | NOT NULL duration_minutes
+ movies        | movies_movie_id_not_null                | NOT NULL movie_id
+ movies        | movies_pkey                             | PRIMARY KEY (movie_id)
+ movies        | movies_title_not_null                   | NOT NULL title
+ seats         | seats_pkey                              | PRIMARY KEY (seat_id)
+ seats         | seats_room_id_fkey                      | FOREIGN KEY (room_id) REFERENCES theater_rooms(room_id) ON DELETE RESTRICT
+ seats         | seats_room_id_not_null                  | NOT NULL room_id
+ seats         | seats_room_id_seat_row_seat_number_key  | UNIQUE (room_id, seat_row, seat_number)
+ seats         | seats_seat_id_not_null                  | NOT NULL seat_id
+ seats         | seats_seat_number_check                 | CHECK (((seat_number >= 1) AND (seat_number <= 10)))
+ seats         | seats_seat_number_not_null              | NOT NULL seat_number
+ seats         | seats_seat_row_check                    | CHECK ((seat_row = ANY (ARRAY['A'::bpchar, 'B'::bpchar, 'C'::bpchar, 'D'::bpchar, 'E'::bpchar])))
+ seats         | seats_seat_row_not_null                 | NOT NULL seat_row
+ showtimes     | showtimes_end_after_start               | CHECK ((ends_at > starts_at))
+ showtimes     | showtimes_ends_at_not_null              | NOT NULL ends_at
+ showtimes     | showtimes_movie_id_fkey                 | FOREIGN KEY (movie_id) REFERENCES movies(movie_id) ON DELETE RESTRICT
+ showtimes     | showtimes_movie_id_not_null             | NOT NULL movie_id
+ showtimes     | showtimes_no_room_overlap               | EXCLUDE USING gist (room_id WITH =, tstzrange(starts_at, ends_at, '[)'::text) WITH &&)
+ showtimes     | showtimes_pkey                          | PRIMARY KEY (showtime_id)
+ showtimes     | showtimes_room_id_fkey                  | FOREIGN KEY (room_id) REFERENCES theater_rooms(room_id) ON DELETE RESTRICT
+ showtimes     | showtimes_room_id_not_null              | NOT NULL room_id
+ showtimes     | showtimes_showtime_id_not_null          | NOT NULL showtime_id
+ showtimes     | showtimes_starts_at_not_null            | NOT NULL starts_at
+ showtimes     | showtimes_ticket_price_check            | CHECK (((ticket_price >= (0)::numeric) AND (ticket_price < 'Infinity'::numeric)))
+ showtimes     | showtimes_ticket_price_not_null         | NOT NULL ticket_price
+ theater_rooms | theater_rooms_pkey                      | PRIMARY KEY (room_id)
+ theater_rooms | theater_rooms_room_id_not_null          | NOT NULL room_id
+ theater_rooms | theater_rooms_room_name_key             | UNIQUE (room_name)
+ theater_rooms | theater_rooms_room_name_not_null        | NOT NULL room_name
+ users         | users_created_at_not_null               | NOT NULL created_at
+ users         | users_password_hash_not_null            | NOT NULL password_hash
+ users         | users_pkey                              | PRIMARY KEY (user_id)
+ users         | users_role_check                        | CHECK (((role)::text = ANY ((ARRAY['CUSTOMER'::character varying, 'ADMIN'::character varying])::text[])))
+ users         | users_role_not_null                     | NOT NULL role
+ users         | users_user_id_not_null                  | NOT NULL user_id
+ users         | users_username_key                      | UNIQUE (username)
+ users         | users_username_not_null                 | NOT NULL username
+(70 rows)
+
+                      routine                      |      owner      | prosecdef |                          proconfig                          |               proacl
+---------------------------------------------------+-----------------+-----------+-------------------------------------------------------------+-------------------------------------
+ cancel_booking(bigint,bigint)                     | cinema_qa_owner | t         | {"search_path=pg_catalog, public, pg_temp",lock_timeout=5s} | {cinema_qa_owner=X/cinema_qa_owner}
+ create_booking(bigint,bigint,bigint[])            | cinema_qa_owner | t         | {"search_path=pg_catalog, public, pg_temp",lock_timeout=5s} | {cinema_qa_owner=X/cinema_qa_owner}
+ expire_overdue_bookings(timestamp with time zone) | cinema_qa_owner | t         | {"search_path=pg_catalog, public, pg_temp"}                 | {cinema_qa_owner=X/cinema_qa_owner}
+ pay_booking(bigint,bigint)                        | cinema_qa_owner | t         | {"search_path=pg_catalog, public, pg_temp",lock_timeout=5s} | {cinema_qa_owner=X/cinema_qa_owner}
+ screening_seat_availability(bigint)               | cinema_qa_owner | t         | {"search_path=pg_catalog, public, pg_temp",lock_timeout=5s} | {cinema_qa_owner=X/cinema_qa_owner}
+(5 rows)

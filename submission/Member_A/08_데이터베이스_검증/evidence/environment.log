@@ -1,0 +1,14 @@
+2026-11-21 01:45:25 KST
+database-remediation
+65c9632a1becb1282ec020111c7c3c94ecff4a2b
+ProductName:		macOS
+ProductVersion:		27.2.1
+BuildVersion:		26B131
+arm64
+psql (PostgreSQL) 18.7 (Postgres.app)
+Python 3.14.5
+psycopg2 2.9.13 (dt dec pq3 ext lo64)
+                                                             version                                                             | encoding |  timezone  | tcp_listeners | unix_socket |  current_user
+---------------------------------------------------------------------------------------------------------------------------------+----------+------------+---------------+-------------+-----------------
+ PostgreSQL 18.7 (Postgres.app) on aarch64-apple-darwin23.6.0, compiled by Apple clang version 15.0.0 (clang-1500.3.9.4), 64-bit | UTF8     | Asia/Seoul |               | t           | cinema_qa_owner
+(1 row)
