@@ -1,6 +1,6 @@
 # Database Test Documentation
 
-Covers the canonical database (`backend/migrations/0001_baseline.sql`, `backend/seeds/demo.sql`). Everything below was executed; the results are copied from real runs on 2026-11-20 against **PostgreSQL 18.6** (Windows). Other PostgreSQL versions (14–17) were **not** tested.
+The original sections cover baseline `0001_baseline.sql` and `backend/seeds/demo.sql`. Their historical results were recorded on 2026-11-20 against **PostgreSQL 18.6** (Windows). Other PostgreSQL versions (14–17) were **not** tested.
 
 ## 1. Safety rules
 
@@ -66,7 +66,44 @@ The new integrity suite also fails against Member A's original schema (`column s
 
 ## 7. Limits
 
-* Tested on PostgreSQL 18.6 only; the schema uses only features available in 14 (identity columns, EXCLUDE with `btree_gist`, constraint triggers, `FOR UPDATE SKIP LOCKED`).
+* These historical results used PostgreSQL 18.6; the baseline uses features available in 14 (identity columns, EXCLUDE with `btree_gist`, constraint triggers, `FOR UPDATE SKIP LOCKED`).
 * The exact-deadline checks use the functions' optional `p_as_of` argument (tests only); real-clock behaviour is covered by the 1.5-second pre-deadline payment, the post-deadline payments and the timed race C4.
 * Flask-level behaviour (sessions, authorisation, registration role, request-time expiry calls) is application scope and is **not** tested here.
 * Demo account passwords are unverified (see the contract §7); no login was tested.
+
+## 0003–0004 회귀 및 시연
+
+- PostgreSQL 18.7에서 0001 → 0003 → 0004 스키마를 사용한다. 별도 Compose 검증 프로필의 기존 실행기는 DB 스키마 작성 후 시드한다.
+- 두 고객이 같은 상영의 같은 좌석을 예매하면 즉시 고유 제약 또는 SQLSTATE 40001로 한 건만 확정된다. 같은 물리 좌석은 다른 상영에서 다시 예매할 수 있다. 취소·만료가 커밋되면 같은 상영에서도 다시 배정할 수 있다.
+- 격리된 DB에서 단가 99,999,999.99의 미래 상영을 만들고 50석을 예매한다. 예매 총액은 4,999,999,999.50이다. 결제 후 취소하면 총액과 CANCELLED/PAID 이력이 남고 활성 배정은 0건이다.
+- 40001 또는 40P01 뒤에는 실패한 트랜잭션을 롤백하고, 재시도가 허용되는 업무라면 새 트랜잭션에서 전체 작업을 다시 수행한다. UC002는 좌석 선택을 다시 받아야 하는 충돌이다.
+- 운영 환경이 아닌 격리 환경에서만 시연한다. 테스트 절차, 3개 격리 수준 및 부하별 증거는 별도로 전달하는 Phase 3 감사 보고서를 참조한다.
+
+- `backend/tests/sql/money_domain.sql`은 세 CHECK의 카탈로그 정의와 직접 쓰기 오류를 검증한다. 전체 시연 순서와 두 세션 명령은 [SQL 시연](../../database/demo/README.md)에 있다.
+
+### 격리된 시드 DB에서 실행하는 총액·이력 시연 SQL
+
+아래 psql 예제는 0004까지의 마이그레이션과 데모 시드를 적용한 전용 테스트 DB에서 고객 ID 2와 1관을 사용한다. 마지막 ROLLBACK으로 시연용 데이터를 되돌린다.
+
+```sql
+BEGIN;
+INSERT INTO showtimes(movie_id, room_id, starts_at, ticket_price)
+VALUES (1, 1, clock_timestamp() + interval '365 days', 99999999.99)
+RETURNING showtime_id \gset
+
+SELECT create_booking(2, :showtime_id, ARRAY(
+    SELECT seat_id FROM seats WHERE room_id = 1 ORDER BY seat_id
+)) AS demo_booking_id \gset
+
+SET CONSTRAINTS ALL IMMEDIATE;
+SELECT b.total_amount, count(bs.seat_id) AS seats, sum(bs.price_at_booking) AS snapshots
+FROM bookings b JOIN booking_seats bs USING (booking_id)
+WHERE b.booking_id = :demo_booking_id GROUP BY b.booking_id;
+
+SELECT pay_booking(:demo_booking_id, 2);
+SELECT cancel_booking(:demo_booking_id, 2);
+SELECT status, payment_status, total_amount,
+       (SELECT count(*) FROM booking_seats WHERE booking_id = :demo_booking_id) AS seats
+FROM bookings WHERE booking_id = :demo_booking_id;
+ROLLBACK;
+```

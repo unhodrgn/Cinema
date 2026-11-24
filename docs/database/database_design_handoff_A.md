@@ -52,9 +52,11 @@ Do not add a `GUEST` role or a separate expiration-history table unless a techni
 7. Expiry only applies when booking status is `BOOKED`, payment status is `UNPAID`, and current time is at or after `expires_at`.
 8. Paid bookings do not expire.
 9. No global seat availability flag in `SEATS`; availability is screening-specific.
-10. `UNIQUE(booking_id, seat_id)` alone does not prevent the same seat being booked by another customer for the same screening. Implement a verified cross-booking uniqueness check, such as a PostgreSQL trigger over `BOOKINGS` and `BOOKING_SEATS`.
+10. Migration 0003 enforces active allocation uniqueness with immediate `UNIQUE(showtime_id, seat_id)`. A composite FK ties that showtime to the booking, and the seat FK references the physical seat. `bookings.total_amount` is `numeric(12,2)`; unit prices remain `numeric(10,2)`.
 
-## E. Required seed data
+## E. Original seed requirements
+
+The current seed has 6 films and 280 screenings over 14 days in Seoul time. The initial requirements below are retained for context.
 
 - 5 rooms.
 - 50 seats per room, 250 total.

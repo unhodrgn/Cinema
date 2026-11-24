@@ -18,7 +18,9 @@
 | 결제 기한 | `expires_at` | 예매 확정 시각 + 10분. 현재 시각 ≥ `expires_at`이고 미결제이면 만료 대상이다 (D3). |
 | 만료 처리 | Expiration / `expire_overdue_bookings()` | 기한이 지난 `BOOKED`+`UNPAID` 예매를 `EXPIRED`로 바꾸고 모든 좌석 행을 삭제하는 원자적·멱등 처리. 요청 시점에 호출한다(자동 스케줄러 없음). |
 | 가격 스냅샷 | `booking_seats.price_at_booking` | 예매 시점의 좌석 단가. 이후 상영 일정 가격은 예매가 생기면 변경할 수 없다 (D2, D6). |
-| 총 예매 금액 | `bookings.total_amount` | 상영 일정 좌석당 가격 × 좌석 수. 스냅샷 합계와 같으며 취소·만료 후에도 남는다 (D6). |
+| 활성 좌석 배정 | Active seat allocation / `booking_seats` | 예매가 BOOKED일 때만 유지한다. 상영 ID와 좌석 ID의 조합은 유일하다. |
+| 총 예매 금액 | `bookings.total_amount` | 상영 일정 좌석당 가격 × 좌석 수. 스냅샷 합계와 같고 `numeric(12,2)`에 저장하며 취소·만료 후에도 남는다 (D6). |
+| 유한 금액 | Finite money | 상영 단가·예매 총액·좌석 단가 스냅샷은 NaN 및 양·음의 무한대를 허용하지 않는다. 0은 가능하다. |
 | 상영 일정 보호 | Screening protection | 예매 기록이 하나라도 있으면(상태 무관) 영화·상영관·시작·종료·가격을 바꿀 수 없는 규칙 (D2). |
 | 유효한 예매 | Active booking | `BOOKED`이면서 `PAID`이거나 `UNPAID`이고 `expires_at` 이전인 예매. 좌석 점유 판단 기준. |
 | 기본키 / 외래키 | PK / FK | 행을 유일하게 식별하는 키 / 다른 테이블 행을 참조하는 제약. |
