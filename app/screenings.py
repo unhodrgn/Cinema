@@ -15,7 +15,7 @@ bp = Blueprint("screenings", __name__, url_prefix="/screenings")
 
 # One row shape for every API that shows a screening (catalog, seats, bookings, admin).
 SCREENING_COLUMNS = """
-    s.showtime_id, s.movie_id, m.title, s.room_id, r.room_name,
+    s.showtime_id, s.movie_id, m.title, m.poster_url, s.room_id, r.room_name,
     s.starts_at, s.ends_at, s.ticket_price,
     (s.starts_at <= clock_timestamp()) AS has_started
 """

@@ -6,6 +6,7 @@ import { getAuth, loginUrl, pageUser } from "../auth.js";
 import { confirmExpiry, createCountdown } from "../deadline.js";
 import { formatDateTimeRange, formatMoney } from "../format.js";
 import { initNav } from "../nav.js";
+import { posterFrame } from "../poster.js";
 import { seatLabel } from "../seats.js";
 import { clear, el, showMessage } from "../ui.js";
 
@@ -18,6 +19,7 @@ async function main() {
 
   const card = document.getElementById("booking-card");
   const movieTitle = document.getElementById("movie-title");
+  const posterBox = document.getElementById("booking-poster");
   const badgesBox = document.getElementById("badges");
   const bookingIdEl = document.getElementById("booking-id");
   const roomNameEl = document.getElementById("room-name");
@@ -116,6 +118,11 @@ async function main() {
   function render(b) {
     card.hidden = false;
     movieTitle.textContent = b.title;
+    clear(posterBox);
+    posterBox.append(posterFrame(b.title, b.poster_url, { size: "sm" }));
+    const paid = b.payment_status === "PAID"; // steps: Seats (done) -> Booking -> Payment
+    document.getElementById("step-booking").classList.toggle("step-current", !paid);
+    document.getElementById("step-payment").classList.toggle("step-current", paid);
     bookingIdEl.textContent = String(b.booking_id);
     roomNameEl.textContent = b.room_name;
     screeningTimeEl.textContent = formatDateTimeRange(b.starts_at, b.ends_at);

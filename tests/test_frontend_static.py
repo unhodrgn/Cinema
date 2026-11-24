@@ -286,13 +286,56 @@ def test_the_seat_grid_can_shrink_to_fit_a_375px_phone():
     grid, row, button = _css_block(css, ".seat-grid"), _css_block(css, ".seat-row"), _css_block(css, ".seat-btn")
 
     assert "max-width: 100%" in grid
-    assert "display: grid" in row and "repeat(10, minmax(0," in row
+    assert "display: grid" in row and row.count("repeat(5, minmax(0,") == 2  # seats 1-5 | aisle | seats 6-10
     assert "width: 100%" in button and "aspect-ratio: 1" in button and "min-width: 0" in button
     assert not re.search(r"(^|\n)\s*width:\s*2\.2rem", button)  # no fixed seat width
 
     # The narrow-screen override has the same specificity as the base rule, so it must come after.
-    narrow = css.index("@media (max-width: 480px) {\n  .seat-row")
+    narrow = css.index("  .seat-row { gap: 2px;")
     assert narrow > css.index(".seat-row {") and narrow > css.index(".seat-btn {")
+
+
+TMDB_NOTICE = "Movie posters: TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB."
+PAGES = sorted(FRONTEND.glob("*.html"))
+
+
+@pytest.mark.parametrize("page", PAGES, ids=lambda p: p.name)
+def test_every_page_has_the_tmdb_attribution_in_its_footer(page):
+    html = page.read_text(encoding="utf-8")
+
+    assert f'<footer class="site-footer">{TMDB_NOTICE}</footer>' in html
+    assert html.count("<footer") == 1 and html.index("</main>") < html.index("<footer")
+
+
+def test_there_are_twelve_pages_and_all_are_checked_for_the_footer():
+    assert len(PAGES) == 12 and {"admin-movies.html", "admin-screenings.html", "admin-bookings.html"} <= {p.name for p in PAGES}
+
+
+@pytest.mark.parametrize("page", PAGES, ids=lambda p: p.name)
+def test_every_page_declares_the_dark_color_scheme(page):
+    assert '<meta name="color-scheme" content="dark">' in page.read_text(encoding="utf-8")
+
+
+def test_the_stylesheet_is_dark_only_with_self_hosted_fonts():
+    css = code_of(FRONTEND / "css" / "style.css")
+
+    assert "color-scheme: dark" in css and "prefers-color-scheme" not in css
+    for token in ("#0e0e10", "#141416", "#2a2a2f", "#f2f0eb", "#b9b5b0", "#d7263d"):
+        assert token in css.lower(), token
+    assert not re.search(r"https?:|//fonts\.|@import", css)  # nothing from another host
+    urls = re.findall(r'url\("\.\./(fonts/[^"]+)"\)', css)
+    assert len(urls) == 4
+    for url in urls:
+        assert (FRONTEND / url).is_file(), url
+    assert (FRONTEND / "fonts" / "LICENSE-inter.txt").is_file() and (FRONTEND / "fonts" / "LICENSE-bebas-neue.txt").is_file()
+
+
+def test_posters_are_shown_in_a_fixed_2_3_frame_that_covers():
+    css = code_of(FRONTEND / "css" / "style.css")
+    frame, image = _css_block(css, ".poster"), _css_block(css, ".poster-img")
+
+    assert "aspect-ratio: 2 / 3" in frame and "overflow: hidden" in frame
+    assert "object-fit: cover" in image and "width: 100%" in image and "height: 100%" in image
 
 
 def test_the_admin_screenings_page_locks_edit_through_screeningEditLock():

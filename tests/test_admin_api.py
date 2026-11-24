@@ -170,9 +170,10 @@ def test_denied_writes_change_nothing(anonymous, customer, admin_db):
 
 def test_list_movies_returns_the_seeded_movies_in_id_order(admin):
     data = admin.get("/api/admin/movies").get_json()["movies"]
-    assert len(data) >= 5
+    assert len(data) >= 6
     assert [m["movie_id"] for m in data] == sorted(m["movie_id"] for m in data)
-    assert set(data[0]) == {"movie_id", "title", "genre", "duration_minutes", "rating", "synopsis", "release_date"}
+    assert set(data[0]) == {"movie_id", "title", "genre", "duration_minutes", "rating", "synopsis", "release_date",
+                            "poster_url"}
 
 
 def test_create_movie_with_only_the_required_fields(admin, admin_db):
@@ -254,6 +255,47 @@ def test_release_date_must_be_a_real_yyyy_mm_dd_date(admin, value):
     assert_field_error(admin.post("/api/admin/movies", movie_body(release_date=value)), "release_date")
 
 
+GOOD_POSTERS = ["/images/posters/exhuma.jpg", "/images/posters/a-b_c.2.png", "/images/posters/20th-century-girl.jpg"]
+BAD_POSTERS = [
+    "images/posters/a.jpg", "/images/a.jpg", "/images/posters/", "/images/posters/a.gif", "/images/posters/a",
+    "/images/posters/../a.jpg", "/images/posters/sub/a.jpg", "/images/posters/.hidden.jpg", "/images/posters/a b.jpg",
+    "http://evil.example/images/posters/a.jpg", "//evil.example/images/posters/a.jpg", "javascript:alert(1)",
+    "/images/posters/" + "a" * 250 + ".jpg", 5, True, ["/images/posters/a.jpg"],
+]
+
+
+@pytest.mark.parametrize("value", GOOD_POSTERS)
+def test_a_poster_path_under_images_posters_is_accepted_and_returned(admin, value):
+    movie = admin.post("/api/admin/movies", movie_body(poster_url=f"  {value}  ")).get_json()["movie"]
+    assert movie["poster_url"] == value
+    assert admin.get(f"/api/admin/movies/{movie['movie_id']}").get_json()["movie"]["poster_url"] == value
+
+
+@pytest.mark.parametrize("value", BAD_POSTERS, ids=lambda v: repr(v)[:40])
+def test_a_poster_path_must_be_a_file_directly_under_images_posters(admin, value):
+    response = admin.post("/api/admin/movies", movie_body(poster_url=value))
+    assert_field_error(response, "poster_url")
+    created = admin.post("/api/admin/movies", movie_body()).get_json()["movie"]
+    assert_field_error(admin.put(f"/api/admin/movies/{created['movie_id']}", movie_body(poster_url=value)), "poster_url")
+
+
+def test_the_poster_is_optional_empty_means_none_and_put_replaces_it(admin):
+    movie = admin.post("/api/admin/movies", movie_body(poster_url="")).get_json()["movie"]
+    assert movie["poster_url"] is None
+    with_poster = admin.post("/api/admin/movies", movie_body(poster_url="/images/posters/exhuma.jpg")).get_json()["movie"]
+    cleared = admin.put(f"/api/admin/movies/{with_poster['movie_id']}", movie_body(poster_url=None)).get_json()["movie"]
+    assert cleared["poster_url"] is None
+
+
+def test_the_screening_and_booking_apis_carry_the_poster(admin, customer):
+    movie = admin.post("/api/admin/movies", movie_body(poster_url="/images/posters/exhuma.jpg")).get_json()["movie"]
+    rooms = admin.get("/api/admin/screenings").get_json()["rooms"]
+    screening = create_screening(admin, movie["movie_id"], rooms[0]["room_id"])
+    assert admin.get(f"/api/admin/screenings/{screening['showtime_id']}").get_json()["screening"]["poster_url"] == "/images/posters/exhuma.jpg"
+    book_first_free_seat(customer, screening["showtime_id"])
+    assert customer.get("/api/bookings").get_json()["bookings"][0]["poster_url"] == "/images/posters/exhuma.jpg"
+
+
 def test_several_invalid_fields_are_reported_together(admin):
     response = admin.post("/api/admin/movies", {"title": "", "duration_minutes": 0, "release_date": "x"})
     assert response.status_code == 400
@@ -276,7 +318,8 @@ def test_request_body_must_be_a_json_object(admin):
 
 def test_update_movie_replaces_all_editable_fields(admin):
     created = admin.post("/api/admin/movies", movie_body(genre="Drama", rating="12+", synopsis="Old")).get_json()["movie"]
-    body = {"title": "Renamed", "duration_minutes": 111, "genre": "Comedy", "rating": "all", "synopsis": "New", "release_date": "2027-01-02"}
+    body = {"title": "Renamed", "duration_minutes": 111, "genre": "Comedy", "rating": "all", "synopsis": "New",
+            "release_date": "2027-01-02", "poster_url": "/images/posters/new.png"}
     response = admin.put(f"/api/admin/movies/{created['movie_id']}", body)
     assert response.status_code == 200
     assert response.get_json()["movie"] == {"movie_id": created["movie_id"], **body}

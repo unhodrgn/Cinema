@@ -52,7 +52,9 @@ CREATE TABLE movies (
  duration_minutes integer      NOT NULL CHECK (duration_minutes BETWEEN 1 AND 300),
  rating           varchar(50),
  synopsis         text,
- release_date     date
+ release_date     date,
+ -- Site-relative path of a poster file served by the frontend (no host, no '..').
+ poster_url       varchar(255) CHECK (poster_url ~ '^/images/posters/[A-Za-z0-9][A-Za-z0-9._-]*\.(jpg|png)$')
 );
 
 CREATE TABLE theater_rooms (

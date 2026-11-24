@@ -5,6 +5,7 @@ import { getApi } from "../api.js";
 import { getAuth, loginUrl, pageUser } from "../auth.js";
 import { formatDateTimeRange, formatMoney } from "../format.js";
 import { initNav } from "../nav.js";
+import { posterFrame } from "../poster.js";
 import { seatLabel } from "../seats.js";
 import { clear, el, showMessage } from "../ui.js";
 
@@ -94,7 +95,8 @@ async function main() {
       );
     }
 
-    card.append(header, facts);
+    const body = el("div", { className: "booking-card-body" }, header, facts);
+    card.append(posterFrame(b.title, b.poster_url, { size: "sm" }), body);
 
     // Actions
     const actions = el("div", { className: "booking-actions" });
@@ -138,7 +140,7 @@ async function main() {
       );
     }
 
-    card.append(actions);
+    body.append(actions);
     return card;
   }
 

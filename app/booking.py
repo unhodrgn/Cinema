@@ -22,7 +22,7 @@ from .security import Policy, policy
 bp = Blueprint("bookings", __name__, url_prefix="/bookings")
 
 BOOKING_COLUMNS = """
-    b.booking_id, b.user_id, b.showtime_id, m.title, s.starts_at, s.ends_at, r.room_name,
+    b.booking_id, b.user_id, b.showtime_id, m.title, m.poster_url, s.starts_at, s.ends_at, r.room_name,
     s.ticket_price, b.booked_at, b.expires_at, b.total_amount, b.status, b.payment_status,
     b.paid_at, b.cancelled_at
 """

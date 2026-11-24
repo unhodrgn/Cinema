@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
   <title>Booking Details - Cinema Reservation</title>
   <link rel="stylesheet" href="/css/style.css">
   <script src="/config.js"></script>
@@ -15,10 +16,17 @@
   </header>
 
   <main class="container narrow">
+    <ol class="steps" aria-label="Booking steps">
+      <li class="step">Seats</li>
+      <li id="step-booking" class="step step-current" aria-current="step">Booking</li>
+      <li id="step-payment" class="step">Payment</li>
+    </ol>
     <h1>Booking Details</h1>
     <div id="message" aria-live="polite"></div>
 
-    <article id="booking-card" class="card" hidden>
+    <article id="booking-card" class="card booking-detail" hidden>
+      <div id="booking-poster"></div>
+      <div class="booking-detail-body">
       <div class="booking-header">
         <h2 id="movie-title">Movie</h2>
         <div id="badges" class="badges"></div>
@@ -57,7 +65,10 @@
         <button id="cancel-button" class="button button-danger" type="button" hidden>Cancel Booking</button>
         <a href="/bookings.html" class="button button-secondary">My Bookings</a>
       </div>
+      </div>
     </article>
   </main>
+
+  <footer class="site-footer">Movie posters: TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</footer>
 </body>
 </html>

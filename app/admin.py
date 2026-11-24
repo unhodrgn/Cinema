@@ -5,6 +5,7 @@ Follows decisions D2 (screening edit protection) and D5 (movie attributes).
 """
 
 import datetime as dt
+import re
 from decimal import Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
 
@@ -18,10 +19,10 @@ from .security import Policy, policy
 
 bp = Blueprint("admin", __name__, url_prefix="/admin")
 
-MOVIE_COLUMNS = "movie_id, title, genre, duration_minutes, rating, synopsis, release_date"
+MOVIE_COLUMNS = "movie_id, title, genre, duration_minutes, rating, synopsis, release_date, poster_url"
 
 SCREENING_COLUMNS = """
-    s.showtime_id, s.movie_id, m.title, s.room_id, r.room_name,
+    s.showtime_id, s.movie_id, m.title, m.poster_url, s.room_id, r.room_name,
     s.starts_at, s.ends_at, s.ticket_price,
     (s.starts_at <= clock_timestamp()) AS has_started,
     EXISTS (SELECT 1 FROM bookings b WHERE b.showtime_id = s.showtime_id) AS has_bookings
@@ -90,6 +91,11 @@ def _parse_price(raw, problems):
     return price
 
 
+# Same rule as the CHECK on movies.poster_url: a file directly under /images/posters/.
+POSTER_PATH = re.compile(r"/images/posters/[A-Za-z0-9][A-Za-z0-9._-]*\.(jpg|png)")
+POSTER_PROBLEM = "Poster path must look like /images/posters/name.jpg (at most 255 characters)."
+
+
 def _validate_movie_input(body):
     problems = {}
 
@@ -143,6 +149,15 @@ def _validate_movie_input(body):
             if release_date and strict_iso_date(release_date) is None:
                 problems["release_date"] = "Release date must be in YYYY-MM-DD format."
 
+    poster_url = body.get("poster_url")
+    if poster_url is not None:
+        if not isinstance(poster_url, str):
+            problems["poster_url"] = POSTER_PROBLEM
+        else:
+            poster_url = poster_url.strip() or None
+            if poster_url and (len(poster_url) > 255 or not POSTER_PATH.fullmatch(poster_url)):
+                problems["poster_url"] = POSTER_PROBLEM
+
     if problems:
         raise ValidationError(problems)
 
@@ -153,6 +168,7 @@ def _validate_movie_input(body):
         "rating": rating,
         "synopsis": synopsis,
         "release_date": release_date,
+        "poster_url": poster_url,
     }
 
 
@@ -190,10 +206,10 @@ def admin_create_movie():
 
     with transaction() as cur:
         cur.execute(
-            """
-            INSERT INTO movies(title, genre, duration_minutes, rating, synopsis, release_date)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            RETURNING movie_id, title, genre, duration_minutes, rating, synopsis, release_date
+            f"""
+            INSERT INTO movies(title, genre, duration_minutes, rating, synopsis, release_date, poster_url)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING {MOVIE_COLUMNS}
             """,
             (
                 data["title"],
@@ -202,6 +218,7 @@ def admin_create_movie():
                 data["rating"],
                 data["synopsis"],
                 data["release_date"],
+                data["poster_url"],
             ),
         )
         movie = dict(cur.fetchone())
@@ -218,11 +235,12 @@ def admin_update_movie(movie_id):
 
     with transaction() as cur:
         cur.execute(
-            """
+            f"""
             UPDATE movies
-            SET title = %s, genre = %s, duration_minutes = %s, rating = %s, synopsis = %s, release_date = %s
+            SET title = %s, genre = %s, duration_minutes = %s, rating = %s, synopsis = %s, release_date = %s,
+                poster_url = %s
             WHERE movie_id = %s
-            RETURNING movie_id, title, genre, duration_minutes, rating, synopsis, release_date
+            RETURNING {MOVIE_COLUMNS}
             """,
             (
                 data["title"],
@@ -231,6 +249,7 @@ def admin_update_movie(movie_id):
                 data["rating"],
                 data["synopsis"],
                 data["release_date"],
+                data["poster_url"],
                 movie_id,
             ),
         )

@@ -35,10 +35,10 @@
 - [x] Phase 4 T6 — customer booking history, details and cancellation API and pages *(verified 20/11 — see section 4A)*
 - [x] Phase 4 T7 — admin movie and screening API and pages *(verified 23/11: automated tests + real-browser check on :8080 — see section 4A)*
 - [x] Phase 4 T8 — admin booking list (view only) API and page *(verified 23/11: automated tests + real-browser check on :8080 — see section 4A)*
-- [x] Phase 4 T9 — frontend integration and validation pass *(done 23/11 in a real browser; limits: responsive layout checked by simulation only, light theme simulated, native `confirm()` dialog not exercised — see section 4A)*
+- [x] Phase 4 T9 — frontend integration and validation pass *(done 23/11 in a real browser; 24/11 redesign removed the light theme and verified all 12 pages at 1280px and 375px — see section 4A & 6.3)*
 - [ ] Phase 4 T10–T11 — integration/E2E/security suite, deployment and separation demo *(not started)*
 - [ ] Backend implementation
-- [ ] Frontend implementation *(all pages built and checked in a browser 23/11; layout on a real phone and the real light theme are still to be checked, section 6.3)*
+- [ ] Frontend implementation *(all 12 pages redesigned dark-only with self-hosted fonts and TMDB posters and verified on 24/11 across 24 screenshots; real-phone check and minor `admin-screenings` mobile select width remain, section 6.3)*
 - [ ] Database–application integration
 - [ ] System testing and bug fixing
 - [ ] Final documentation
@@ -382,10 +382,10 @@ all Python tests **1196 passed, 1 failed, 2 skipped** · the one failure is the 
 - [x] Validate forms and user input *(23/11)*
 - [x] Display success and error messages *(23/11, incl. API unreachable and seat conflicts)*
 - [x] Display booking and payment statuses *(23/11, all five combinations; real 10-minute expiry)*
-- [ ] Validate responsive layout *(checked 23/11 at 375 / 768 / 1280 by simulation only; confirm on a real phone and in the real light theme)*
+- [ ] Validate responsive layout *(23/11 checked at 375 / 768 / 1280; 24/11 redesign switched to dark-only — light theme removed — and captured all 12 pages at 1280px and 375px in `D:\dev\project\Cinema-screenshots\redesign\` with 0 contrast failures, min 4.96:1; remaining: check on a real phone and minor 375px `<select id="filter-movie">` width on `admin-screenings.html`)*
 - [x] Verify customer/admin access restrictions *(23/11)*
 
-**Status:** In progress — all pages done and checked in a real browser on 23/11/2026 (T9); only the real-device / real-light-theme check of the responsive layout remains in section 6.3
+**Status:** In progress — all 12 pages redesigned (dark-only, self-hosted Bebas Neue & Inter, TMDB posters, home/seats/booking/admin polish) and verified across 24 headless-Chrome screenshots on 24/11/2026; only the real-phone responsive check (and minor `admin-screenings` mobile select width) remains in section 6.3
 
 ---
 
@@ -519,7 +519,7 @@ all Python tests **1196 passed, 1 failed, 2 skipped** · the one failure is the 
 | 3. Flask Application Foundation | In progress — core implemented and verified; app DB role (needs A) and documentation sync pending | Member B |
 | 4A. Application Features (REST API + independent frontend, T1–T11) | In progress — **T1 through T9 done and verified (T7–T9 on 23/11)**; T10–T11 not started | Member B |
 | 4. Backend Implementation | API complete and automatically tested (delivered through 4A); integration and security suite (T10) pending | Member B |
-| 5. Frontend Implementation | In progress — all pages done and checked in a browser (23/11); responsive check on a real device pending | Member B |
+| 5. Frontend Implementation | In progress — all 12 pages redesigned (dark-only, self-hosted fonts, posters) and verified 24/11 (24 screenshots, 0 contrast failures); real-device check pending | Member B |
 | 6. Database–Application Integration | Not Started | Member B |
 | 7. System Testing | Not Started | Member A + B |
 | 8. Documentation & Presentation | Not Started | Member A + B |
@@ -535,10 +535,12 @@ all Python tests **1196 passed, 1 failed, 2 skipped** · the one failure is the 
 
 **Update 23/11/2026:** placeholders removed, flaky token tests fixed, **T7, T8 and T9 verified** by a real-browser pass; two blockers (CORS preflight for admin writes and My Bookings) and several major/minor findings were fixed with regression tests (section 4A, "Verification of T9"). Content decisions made: **UI fully in English**, prices shown in **₩**, seed data in English and relative to the load date, **started screenings locked for editing**, **no admin dashboard (N/A)**. Test totals: pytest 1275 passed / 2 skipped, Node 109/109, database scripts all passed.
 
+**Update 24/11/2026:** completed the approved **Phase A (posters + 6 real films)** and **Phase B (dark-only visual redesign + self-hosted fonts)** implementation and verification. Schema gained `movies.poster_url` (`varchar(255)` + site-relative `CHECK`); seed updated to 6 real films with Korean release dates, runtimes (incl. 110 & 87 min), ratings (`15/15/15/12/15/12`, with "TO CONFIRM" comment preserved), and local TMDB poster JPEGs (`frontend/images/posters/`); backend movie/screening/booking/admin APIs carry and validate `poster_url`. Frontend switched to **dark-only** (`color-scheme: dark`, light theme removed), self-hosted Latin WOFF2 **Bebas Neue** and **Inter** (`frontend/fonts/` + OFL licenses, `.woff2` & `.jpg` added to `CONTENT_TYPES`, CSP and plain-text error pages unchanged, wordmark `"Cinema Reservation"` kept), redesigned home/seats/booking/catalog/admin layouts, and added the TMDB attribution footer to all 12 HTML pages. Fixed stale 5-movie / 120-min assumptions in `database/tests/integrity_tests.sql`, `tests/test_database.py`, and `tests/test_database_fixture.py`. Verified on a disposable PostgreSQL 18.6 (`127.0.0.1:54329`, development DB on `:5432` untouched): `cinema_e2e` rebuilt (`3/6/5/250/280`), `scripts/set_demo_passwords.py` run on `cinema_e2e`, pytest **1354 passed, 3 skipped, 0 failed**, Node **120/120**, `integrity_tests.sql` **177/177**, `reconciliation_probes.sql` **31 MATCH / 0 MISMATCH** + `[P16] MATCH`, **24 screenshots** (12 pages × 1280px & 375px) saved to `D:\dev\project\Cinema-screenshots\redesign\` with **0 contrast failures** (min `4.96:1`) and 0 console/image errors. Manual `ALTER TABLE` + 6 `UPDATE` SQL statements prepared separately for port `5432` if needed.
+
 **Next steps (plan agreed after the 20/11 review, deadline 29/11):**
 1. ~~Finish T7~~ and ~~Finish T8~~ — done 20/11 (automated) and 23/11 (real-browser check)
-2. Phase 3 Task 8 / hygiene: ~~remove the empty placeholders~~ (done 23/11) and ~~fix the two flaky token tests~~ (done 23/11); still open: rewrite `README.md`, driver decision record, hygiene tests
-3. ~~T9: real-browser validation pass~~ — done 23/11 (T7, T8 and section 6.2 ticked); remaining: the responsive layout on a real phone and the real light theme
+2. Phase 3 Task 8 / hygiene: ~~remove the empty placeholders~~ (done 23/11) and ~~fix the two flaky token tests~~ (done 23/11); still open: rewrite `README.md`, sync `docs/api/api_contract.md` prose for `poster_url`, driver decision record, hygiene tests
+3. ~~T9: real-browser validation pass~~ — done 23/11 (T7, T8 and section 6.2 ticked) and ~~dark-only redesign + 24 screenshots~~ — done 24/11; remaining: responsive check on a real phone and minor 375px `filter-movie` select width on `admin-screenings.html`
 4. T10: end-to-end and security suite (TC01–TC15 of `chia_viec.md`, D1–D6 through the application, concurrent booking)
 5. T11 and documentation: demo passwords, rehearsal on a second device, SQL scripts for the demo, README sync, remove empty placeholders; in parallel get Member A's review, driver confirmation and the application database role
 6. Slides (including the required "why a team project in the age of AI" page), rehearsal, clean-environment check, packaging, submission
@@ -560,8 +562,9 @@ all Python tests **1196 passed, 1 failed, 2 skipped** · the one failure is the 
 | Language of the user interface | Project owner | **Decided 23/11/2026: fully English** (UI, API messages and seed data). Closed |
 | Admin dashboard | Project owner | **Decided 23/11/2026: not built, N/A** — the navigation links to the three admin pages. Closed |
 | Editing a screening that has started | Project owner | **Decided and implemented 23/11/2026:** locked (`409 screening_has_started`), in addition to the D2 rule. Closed |
-| Currency and demo seed | Project owner | **Decided 23/11/2026:** prices shown with ₩; the seed is English and relative to the day it is loaded (14 days). Demo data therefore lasts only until load date + 13: load the seed into a new database shortly before the demo. Closed |
-| Checks not yet done | Member B | Responsive layout on a real phone, the real light theme, and the native `confirm()` dialog of the cancel buttons (T9 limits); minor items left open: register while logged in, customer sees the admin page frame, faint legend swatches in light theme, plain-text `404` |
+| Currency and demo seed | Project owner | **Updated 24/11/2026:** prices shown with ₩; seed now holds 6 real films with fixed Korean release dates, runtimes (incl. 110 & 87 min), TMDB posters (`frontend/images/posters/`), and 14-day relative schedule (280 screenings). Korean age ratings for Jujutsu Kaisen 0 / Hidden Inventory / Execution (`15`), Exhuma (`15`) and Godzilla x Kong (`12`) remain marked `TO CONFIRM` in `database/seed.sql`. Development DB on `:5432` was not touched (manual `ALTER TABLE` + 6 `UPDATE` statements ready) |
+| UI theme, fonts and posters | Project owner | **Decided and implemented 24/11/2026:** dark-only theme (`color-scheme: dark`, light theme removed), self-hosted Latin WOFF2 Bebas Neue & Inter (`frontend/fonts/` + OFL licenses, `.woff2` & `.jpg` in `CONTENT_TYPES`, CSP unchanged), plain-text error pages kept, wordmark `"Cinema Reservation"` kept, TMDB attribution footer on all 12 pages. Closed |
+| Checks not yet done | Member B | Responsive layout on a real phone, native `confirm()` dialog of the cancel buttons, and minor 375px `<select id="filter-movie">` flex width (`418px`) on `admin-screenings.html`; minor items left open: register while logged in, customer sees the admin page frame, plain-text `404`, and `docs/api/api_contract.md` prose sync for `poster_url` |
 | Bearer-token limits (accepted 20/11) | Project owner | Tokens last 8 h by default (configurable) and cannot be revoked on the server; logout only discards the token in the browser (API contract, section 6) |
 
 **Reminder for Phase 4:** Flask must call `expire_overdue_bookings()` (request-time expiry) before seat availability, booking history and admin booking lists; `create_booking`, `pay_booking` and `cancel_booking` already expire what they need. Nothing expires by itself.
@@ -603,6 +606,7 @@ Use this section to record significant project changes.
 | 23/11/2026 | Fixes with regression tests: CORS preflight over all matching rules (+72 tests), countdown re-fetch (`js/deadline.js`), seat-conflict handling, seat grid at 375px, `pageUser()` (network error is not "logged out"), screening date, friendly admin messages, home page text. Verified again on :8080 without any proxy | Completed |
 | 23/11/2026 | Decisions implemented: UI fully English (English seed, ₩ on every price), seed relative to the load date (14 days, 280 screenings), started screenings locked (`409 screening_has_started`), admin dashboard N/A; contract updated; database scripts all passed. pytest 1275 passed / 2 skipped, Node 103/103 | Completed |
 | 23/11/2026 | Navbar with an unreachable API shows a neutral "Account unavailable" for a logged-in user instead of Log in / Register (+6 Node tests, checked in the browser). Node 109/109 | Completed |
+| 24/11/2026 | Phase A + Phase B redesign completed and verified: `movies.poster_url` (+ CHECK), 6 real films with TMDB posters and Korean release dates, backend `poster_url` API/validation, self-hosted Bebas Neue & Inter Latin WOFF2 (+ OFL licenses, `.woff2`/`.jpg` in `server.py`, CSP unchanged), dark-only theme (`color-scheme: dark`, light variant removed), TMDB footer across all 12 pages, redesigned home/seats/booking/catalog/admin views; fixed stale 5-movie/120-min test assertions (`integrity_tests.sql`, `test_database.py`, `test_database_fixture.py`). Verified on disposable PG 18.6 (`:54329`, `:5432` untouched): `cinema_e2e` rebuilt, `set_demo_passwords.py` run, pytest 1354 passed / 3 skipped, Node 120/120, `integrity_tests.sql` 177/177, `reconciliation_probes.sql` 31 MATCH + P16 MATCH, 24 screenshots (`D:\dev\project\Cinema-screenshots\redesign\`), 0 contrast failures (min 4.96:1) | Completed |
 
 Add a new row whenever a major milestone is completed.
 

@@ -13,7 +13,7 @@ from .security import Policy, policy
 
 bp = Blueprint("movies", __name__, url_prefix="/movies")
 
-MOVIE_COLUMNS = "movie_id, title, genre, duration_minutes, rating, synopsis, release_date"
+MOVIE_COLUMNS = "movie_id, title, genre, duration_minutes, rating, synopsis, release_date, poster_url"
 
 
 def fetch_movie(cur, movie_id):

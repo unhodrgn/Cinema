@@ -5,6 +5,8 @@ These tests need a reachable server and are skipped when there is none (see
 ``cinema_test_*`` that this test session created.
 """
 
+from pathlib import Path
+
 import pytest
 
 import disposable_db
@@ -95,10 +97,48 @@ def test_schema_was_applied(db_connection):
 
 @pytest.mark.parametrize(
     "table, expected",
-    [("users", 3), ("movies", 5), ("theater_rooms", 5), ("seats", 250), ("showtimes", 280)],
+    [("users", 3), ("movies", 6), ("theater_rooms", 5), ("seats", 250), ("showtimes", 280)],
 )
 def test_seed_record_counts(db_connection, table, expected):
     assert scalar(db_connection, f"SELECT count(*) FROM {table}") == expected
+
+
+def test_seed_movies_are_the_six_real_films_with_posters(db_connection):
+    rows = _fetch_all(db_connection, "SELECT title, genre, duration_minutes, rating, poster_url FROM movies ORDER BY movie_id")
+
+    assert rows == [
+        ("Jujutsu Kaisen 0", "Animation", 105, "15", "/images/posters/jjk-0.jpg"),
+        ("Jujutsu Kaisen: Hidden Inventory / Premature Death", "Animation", 110, "15", "/images/posters/jjk-hidden-inventory.jpg"),
+        ("Jujutsu Kaisen: Execution", "Animation", 87, "15", "/images/posters/jjk-execution.jpg"),
+        ("20th Century Girl", "Romance", 119, "12", "/images/posters/20th-century-girl.jpg"),
+        ("Exhuma", "Horror", 134, "15", "/images/posters/exhuma.jpg"),
+        ("Godzilla x Kong: The New Empire", "Action", 115, "12", "/images/posters/godzilla-x-kong.jpg"),
+    ]
+
+
+def test_every_seeded_poster_file_exists_in_the_frontend(db_connection):
+    frontend = Path(__file__).resolve().parents[1] / "frontend"
+    for (url,) in _fetch_all(db_connection, "SELECT poster_url FROM movies"):
+        assert (frontend / url.lstrip("/")).is_file(), url
+
+
+@pytest.mark.parametrize("bad", ["a.jpg", "/images/posters/../a.jpg", "http://x/images/posters/a.jpg", "/images/posters/a.gif",
+                                 "/images/posters/sub/a.jpg", "/images/posters/" + "a" * 250 + ".jpg"])
+def test_the_database_itself_refuses_a_bad_poster_path(db_connection, bad):
+    import psycopg2
+
+    with db_connection.cursor() as cur, pytest.raises(psycopg2.Error):
+        cur.execute("INSERT INTO movies(title, duration_minutes, poster_url) VALUES ('x', 90, %s)", (bad,))
+    db_connection.rollback()
+
+
+def test_every_seeded_movie_plays_every_day_without_overlap(db_connection):
+    rows = _fetch_all(
+        db_connection,
+        "SELECT (starts_at AT TIME ZONE 'Asia/Seoul')::date AS d, movie_id, count(*) FROM showtimes GROUP BY 1, 2",
+    )
+    assert len({d for d, _, _ in rows}) == 14
+    assert {n for _, _, n in rows} == {3, 4} and len(rows) == 14 * 6
 
 
 def test_seed_leaves_no_bookings(db_connection):
@@ -124,18 +164,18 @@ def _fetch_all(connection, sql, params=None):
 def test_uncommitted_work_is_invisible_to_other_connections(cinema_test_db, db_connection):
     with db_connection.cursor() as cur:
         cur.execute("INSERT INTO movies(title, duration_minutes) VALUES ('Isolation probe', 90)")
-    assert scalar(db_connection, "SELECT count(*) FROM movies") == 6
+    assert scalar(db_connection, "SELECT count(*) FROM movies") == 7
 
     other = cinema_test_db.connect()
     try:
-        assert scalar(other, "SELECT count(*) FROM movies") == 5
+        assert scalar(other, "SELECT count(*) FROM movies") == 6
     finally:
         other.close()
 
 
 def test_the_fixture_rolls_back_uncommitted_work(db_connection):
     # The previous test inserted a row and never committed: it must not be here.
-    assert scalar(db_connection, "SELECT count(*) FROM movies") == 5
+    assert scalar(db_connection, "SELECT count(*) FROM movies") == 6
     assert scalar(db_connection, "SELECT count(*) FROM movies WHERE title = 'Isolation probe'") == 0
 
 
@@ -262,7 +302,7 @@ def test_existing_database_is_never_overwritten(cinema_test_db, postgres_setting
         clash.create()
 
     assert database_exists(postgres_settings, cinema_test_db.name)
-    assert scalar(cinema_test_db.connect(), "SELECT count(*) FROM movies") == 5
+    assert scalar(cinema_test_db.connect(), "SELECT count(*) FROM movies") == 6
 
 
 def _schema():

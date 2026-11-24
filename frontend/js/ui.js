@@ -6,7 +6,7 @@
 const FORBIDDEN_TAGS = new Set(["script", "iframe", "object", "embed", "style", "link", "meta", "base"]);
 const TAG_NAME = /^[a-z][a-z0-9-]*$/;
 const ATTRIBUTE_NAME =
-  /^(aria-[a-z-]+|data-[a-z0-9-]+|class|id|href|type|name|value|for|role|title|placeholder|disabled|hidden|min|max|step|required|autocomplete|colspan|scope|selected|checked|maxlength|minlength|pattern|inputmode|tabindex|lang)$/;
+  /^(aria-[a-z-]+|data-[a-z0-9-]+|class|id|href|type|name|value|for|role|title|placeholder|disabled|hidden|min|max|step|required|autocomplete|colspan|scope|selected|checked|maxlength|minlength|pattern|inputmode|tabindex|lang|src|alt|loading|decoding)$/;
 
 /** `value` if it is a same-site link (`/path`, `#anchor`, `?query`), else null. */
 export function safeHref(value) {
@@ -31,10 +31,10 @@ export function el(tag, props = {}, ...children) {
   for (const [name, raw] of Object.entries(props.attrs ?? {})) {
     if (!ATTRIBUTE_NAME.test(name)) throw new Error(`attribute not allowed: ${name}`);
     if (raw === false || raw === null || raw === undefined) continue;
-    if (name === "href") {
-      const href = safeHref(raw);
-      if (href === null) throw new Error("href must be a same-site link");
-      node.setAttribute("href", href);
+    if (name === "href" || name === "src") {
+      const link = safeHref(raw); // images are same-site too (the CSP agrees: img-src 'self')
+      if (link === null) throw new Error(`${name} must be a same-site link`);
+      node.setAttribute(name, link);
     } else {
       node.setAttribute(name, raw === true ? "" : String(raw));
     }

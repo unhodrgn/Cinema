@@ -7,7 +7,7 @@ import { formatDuration } from "../format.js";
 import { initNav } from "../nav.js";
 import { clear, el, setFieldError, showMessage } from "../ui.js";
 
-const FIELDS = ["title", "duration_minutes", "genre", "rating", "release_date", "synopsis"];
+const FIELDS = ["title", "duration_minutes", "genre", "rating", "release_date", "poster_url", "synopsis"];
 
 async function main() {
   await initNav(document.getElementById("site-nav"));
@@ -30,6 +30,7 @@ async function main() {
   const genreInput = document.getElementById("movie-genre");
   const ratingInput = document.getElementById("movie-rating");
   const releaseInput = document.getElementById("movie-release");
+  const posterInput = document.getElementById("movie-poster");
   const synopsisInput = document.getElementById("movie-synopsis");
   const cancelBtn = document.getElementById("cancel-btn");
   const container = document.getElementById("movies-container");
@@ -59,6 +60,7 @@ async function main() {
     genreInput.value = movie.genre || "";
     ratingInput.value = movie.rating || "";
     releaseInput.value = movie.release_date || "";
+    posterInput.value = movie.poster_url || "";
     synopsisInput.value = movie.synopsis || "";
     formTitle.textContent = `Edit Movie #${movie.movie_id}: ${movie.title}`;
     cancelBtn.hidden = false;
@@ -90,6 +92,7 @@ async function main() {
             { header: "Genre", cell: (m) => m.genre || "-" },
             { header: "Rating", cell: (m) => m.rating || "-" },
             { header: "Release Date", cell: (m) => m.release_date || "-" },
+            { header: "Poster", cell: (m) => m.poster_url || "-" },
             {
               header: "Actions",
               className: "cell-actions",
@@ -124,6 +127,7 @@ async function main() {
       genre: genreInput.value.trim() || null,
       rating: ratingInput.value.trim() || null,
       release_date: releaseInput.value.trim() || null,
+      poster_url: posterInput.value.trim() || null,
       synopsis: synopsisInput.value.trim() || null,
     };
 

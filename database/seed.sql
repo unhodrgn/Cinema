@@ -4,9 +4,13 @@
 --   psql -X -v ON_ERROR_STOP=1 -d <db> -f database/seed.sql
 --
 -- ALL VALUES BELOW ARE DEMO DATA, not business rules:
---   * movie titles, genres, ratings, synopses and release dates are made-up English demo
---     content (the films do not exist); BR-DL-001 sec. 6 approves no genre or rating
---     vocabulary. Release dates are relative to the day the seed is loaded.
+--   * the 6 movies are real films: English title, genre, running time (Korean listings),
+--     Korean release date and poster file are real. Synopses are short own-words summaries.
+--     Korean age ratings are NOT verified, except 20th Century Girl (12): TO CONFIRM the
+--     three Jujutsu Kaisen films (15), Exhuma (15) and Godzilla x Kong (12).
+--     Poster files live in frontend/images/posters/ (source: TMDB). BR-DL-001 sec. 6
+--     approves no genre or rating vocabulary. Screenings, prices, rooms, seats, accounts
+--     and bookings are demo data.
 --   * ticket_price 12000.00 is a demo price (D6 #6: no numeric price approved).
 --   * the 3 accounts keep Member A's demo password HASHES. The plaintext
 --     passwords were never documented by A and have not been verified, so none
@@ -26,17 +30,25 @@ INSERT INTO users(username, password_hash, role) VALUES
  ('customer_demo',  'pbkdf2:sha256:600000$e5714680b2a12625$e0615cb2938c2dceae1fa1f7422c3c45db16eca464978e2c755fe32d8d10fe12', 'CUSTOMER'),
  ('customer_demo2', 'pbkdf2:sha256:600000$79a1d0adbb18490b$68288afaddc1fa4208923dd8c0d99edf65a4d794724b28a0a7215a664908d551', 'CUSTOMER');
 
-INSERT INTO movies(title, genre, duration_minutes, rating, synopsis, release_date) VALUES
- ('Skyline Rescue',     'Action',    120, 'ALL', 'A rescue pilot races a storm to reach hikers stranded on a remote mountain ridge.',
-    timezone('Asia/Seoul', now())::date - 90),
- ('Paper Lanterns',     'Drama',     135, '12',  'Two estranged sisters reunite to save their late grandmother''s lantern shop.',
-    timezone('Asia/Seoul', now())::date - 75),
- ('Dinner for Eight',   'Comedy',    140, '15',  'A dinner party spirals out of control when every guest arrives with a secret.',
-    timezone('Asia/Seoul', now())::date - 60),
- ('Cold Signal',        'Thriller',  125, '15',  'An Arctic radio operator intercepts a message that should not exist.',
-    timezone('Asia/Seoul', now())::date - 45),
- ('Little Cloud',       'Animation', 145, 'ALL', 'A small cloud that cannot make rain sets out to find where rain comes from.',
-    timezone('Asia/Seoul', now())::date - 30);
+INSERT INTO movies(title, genre, duration_minutes, rating, synopsis, release_date, poster_url) VALUES
+ ('Jujutsu Kaisen 0', 'Animation', 105, '15',
+    'Yuta Okkotsu, haunted by the cursed spirit of his childhood friend, is taken in by Tokyo Jujutsu High.',
+    DATE '2022-02-17', '/images/posters/jjk-0.jpg'),
+ ('Jujutsu Kaisen: Hidden Inventory / Premature Death', 'Animation', 110, '15',
+    'Gojo and Geto take on a mission to guard the Star Plasma Vessel, a job that will change both of them.',
+    DATE '2025-10-16', '/images/posters/jjk-hidden-inventory.jpg'),
+ ('Jujutsu Kaisen: Execution', 'Animation', 87, '15',
+    'The Shibuya Incident is retold and followed by a first look at the Culling Game.',
+    DATE '2025-12-03', '/images/posters/jjk-execution.jpg'),
+ ('20th Century Girl', 'Romance', 119, '12',
+    'In 1999, a teenager promises to collect every detail of her best friend''s first crush.',
+    DATE '2022-10-06', '/images/posters/20th-century-girl.jpg'),
+ ('Exhuma', 'Horror', 134, '15',
+    'Shamans, a feng shui master and an undertaker move a wealthy family''s cursed ancestral grave.',
+    DATE '2024-02-22', '/images/posters/exhuma.jpg'),
+ ('Godzilla x Kong: The New Empire', 'Action', 115, '12',
+    'Godzilla and Kong must join forces against a hidden threat buried deep in the Hollow Earth.',
+    DATE '2024-03-27', '/images/posters/godzilla-x-kong.jpg');
 
 INSERT INTO theater_rooms(room_name)
 SELECT 'Hall ' || n FROM generate_series(1, 5) AS n;
@@ -48,10 +60,10 @@ CROSS JOIN generate_series(0, 4) AS row_idx
 CROSS JOIN generate_series(1, 10) AS seat_num;
 
 -- Schedule rotation: for room 1..5 and slot 0..3 (rooms and movies numbered by id order),
---   movie index = ((room_number - 1 + slot) % 5) + 1.
+--   movie index = ((room_number - 1 + slot) % 6) + 1.
 -- Each movie appears 4 times/day; each room has 4 screenings/day (20/day, 280 in 14 days).
 -- ends_at = starts_at + movie duration (stored; later duration edits never move it).
--- Longest movie is 145 min, so the 3-hour slot spacing never overlaps.
+-- Longest movie is 134 min, so the 3-hour slot spacing never overlaps.
 WITH demo_days AS (
  SELECT (timezone('Asia/Seoul', now())::date + day_offset) AS local_day
  FROM generate_series(0, 13) AS day_offset
@@ -69,7 +81,7 @@ WITH demo_days AS (
  FROM demo_days d
  CROSS JOIN numbered_rooms r
  CROSS JOIN slots s
- JOIN numbered_movies m ON m.movie_no = ((r.room_no - 1 + s.slot_idx) % 5) + 1
+ JOIN numbered_movies m ON m.movie_no = ((r.room_no - 1 + s.slot_idx) % 6) + 1
 )
 INSERT INTO showtimes(movie_id, room_id, starts_at, ends_at, ticket_price)
 SELECT movie_id, room_id, starts_at, starts_at + duration_minutes * interval '1 minute', 12000.00
@@ -80,7 +92,7 @@ COMMIT;
 
 -- Verify after seeding:
 SELECT 'users' AS entity, count(*) AS actual, 3 AS expected FROM users
-UNION ALL SELECT 'movies', count(*), 5 FROM movies
+UNION ALL SELECT 'movies', count(*), 6 FROM movies
 UNION ALL SELECT 'theater_rooms', count(*), 5 FROM theater_rooms
 UNION ALL SELECT 'seats', count(*), 250 FROM seats
 UNION ALL SELECT 'showtimes', count(*), 280 FROM showtimes;

@@ -337,7 +337,7 @@ def test_a_read_only_transaction_leaves_no_open_transaction(db_app):
     with db_app.app_context():
         with transaction() as cur:
             cur.execute("SELECT count(*) AS n FROM movies")
-            assert cur.fetchone()["n"] == 5
+            assert cur.fetchone()["n"] == 6
         assert database.get_db().info.transaction_status == TRANSACTION_STATUS_IDLE
 
 

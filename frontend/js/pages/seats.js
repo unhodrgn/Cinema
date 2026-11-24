@@ -5,6 +5,7 @@ import { getApi } from "../api.js";
 import { getAuth, loginUrl, pageUser } from "../auth.js";
 import { formatMoney, formatTimeRange } from "../format.js";
 import { initNav } from "../nav.js";
+import { posterFrame } from "../poster.js";
 import {
   calculateTotal,
   dropUnavailable,
@@ -25,6 +26,7 @@ async function main() {
   const gridContainer = document.getElementById("seat-grid");
   const selectedListSpan = document.getElementById("selected-list");
   const totalPriceSpan = document.getElementById("total-price");
+  const ticketLine = document.getElementById("ticket-line");
   const bookButton = document.getElementById("book-button");
 
   const params = new URLSearchParams(globalThis.location.search);
@@ -72,6 +74,7 @@ async function main() {
     if (!screeningData) return;
 
     const titleEl = el("h2", { text: screeningData.title });
+    const poster = posterFrame(screeningData.title, screeningData.poster_url, { size: "sm" });
     const timeEl = el("p", {
       text: `${formatTimeRange(screeningData.starts_at, screeningData.ends_at)} · ${screeningData.room_name}`,
     });
@@ -79,10 +82,11 @@ async function main() {
       className: "muted",
       text: `Price per seat: ${formatMoney(screeningData.ticket_price)}`,
     });
-    infoContainer.append(titleEl, timeEl, priceEl);
+    const body = el("div", { className: "screening-info-body" }, titleEl, timeEl, priceEl);
+    infoContainer.append(poster, body);
 
     if (screeningData.has_started) {
-      infoContainer.append(
+      body.append(
         el("div", {
           className: "badge badge-neutral",
           text: "This screening has already started and cannot be booked.",
@@ -107,9 +111,10 @@ async function main() {
 
     for (const [rowLetter, seatsInRow] of rows.entries()) {
       const rowEl = el("div", { className: "seat-row" });
-      rowEl.append(el("span", { className: "seat-row-label", text: rowLetter }));
+      rowEl.append(el("span", { className: "seat-row-label", attrs: { "aria-hidden": "true" }, text: rowLetter }));
 
       for (const seat of seatsInRow) {
+        if (seat.seat_number === 6) rowEl.append(el("span", { className: "seat-aisle", attrs: { "aria-hidden": "true" } }));
         const isOccupied = !seat.is_available;
         const isSelected = selectedSeats.has(seat.seat_id);
 
@@ -141,6 +146,7 @@ async function main() {
         });
         rowEl.append(btn);
       }
+      rowEl.append(el("span", { className: "seat-row-label", attrs: { "aria-hidden": "true" }, text: rowLetter }));
       gridContainer.append(rowEl);
     }
   }
@@ -149,6 +155,7 @@ async function main() {
     if (selectedSeats.size === 0) {
       selectedListSpan.textContent = "None";
       totalPriceSpan.textContent = formatMoney("0");
+      ticketLine.textContent = `0 × ${formatMoney(screeningData ? screeningData.ticket_price : "0")}`;
       bookButton.disabled = true;
       return;
     }
@@ -162,6 +169,7 @@ async function main() {
     selectedListSpan.textContent = sortedLabels.join(", ");
     const rawTotal = calculateTotal(selectedSeats.size, screeningData ? screeningData.ticket_price : "0");
     totalPriceSpan.textContent = formatMoney(rawTotal);
+    ticketLine.textContent = `${selectedSeats.size} × ${formatMoney(screeningData ? screeningData.ticket_price : "0")}`;
 
     bookButton.disabled = Boolean(screeningData && screeningData.has_started);
   }

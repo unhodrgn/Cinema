@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
   <title>Select Seats - Cinema Reservation</title>
   <link rel="stylesheet" href="/css/style.css">
   <script src="/config.js"></script>
@@ -15,33 +16,43 @@
   </header>
 
   <main class="container">
+    <ol class="steps" aria-label="Booking steps">
+      <li class="step step-current" aria-current="step">Seats</li>
+      <li class="step">Booking</li>
+      <li class="step">Payment</li>
+    </ol>
     <h1>Select Seats</h1>
-    <div id="screening-info" class="card"></div>
+    <div id="screening-info" class="card screening-info"></div>
     <div id="message" aria-live="polite"></div>
 
-    <section id="seat-picker-card" class="card" hidden>
-      <div class="screen-box">SCREEN</div>
-      
-      <div class="seat-legend">
-        <div class="legend-item"><div class="legend-box available"></div><span>Available</span></div>
-        <div class="legend-item"><div class="legend-box selected"></div><span>Selected</span></div>
-        <div class="legend-item"><div class="legend-box occupied"></div><span>Occupied</span></div>
+    <section id="seat-picker-card" class="seat-layout" hidden>
+      <div class="card seat-map">
+        <div class="screen-box">SCREEN</div>
+
+        <div id="seat-grid" class="seat-grid"></div>
+
+        <div class="seat-legend">
+          <div class="legend-item"><div class="legend-box available"></div><span>Available</span></div>
+          <div class="legend-item"><div class="legend-box selected"></div><span>Selected</span></div>
+          <div class="legend-item"><div class="legend-box occupied"></div><span>Occupied</span></div>
+        </div>
       </div>
 
-      <div id="seat-grid" class="seat-grid"></div>
-
-      <div class="seat-summary-bar">
-        <div>
-          <strong>Selected:</strong> <span id="selected-list">None</span>
-        </div>
-        <div>
-          <strong>Estimated Total:</strong> <span id="total-price">₩0</span>
-        </div>
-        <div>
-          <button id="book-button" class="button" type="button" disabled>Proceed to Booking</button>
-        </div>
-      </div>
+      <aside class="card seat-summary-bar" aria-label="Booking summary">
+        <h2>Summary</h2>
+        <dl class="summary-list">
+          <dt>Seats</dt>
+          <dd id="selected-list">None</dd>
+          <dt>Tickets</dt>
+          <dd id="ticket-line">0 × ₩0</dd>
+          <dt>Total</dt>
+          <dd><strong id="total-price">₩0</strong></dd>
+        </dl>
+        <button id="book-button" class="button" type="button" disabled>Proceed to booking</button>
+      </aside>
     </section>
   </main>
+
+  <footer class="site-footer">Movie posters: TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</footer>
 </body>
 </html>

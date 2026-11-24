@@ -3,12 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
   <title>Manage Movies - Admin</title>
   <link rel="stylesheet" href="/css/style.css">
   <script src="/config.js"></script>
   <script type="module" src="/js/pages/admin_movies.js"></script>
 </head>
-<body>
+<body class="admin">
   <header class="site-header">
     <a class="brand" href="/">Cinema Reservation</a>
     <nav id="site-nav" class="site-nav" aria-label="Main"></nav>
@@ -48,6 +49,11 @@
           <p id="error-release_date" class="field-error" aria-live="polite"></p>
         </div>
         <div class="field">
+          <label for="movie-poster">Poster path (optional)</label>
+          <input id="movie-poster" name="poster_url" maxlength="255" autocomplete="off" placeholder="/images/posters/name.jpg">
+          <p id="error-poster_url" class="field-error" aria-live="polite"></p>
+        </div>
+        <div class="field">
           <label for="movie-synopsis">Synopsis</label>
           <textarea id="movie-synopsis" name="synopsis" rows="3"></textarea>
           <p id="error-synopsis" class="field-error" aria-live="polite"></p>
@@ -64,5 +70,7 @@
       <div id="movies-container" class="card card-flush"></div>
     </section>
   </main>
+
+  <footer class="site-footer">Movie posters: TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</footer>
 </body>
 </html>

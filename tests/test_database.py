@@ -256,7 +256,7 @@ def test_get_db_runs_real_queries(db_app):
     with db_app.app_context():
         with database.get_db().cursor() as cur:
             assert scalar(cur, "SELECT 1") == 1
-            assert scalar(cur, "SELECT count(*) FROM movies") == 5
+            assert scalar(cur, "SELECT count(*) FROM movies") == 6
             assert scalar(cur, "SELECT count(*) FROM seats") == 250
 
 
@@ -328,7 +328,7 @@ def test_uncommitted_work_is_discarded_by_cleanup(db_app, db_connection, app_ses
     with db_app.app_context():
         with database.get_db().cursor() as cur:
             cur.execute("INSERT INTO movies(title, duration_minutes) VALUES ('Cleanup probe', 90)")
-            assert scalar(cur, "SELECT count(*) FROM movies") == 6
+            assert scalar(cur, "SELECT count(*) FROM movies") == 7
 
     with db_connection.cursor() as cur:
         cur.execute("SELECT count(*) FROM movies WHERE title = 'Cleanup probe'")

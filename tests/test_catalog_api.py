@@ -101,11 +101,15 @@ def test_the_movie_list_needs_no_login_and_has_the_six_attributes(client):
 
     assert response.status_code == 200
     movies = response.get_json()["movies"]
-    assert [m["title"] for m in movies][:5] == ["Skyline Rescue", "Paper Lanterns", "Dinner for Eight", "Cold Signal", "Little Cloud"]
+    assert [m["title"] for m in movies][:6] == ["Jujutsu Kaisen 0", "Jujutsu Kaisen: Hidden Inventory / Premature Death", "Jujutsu Kaisen: Execution", "20th Century Girl", "Exhuma", "Godzilla x Kong: The New Empire"]
     first = movies[0]
-    assert set(first) == {"movie_id", "title", "genre", "duration_minutes", "rating", "synopsis", "release_date"}
-    assert first["genre"] == "Action" and first["duration_minutes"] == 120 and first["rating"] == "ALL"
-    assert first["synopsis"].startswith("A rescue pilot") and first["release_date"] == (dt.datetime.now(ZoneInfo("Asia/Seoul")).date() - dt.timedelta(days=90)).isoformat()
+    assert set(first) == {"movie_id", "title", "genre", "duration_minutes", "rating", "synopsis", "release_date", "poster_url"}
+    assert first["genre"] == "Animation" and first["duration_minutes"] == 105 and first["rating"] == "15"
+    assert first["synopsis"].startswith("Yuta Okkotsu") and first["release_date"] == "2022-02-17"
+    assert first["poster_url"] == "/images/posters/jjk-0.jpg"
+    assert [m["poster_url"] for m in movies[:6]] == [
+        "/images/posters/" + f for f in ("jjk-0.jpg", "jjk-hidden-inventory.jpg", "jjk-execution.jpg",
+                                         "20th-century-girl.jpg", "exhuma.jpg", "godzilla-x-kong.jpg")]
     assert "Set-Cookie" not in response.headers and response.headers["Cache-Control"] == "no-store"
 
 
@@ -171,8 +175,9 @@ def test_screenings_are_listed_for_one_day_with_the_documented_fields(client, ow
     body = response.get_json()
     assert body["date"] == FAR_DAY and len(body["screenings"]) == 1
     row = body["screenings"][0]
-    assert set(row) == {"showtime_id", "movie_id", "title", "room_id", "room_name", "starts_at", "ends_at",
-                        "ticket_price", "has_started"}
+    assert set(row) == {"showtime_id", "movie_id", "title", "poster_url", "room_id", "room_name", "starts_at",
+                        "ends_at", "ticket_price", "has_started"}
+    assert row["poster_url"] is None  # a movie added without a poster
     assert row["showtime_id"] == show and row["title"] == "Day movie" and row["room_id"] == room
     assert row["starts_at"] == f"{FAR_DAY}T19:00:00+09:00" and row["ends_at"] == f"{FAR_DAY}T21:00:00+09:00"
     assert row["ticket_price"] == "9500.50" and isinstance(row["ticket_price"], str)
@@ -229,16 +234,19 @@ def test_a_day_without_screenings_is_an_empty_list(client):
     assert response.get_json() == {"date": "2031-01-01", "screenings": []}
 
 
-def test_the_seeded_week_has_four_screenings_per_movie_per_day(client, owner):
+def test_the_seeded_week_has_three_or_four_screenings_per_movie_per_day(client, owner):
     day = scalar(owner, "SELECT (min(starts_at) AT TIME ZONE 'Asia/Seoul')::date::text FROM showtimes "
                         "WHERE starts_at > now() - interval '1 day' AND room_id <= 5")
-    movie = client.get("/api/movies").get_json()["movies"][0]["movie_id"]
+    movies = client.get("/api/movies").get_json()["movies"][:6]
 
     rows = client.get(f"/api/screenings?date={day}").get_json()["screenings"]
-    per_movie = client.get(f"/api/screenings?date={day}&movie_id={movie}").get_json()["screenings"]
-
-    assert len(rows) >= 20 and len(per_movie) == 4
-    assert all(r["movie_id"] == movie for r in per_movie)
+    assert len(rows) >= 20
+    counts = []
+    for movie in movies:  # 6 movies share the 20 daily slots: every movie plays every day
+        per_movie = client.get(f"/api/screenings?date={day}&movie_id={movie['movie_id']}").get_json()["screenings"]
+        assert all(r["movie_id"] == movie["movie_id"] for r in per_movie)
+        counts.append(len(per_movie))
+    assert counts == [3, 3, 3, 4, 4, 3]
 
 
 def test_the_default_day_is_today_in_the_cinemas_time_zone_decided_by_the_database(client, owner):

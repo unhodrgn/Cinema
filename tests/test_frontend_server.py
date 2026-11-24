@@ -66,6 +66,10 @@ def test_the_index_page_is_served_at_the_root_and_by_name(live):
         ("/js/api.js", "text/javascript; charset=utf-8"),
         ("/js/ui.js", "text/javascript; charset=utf-8"),
         ("/js/pages/index.js", "text/javascript; charset=utf-8"),
+        ("/images/posters/exhuma.jpg", "image/jpeg"),
+        ("/fonts/bebas-neue-latin-400-normal.woff2", "font/woff2"),
+        ("/fonts/inter-latin-400-normal.woff2", "font/woff2"),
+        ("/fonts/LICENSE-inter.txt", "text/plain; charset=utf-8"),
     ],
 )
 def test_static_assets_have_the_right_content_type(live, target, content_type):
@@ -74,6 +78,26 @@ def test_static_assets_have_the_right_content_type(live, target, content_type):
     assert status == 200
     assert headers["content-type"] == content_type
     assert len(body) > 0
+
+
+def test_poster_jpg_files_are_real_jpegs_with_nosniff(live):
+    for name in ("jjk-0", "jjk-hidden-inventory", "jjk-execution", "20th-century-girl", "exhuma", "godzilla-x-kong"):
+        status, headers, body = get(live, f"/images/posters/{name}.jpg")
+        assert status == 200 and body[:3] == b"\xff\xd8\xff", name
+        assert headers["content-type"] == "image/jpeg" and headers["x-content-type-options"] == "nosniff"
+        assert 0 < len(body) <= 200 * 1024, name  # "reasonably small"
+    status, headers, body = get(live, "/images/posters/exhuma.jpg", method="HEAD")
+    assert status == 200 and headers["content-type"] == "image/jpeg" and body == b""
+
+
+def test_woff2_fonts_are_real_woff2_files(live):
+    status, _, body = get(live, "/fonts/bebas-neue-latin-400-normal.woff2")
+    assert status == 200 and body[:4] == b"wOF2"
+
+
+def test_images_of_other_types_are_still_not_served(live):
+    for target in ("/images/posters/exhuma.gif", "/images/posters/exhuma.jpg.bak", "/images/posters/exhuma.svg"):
+        assert get(live, target)[0] == 404, target
 
 
 def test_head_returns_the_headers_without_a_body(live):

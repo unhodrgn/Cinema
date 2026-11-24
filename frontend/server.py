@@ -52,6 +52,8 @@ CONTENT_TYPES = {
     ".txt": "text/plain; charset=utf-8",
     ".ico": "image/x-icon",
     ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".woff2": "font/woff2",
 }
 HIDDEN_DIRECTORIES = {"tests", "node_modules", "__pycache__"}
 CONFIG_PATH = "config.js"

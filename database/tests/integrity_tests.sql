@@ -101,7 +101,7 @@ DECLARE r record;
 BEGIN
  PERFORM pg_temp.ok((SELECT count(*) FROM users) = 3, 'SEED 3 accounts');
  PERFORM pg_temp.ok((SELECT count(*) FROM users WHERE role='ADMIN') = 1 AND (SELECT count(*) FROM users WHERE role='CUSTOMER') = 2, 'SEED 1 ADMIN + 2 CUSTOMER');
- PERFORM pg_temp.ok((SELECT count(*) FROM movies) = 5, 'SEED 5 movies');
+ PERFORM pg_temp.ok((SELECT count(*) FROM movies) = 6, 'SEED 6 movies');
  PERFORM pg_temp.ok((SELECT count(*) FROM theater_rooms) = 5, 'SEED 5 rooms');
  PERFORM pg_temp.ok((SELECT count(*) FROM seats) = 250, 'SEED 250 seats');
  PERFORM pg_temp.ok((SELECT bool_and(c = 50) AND count(*) = 5 FROM (SELECT count(*) c FROM seats GROUP BY room_id) x), 'SEED 50 seats per room');
@@ -176,12 +176,13 @@ END $t$;
 
 -- ================================================================ D1/BR-10 cancel after start (D3: expiry still works)
 DO $t$
-DECLARE c1 bigint := pg_temp.cust(); s bigint := pg_temp.mk_show(3); b bigint; b_paid bigint; b_unpaid bigint;
+DECLARE c1 bigint := pg_temp.cust(); s bigint := pg_temp.mk_show(3); b bigint; b_paid bigint; b_unpaid bigint; dur int;
 BEGIN
+ SELECT m.duration_minutes INTO dur FROM showtimes sh JOIN movies m USING (movie_id) WHERE sh.showtime_id = s;
  b_paid   := create_booking(c1, s, ARRAY[pg_temp.seat(s,'A',1)]);
  PERFORM pg_temp.ok(pay_booking(b_paid, c1) = 'PAID', 'setup: paid booking');
  b_unpaid := create_booking(c1, s, ARRAY[pg_temp.seat(s,'A',2)]);
- PERFORM pg_temp.move_show_start(s, now() - interval '10 days', now() - interval '10 days' + interval '2 hours');
+ PERFORM pg_temp.move_show_start(s, now() - interval '10 days', now() - interval '10 days' + dur * interval '1 minute');
  PERFORM pg_temp.expect_err(format($$SELECT cancel_booking(%s, %s)$$, b_paid, c1), 'UC005', 'BR-10 cancel after screening start rejected');
  PERFORM pg_temp.ok((SELECT count(*) FROM booking_seats WHERE booking_id=b_paid) = 1 AND (SELECT status FROM bookings WHERE booking_id=b_paid)='BOOKED', 'BR-10 rejected cancel is atomic (seats + status untouched)');
  PERFORM pg_temp.expect_err(format($$SELECT create_booking(%s, %s, ARRAY[%s]::bigint[])$$, c1, s, pg_temp.seat(s,'B',1)), 'UC004', 'BR-12 booking a started screening rejected');

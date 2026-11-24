@@ -2,6 +2,7 @@
 // ui.js (no HTML parsing), and links are built only from validated integer ids.
 
 import { formatDuration, formatMoney, formatTimeRange, isIdText } from "./format.js";
+import { posterFrame } from "./poster.js";
 import { el } from "./ui.js";
 
 /** `/movie.html?id=3` for a usable id, else null (the title is then shown without a link). */
@@ -25,11 +26,33 @@ export function movieCard(movie) {
   const title = href
     ? el("a", { attrs: { href }, text: movie.title })
     : el("span", { text: movie.title });
-  const children = [el("h2", { className: "movie-title" }, title)];
+  const body = [el("h2", { className: "movie-title" }, title)];
   const facts = movieFacts(movie);
-  if (facts) children.push(el("p", { className: "muted", text: facts }));
-  if (movie.synopsis) children.push(el("p", { className: "synopsis", text: movie.synopsis }));
-  return el("article", { className: "card movie-card" }, ...children);
+  if (facts) body.push(el("p", { className: "muted", text: facts }));
+  if (movie.synopsis) body.push(el("p", { className: "synopsis", text: movie.synopsis }));
+  return el("article", { className: "card movie-card" },
+    posterLink(href, movie),
+    el("div", { className: "movie-card-body" }, ...body));
+}
+
+/** The poster as a picture-only link (the title link next to it is the one screen readers use). */
+function posterLink(href, movie, size = "md") {
+  const poster = posterFrame(movie.title, movie.poster_url, { size });
+  return href
+    ? el("a", { className: "poster-link", attrs: { href, tabindex: "-1", "aria-hidden": "true" } }, poster)
+    : poster;
+}
+
+/** A poster tile for the "Now Showing" grid: poster, title, small facts. */
+export function movieTile(movie) {
+  const href = movieHref(movie.movie_id);
+  const title = href
+    ? el("a", { attrs: { href }, text: movie.title })
+    : el("span", { text: movie.title });
+  return el("article", { className: "movie-tile" },
+    posterLink(href, movie),
+    el("h3", { className: "movie-title" }, title),
+    el("p", { className: "muted", text: movieFacts(movie) }));
 }
 
 /** The detail block of one movie: the six approved attributes, "not given" when empty. */
@@ -45,10 +68,13 @@ export function movieDetails(movie) {
     list.append(el("dt", { text: label }), el("dd", { text: value || "Not given" }));
   }
   return [
-    el("h1", { text: movie.title }),
-    list,
-    el("h2", { text: "Synopsis" }),
-    el("p", { className: "synopsis", text: movie.synopsis || "Not given" }),
+    el("div", { className: "movie-detail" },
+      posterFrame(movie.title, movie.poster_url, { size: "lg" }),
+      el("div", { className: "movie-detail-body" },
+        el("h1", { text: movie.title }),
+        list,
+        el("h2", { text: "Synopsis" }),
+        el("p", { className: "synopsis", text: movie.synopsis || "Not given" }))),
   ];
 }
 
@@ -61,7 +87,9 @@ export function screeningRow(screening, { showMovie = false } = {}) {
   const parts = [el("strong", { className: "time", text: formatTimeRange(screening.starts_at, screening.ends_at) })];
   if (showMovie) {
     const href = movieHref(screening.movie_id);
-    parts.push(href ? el("a", { attrs: { href }, text: screening.title }) : el("span", { text: screening.title }));
+    parts.unshift(posterFrame(screening.title, screening.poster_url, { size: "sm" }));
+    parts.push(href ? el("a", { className: "screening-movie", attrs: { href }, text: screening.title })
+      : el("span", { className: "screening-movie", text: screening.title }));
   }
   parts.push(
     el("span", { text: screening.room_name }),
@@ -70,7 +98,7 @@ export function screeningRow(screening, { showMovie = false } = {}) {
   if (screening.has_started) {
     parts.push(el("span", { className: "badge badge-neutral", text: "Already started" }));
   } else if (screening.showtime_id) {
-    parts.push(el("a", { attrs: { href: `/seats.html?screening_id=${screening.showtime_id}` }, text: "Select Seats" }));
+    parts.push(el("a", { className: "button button-small", attrs: { href: `/seats.html?screening_id=${screening.showtime_id}` }, text: "Select Seats" }));
   }
-  return el("li", { className: "screening" }, ...parts);
+  return el("li", { className: showMovie ? "screening screening-with-poster" : "screening" }, ...parts);
 }
