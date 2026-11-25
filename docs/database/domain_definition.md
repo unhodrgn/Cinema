@@ -1,6 +1,6 @@
 # 도메인 정의서 (Domain Definition)
 
-**기준:** `backend/migrations/0001_baseline.sql`. 승인되지 않은 값 목록(장르, 관람 등급)은 정의하지 않는다 (BR-DL-001 §6).
+**기준:** `backend/migrations/0001_baseline.sql` + `0003_booking_integrity.sql` + `0004_finite_money.sql`. 승인되지 않은 값 목록(장르, 관람 등급)은 정의하지 않는다 (BR-DL-001 §6).
 
 | 도메인 | 적용 컬럼 | PostgreSQL 타입 | 허용 범위 / 형식 | 검증 수단 |
 |---|---|---|---|---|
@@ -15,17 +15,22 @@
 | 관람 등급 | `movies.rating` | varchar(50) | **자유 텍스트**(어휘 없음) | 없음 (NULL 허용) |
 | 줄거리 | `movies.synopsis` | text | 문자열 | NULL 허용 |
 | 개봉일 | `movies.release_date` | date | 날짜 | 타입 (NULL 허용) |
+| 포스터 | `movies.poster_url` | varchar(255) | `/images/posters/` 직속의 JPG 또는 PNG 상대 경로, NULL 허용 | CHECK |
 | 상영관명 | `theater_rooms.room_name` | varchar(60) | 유일 | UNIQUE, NOT NULL |
 | 좌석 행 | `seats.seat_row` | char(1) | `A`~`E` | CHECK |
 | 좌석 번호 | `seats.seat_number` | smallint | 1~10 | CHECK |
 | 상영 시각 | `showtimes.starts_at`, `showtimes.ends_at` | timestamptz | `ends_at > starts_at`. 같은 상영관에서 `[시작, 종료)` 구간이 겹치지 않음 | CHECK, EXCLUDE |
-| 금액 | `showtimes.ticket_price`, `booking_seats.price_at_booking`, `bookings.total_amount` | numeric(10,2) | 0 이상 | CHECK |
+| 좌석 단가 | `showtimes.ticket_price`, `booking_seats.price_at_booking` | numeric(10,2) | 0 이상의 유한 값 | CHECK |
+| 예매 총액 | `bookings.total_amount` | numeric(12,2) | 0 이상의 유한 값; 현재 최대 50석 × 99,999,999.99 = 4,999,999,999.50 | CHECK + 지연 제약 트리거 |
+| 활성 배정 상영 ID | `booking_seats.showtime_id` | bigint | 필수, 부모 예매와 같음 | 복합 FK, 좌석 ID와 함께 UNIQUE |
 | 예매 상태 | `bookings.status` | varchar(10) | `BOOKED`, `CANCELLED`, `EXPIRED` (기본 `BOOKED`) | CHECK + 전이 트리거 |
 | 결제 상태 | `bookings.payment_status` | varchar(10) | `UNPAID`, `PAID` (기본 `UNPAID`) | CHECK + 전이 트리거 |
 | 예매 시각 | `bookings.booked_at` | timestamptz | 예매 확정 성공 시각 | 트리거 |
 | 결제 기한 | `bookings.expires_at` | timestamptz | `booked_at + 10분` | CHECK, 트리거 |
 | 결제 일시 | `bookings.paid_at` | timestamptz | `PAID`일 때만 값 있음 | CHECK, 트리거 |
 | 취소 일시 | `bookings.cancelled_at` | timestamptz | `CANCELLED`일 때만 값 있음 | CHECK, 트리거 |
+
+금액은 유한한 값이어야 한다. 0004의 CHECK가 `NaN`, `Infinity`, `-Infinity`를 거부한다. 단가와 총액의 기존 precision 및 음수 제한은 유지한다.
 
 ## 시간 표기 규칙
 

@@ -86,7 +86,7 @@ def cinema_test_db(postgres_settings):
         )
     forbidden = disposable_db.read_forbidden_names(_ORIGINAL_ENVIRON, _DOTENV_VALUES)
     with disposable_db.provision_database(
-        postgres_settings, disposable_db.SCHEMA_PATH, disposable_db.SEED_PATH, forbidden
+        postgres_settings, disposable_db.CURRENT_SCHEMA_PATHS, disposable_db.SEED_PATH, forbidden
     ) as database:
         yield database
 
@@ -110,7 +110,7 @@ def cinema_template_db(postgres_settings):
         )
     forbidden = disposable_db.read_forbidden_names(_ORIGINAL_ENVIRON, _DOTENV_VALUES)
     with disposable_db.provision_database(
-        postgres_settings, disposable_db.SCHEMA_PATH, disposable_db.SEED_PATH, forbidden
+        postgres_settings, disposable_db.CURRENT_SCHEMA_PATHS, disposable_db.SEED_PATH, forbidden
     ) as template:
         yield template
 

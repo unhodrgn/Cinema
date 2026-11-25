@@ -1,6 +1,6 @@
 """Safe provisioning of disposable PostgreSQL databases for tests.
 
-A disposable database is created, filled with the canonical ``backend/migrations/0001_baseline.sql``
+A disposable database is created, filled with the selected schema migrations
 and ``backend/seeds/demo.sql``, used by tests, and dropped again. Because this code issues
 ``CREATE DATABASE`` and ``DROP DATABASE``, it is deliberately paranoid:
 
@@ -28,6 +28,11 @@ import psycopg2
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = BACKEND_DIR / "migrations" / "0001_baseline.sql"
+CURRENT_SCHEMA_PATHS = (
+    SCHEMA_PATH,
+    SCHEMA_PATH.with_name("0003_booking_integrity.sql"),
+    SCHEMA_PATH.with_name("0004_finite_money.sql"),
+)
 SEED_PATH = BACKEND_DIR / "seeds" / "demo.sql"
 
 TEST_DB_PREFIX = "cinema_test_"
@@ -350,7 +355,9 @@ def provision_database(settings, schema_path, seed_path, forbidden_names=()):
     database = DisposableDatabase(settings, forbidden_names=forbidden_names)
     try:
         database.create()
-        database.apply_sql_file(schema_path)
+        paths = (schema_path,) if isinstance(schema_path, (str, Path)) else schema_path
+        for path in paths:
+            database.apply_sql_file(path)
         database.apply_sql_file(seed_path)
         yield database
     finally:

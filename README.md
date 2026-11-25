@@ -103,7 +103,7 @@ To test the main flow, log in as a customer, select a future showtime, book seat
 | Verify required SQL objects | `docker compose exec -T api python -m scripts.check_schema` |
 | Stop stack and keep volumes | `docker compose down` |
 
-For volumes created before the **Delete** feature, apply the permission migration so the runtime role can delete movies and showtimes. [PostgreSQL Guide](database/README.md#quyền-xóa-phim-trên-database-hiện-hữu)
+For volumes created before the **Delete** feature, apply the permission migration so the runtime role can delete movies and showtimes. Existing volumes also require migrations 0003 and 0004. See the [booking integrity upgrade](database/README.md#nâng-cấp-toàn-vẹn-booking-0003). [PostgreSQL Guide](database/README.md#quyền-xóa-phim-trên-database-hiện-hữu)
 
 **Change ports.** The example below uses port 8081 for the frontend and 5001 for the API. Put all four lines in `.env`, run `docker compose up -d --wait`, and open `http://localhost:8081`.
 
@@ -154,7 +154,7 @@ pg_isready -h 127.0.0.1 -p 5432
 
 ### Prepare database and configuration
 
-The following example is for a local server and a **new database** named `cinema_demo`. Run `createdb` and the baseline once from the root. For a database that already contains data, perform a backup, restore onto a copy, and compare schemas before connecting the application. [Workflow for an existing database](database/README.md#database-đã-có-dữ-liệu)
+The following example is for a local server and a **new database** named `cinema_demo`. Run `createdb` and apply migrations 0001, 0003 and 0004 before seeding. For a database that already contains data, perform a backup, restore onto a copy, and compare schemas before connecting the application. [Workflow for an existing database](database/README.md#database-đã-có-dữ-liệu)
 
 **macOS — Terminal**
 
@@ -163,6 +163,8 @@ With PostgreSQL freshly installed via Homebrew, use the setup role of the curren
 ```sh
 createdb cinema_demo
 psql -X -v ON_ERROR_STOP=1 -d cinema_demo -f backend/migrations/0001_baseline.sql
+psql -X -v ON_ERROR_STOP=1 -d cinema_demo -f backend/migrations/0003_booking_integrity.sql
+psql -X -v ON_ERROR_STOP=1 -d cinema_demo -f backend/migrations/0004_finite_money.sql
 psql -X -v ON_ERROR_STOP=1 -d cinema_demo -f backend/seeds/demo.sql
 psql -X -v ON_ERROR_STOP=1 -d cinema_demo
 ```
@@ -174,6 +176,8 @@ Use the `postgres` setup account and enter the password when prompted.
 ```powershell
 createdb -h 127.0.0.1 -p 5432 -U postgres cinema_demo
 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 5432 -U postgres -d cinema_demo -f backend/migrations/0001_baseline.sql
+psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 5432 -U postgres -d cinema_demo -f backend/migrations/0003_booking_integrity.sql
+psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 5432 -U postgres -d cinema_demo -f backend/migrations/0004_finite_money.sql
 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 5432 -U postgres -d cinema_demo -f backend/seeds/demo.sql
 psql -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 5432 -U postgres -d cinema_demo
 ```

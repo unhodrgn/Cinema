@@ -1,7 +1,7 @@
 # PostgreSQL ↔ Flask Integration Contract
 
 **Project:** 영화관 예매 및 좌석 관리 시스템 (Cinema Reservation System)
-**Applies to:** `backend/migrations/0001_baseline.sql` and `backend/seeds/demo.sql` (canonical) · verified on PostgreSQL 18.6
+**Applies to:** `backend/migrations/0001_baseline.sql`, `0003_booking_integrity.sql`, `0004_finite_money.sql` and `backend/seeds/demo.sql` · verified on PostgreSQL 18.7
 **Authority:** B01–B05 and BR-DL-001 (D1–D6). This contract implements them; it changes none of them.
 **Supersedes:** `CinemaDB_FINAL_PostgreSQL_Handover/docs/05_Integration_Contract_KO.md` (kept unchanged as history; outdated — it still describes `CONFIRMED`, `paid_at` auto-payment and no expiry).
 
@@ -32,8 +32,8 @@ All keys are `bigint GENERATED ALWAYS AS IDENTITY` (never supply an id on INSERT
 | `theater_rooms` | `room_id`, `room_name varchar(60) UNIQUE` |
 | `seats` | `seat_id`, `room_id` → `theater_rooms`, `seat_row char(1)` A–E, `seat_number smallint` 1–10, `UNIQUE(room_id, seat_row, seat_number)` |
 | `showtimes` | `showtime_id`, `movie_id` → `movies`, `room_id` → `theater_rooms`, `starts_at timestamptz`, `ends_at timestamptz` (> `starts_at`), `ticket_price numeric(10,2)` ≥ 0 |
-| `bookings` | `booking_id`, `user_id` → `users`, `showtime_id` → `showtimes`, `status`, `payment_status`, `booked_at timestamptz`, `expires_at timestamptz`, `total_amount numeric(10,2)` ≥ 0, `paid_at` *null*, `cancelled_at` *null* |
-| `booking_seats` | `booking_seat_id`, `booking_id` → `bookings`, `seat_id` → `seats`, `price_at_booking numeric(10,2)` ≥ 0, `UNIQUE(booking_id, seat_id)` |
+| `bookings` | `booking_id`, `user_id` → `users`, `showtime_id` → `showtimes`, `status`, `payment_status`, `booked_at timestamptz`, `expires_at timestamptz`, `total_amount numeric(12,2)` ≥ 0, `paid_at` *null*, `cancelled_at` *null* |
+| `booking_seats` | `booking_seat_id`, `(booking_id, showtime_id)` → `bookings(booking_id, showtime_id)`, `seat_id` → `seats`, `price_at_booking numeric(10,2)` ≥ 0, `UNIQUE(booking_id, seat_id)`, `UNIQUE(showtime_id, seat_id)` |
 
 Relationships: `theater_rooms 1─N seats`, `theater_rooms 1─N showtimes`, `movies 1─N showtimes`, `users 1─N bookings`, `showtimes 1─N bookings`, `bookings 1─N booking_seats` (≥ 1 while `BOOKED`, 0 otherwise), `seats 1─N booking_seats`. There is **no** seat-status column: availability is per screening (§8). No table stores a GUEST; an unauthenticated visitor has no row (D4).
 
@@ -120,6 +120,7 @@ with conn:
 * For `pay_booking` and `cancel_booking`, a returned `'EXPIRED'` is a **committed** outcome, not an error: do not raise before committing.
 * Never run `SET CONSTRAINTS … IMMEDIATE` around `create_booking` (booking and seats are validated together at COMMIT).
 * Do not check availability in Python and then insert separately (check-then-write race): always call `create_booking` and handle `UC002`.
+* If PostgreSQL aborts a transaction with 40001 or 40P01, roll back and start a new transaction before retrying the complete operation. Do not retry one statement in the aborted transaction. The current HTTP contract stays in effect.
 * Do not issue direct `UPDATE bookings`, `INSERT/DELETE booking_seats` or `UPDATE showtimes` for booked data except as stated in §7 (admin editing of unbooked screenings).
 
 ## 5. Seat availability (C-04) — query behaviour
@@ -196,9 +197,9 @@ Enforced by the database (do not duplicate as the only guard, but still validate
 
 ## 8. PostgreSQL connection requirements
 
-* PostgreSQL **14+** (verified on 18.6 only). Extension `btree_gist` is required by `schema.sql` (shipped with PostgreSQL; creating it needs a role allowed to — the database owner can since PG 13).
+* PostgreSQL **18** (verified on 18.7). Extension `btree_gist` is required by the baseline (shipped with PostgreSQL; creating it needs a role allowed to — the database owner can since PG 13).
 * Driver: Flask uses psycopg2 and parameterized SQL. Dependencies are pinned in `backend/requirements.txt`.
 * Configuration through environment variables (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`); `.env` is git-ignored; never commit credentials.
-* The functions and triggers run with the caller's privileges. The Flask runtime role needs `EXECUTE`, `SELECT` on all application tables, `INSERT` on `users`, `INSERT/UPDATE` on `bookings`, `INSERT/DELETE` on `booking_seats` and `INSERT/UPDATE/DELETE` on `movies` and `showtimes`. The baseline creates no roles. Fresh Compose volumes apply `backend/migrations/compose-role.sql` and `backend/migrations/0002_movie_delete_permissions.sql`. Use a non-owner, non-superuser application role for an externally managed database. Use the owner role for setup and tests.
-* Create the database empty, then: `psql -X -v ON_ERROR_STOP=1 -d <db> -f backend/migrations/0001_baseline.sql` and `… -f backend/seeds/demo.sql` (once). Tests: `bash database/tests/run_all.sh` on a **disposable** database only.
+* The functions and triggers run with the caller's privileges. The Flask runtime role needs `EXECUTE`, `SELECT` on all application tables, `INSERT` on `users`, `INSERT/UPDATE` on `bookings`, `INSERT/DELETE` on `booking_seats` and `INSERT/UPDATE/DELETE` on `movies` and `showtimes`. The baseline creates no roles. Fresh Compose volumes apply `backend/migrations/compose-role.sql`, `backend/migrations/0002_movie_delete_permissions.sql` then `backend/migrations/0003_booking_integrity.sql` and `backend/migrations/0004_finite_money.sql`. Use a non-owner, non-superuser application role for an externally managed database. Use the owner role for setup and tests.
+* Create the database empty, then: `psql -X -v ON_ERROR_STOP=1 -d <db> -f backend/migrations/0001_baseline.sql` then `… -f backend/migrations/0003_booking_integrity.sql`, then `… -f backend/migrations/0004_finite_money.sql`, then `… -f backend/seeds/demo.sql` (once). Tests: `bash database/tests/run_all.sh` on a **disposable** database only.
 * Timestamps are `timestamptz`; the seed uses 14 consecutive `Asia/Seoul` days starting on the day it is run.
