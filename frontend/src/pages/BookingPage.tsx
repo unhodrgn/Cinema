@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { loginUrl } from "../../js/auth.js";
 import {
   calculateTotal,
@@ -21,6 +21,7 @@ export function BookingPage() {
   const { selection, reconcile, toggle } = useBookingStore();
   const [data, setData] = useState<MapData>();
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
   const [message, setMessage] = useState("");
   useEffect(() => {
     if (!isIdText(id)) return;
@@ -43,12 +44,15 @@ export function BookingPage() {
     data?.seats.filter((s) => s.is_available && selection.has(s.seat_id)) || [];
   async function reserve() {
     const seatIds = chosen.map((s) => s.seat_id);
-    if (busy || !seatIds.length) return;
+    if (inFlight.current || !seatIds.length) return;
+    inFlight.current = true;
     setBusy(true);
     setMessage("");
+    let navigating = false;
     try {
       const user = await auth.currentUser();
       if (!user) {
+        navigating = true;
         location.assign(
           loginUrl(
             "/seats.html?screening_id=" +
@@ -67,6 +71,7 @@ export function BookingPage() {
         screening_id: Number(id),
         seat_ids: seatIds,
       });
+      navigating = true;
       location.assign("/booking.html?id=" + booking.booking_id);
     } catch (error) {
       setMessage(errorMessage(error));
@@ -83,7 +88,10 @@ export function BookingPage() {
         setData(undefined);
       }
     } finally {
-      setBusy(false);
+      if (!navigating) {
+        inFlight.current = false;
+        setBusy(false);
+      }
     }
   }
   const s = data?.screening;
@@ -106,8 +114,14 @@ export function BookingPage() {
               <p>
                 {formatDateTimeRange(s.starts_at, s.ends_at)} · {s.room_name}
               </p>
-              <p>Price per seat: {formatMoney(s.ticket_price)}</p>
-              {s.has_started && <p>This screening has already started.</p>}
+              <p className="muted">
+                Price per seat: {formatMoney(s.ticket_price)}
+              </p>
+              {s.has_started && (
+                <p className="badge badge-neutral">
+                  This screening has already started.
+                </p>
+              )}
             </div>
           </div>
           <section className="seat-layout">
@@ -139,9 +153,10 @@ export function BookingPage() {
               <button
                 className="button"
                 disabled={busy || s.has_started || !chosen.length}
+                aria-busy={busy || undefined}
                 onClick={reserve}
               >
-                Proceed to booking
+                {busy ? "Booking…" : "Proceed to booking"}
               </button>
             </aside>
           </section>

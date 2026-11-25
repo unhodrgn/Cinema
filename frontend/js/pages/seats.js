@@ -43,6 +43,7 @@ async function main() {
   let screeningData = null;
   let allSeats = [];
   const seatMap = new Map(); // seat_id -> seat object
+  let isSubmitting = false;
 
   /** Reload the seat map. Seats of the selection that are no longer free are dropped from it.
    *  Returns `{ ok, removed }`: whether the map was loaded and the labels that were dropped. */
@@ -171,49 +172,62 @@ async function main() {
     totalPriceSpan.textContent = formatMoney(rawTotal);
     ticketLine.textContent = `${selectedSeats.size} × ${formatMoney(screeningData ? screeningData.ticket_price : "0")}`;
 
-    bookButton.disabled = Boolean(screeningData && screeningData.has_started);
+    bookButton.disabled = isSubmitting || Boolean(screeningData && screeningData.has_started);
   }
 
   bookButton.addEventListener("click", async () => {
+    if (isSubmitting) return;
     if (selectedSeats.size === 0) {
       showMessage(messageBox, "error", "Please select at least one seat.");
       return;
     }
 
-    const { user, failed } = await pageUser(getAuth(), messageBox);
-    if (failed) return;
-
-    const seatIds = Array.from(selectedSeats);
-    const returnDestination = `/seats.html?screening_id=${screeningId}&selected=${formatSelectedSeats(seatIds)}`;
-
-    if (!user) {
-      // Provisional seat selection preserved across login
-      globalThis.location.assign(loginUrl(returnDestination));
-      return;
-    }
-
-    if (user.role !== "CUSTOMER") {
-      showMessage(messageBox, "error", "Only customer accounts can make bookings.");
-      return;
-    }
-
+    isSubmitting = true;
     bookButton.disabled = true;
+    bookButton.setAttribute("aria-busy", "true");
+    bookButton.textContent = "Booking…";
     clear(messageBox);
 
+    let navigating = false;
     try {
+      const { user, failed } = await pageUser(getAuth(), messageBox);
+      if (failed) return;
+
+      const seatIds = Array.from(selectedSeats);
+      const returnDestination = `/seats.html?screening_id=${screeningId}&selected=${formatSelectedSeats(seatIds)}`;
+
+      if (!user) {
+        // Provisional seat selection preserved across login
+        navigating = true;
+        globalThis.location.assign(loginUrl(returnDestination));
+        return;
+      }
+
+      if (user.role !== "CUSTOMER") {
+        showMessage(messageBox, "error", "Only customer accounts can make bookings.");
+        return;
+      }
+
       const response = await getApi().post("/api/bookings", {
         screening_id: Number(screeningId),
         seat_ids: seatIds,
       });
       const booking = response.booking;
+      navigating = true;
       globalThis.location.assign(`/booking.html?id=${booking.booking_id}`);
     } catch (err) {
-      bookButton.disabled = false;
       // Refresh the seat map (this also drops seats that were taken from the selection and
       // recalculates the total), THEN explain: loading clears the message box.
       const { ok, removed } = await loadData();
       if (ok) {
         showMessage(messageBox, "error", takenSeatsMessage(removed) || err.message || "Failed to create booking.");
+      }
+    } finally {
+      if (!navigating) {
+        isSubmitting = false;
+        bookButton.removeAttribute("aria-busy");
+        bookButton.textContent = "Proceed to booking";
+        updateSummary();
       }
     }
   });

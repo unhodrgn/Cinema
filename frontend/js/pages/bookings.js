@@ -27,6 +27,8 @@ async function main() {
     return;
   }
 
+  let isCancelling = false;
+
   async function loadBookings() {
     clear(messageBox);
     clear(container);
@@ -120,24 +122,31 @@ async function main() {
 
     const screeningStarted = Date.parse(b.starts_at) <= Date.now();
     if (b.status === "BOOKED" && !screeningStarted) {
-      actions.append(
-        el("button", {
-          className: "button button-danger",
-          attrs: { type: "button" },
-          text: "Cancel",
-          on: {
-            click: async () => {
-              if (!globalThis.confirm("Are you sure you want to cancel this booking?")) return;
-              try {
-                await getApi().post(`/api/bookings/${b.booking_id}/cancel`, {});
-                await loadBookings();
-              } catch (err) {
-                showMessage(messageBox, "error", err.message || "Failed to cancel booking.");
-              }
-            },
-          },
-        }),
-      );
+      const cancelBtn = el("button", {
+        className: "button button-danger",
+        attrs: { type: "button" },
+        text: "Cancel",
+      });
+      cancelBtn.addEventListener("click", async () => {
+        if (isCancelling) return;
+        if (!globalThis.confirm("Are you sure you want to cancel this booking?")) return;
+        isCancelling = true;
+        cancelBtn.disabled = true;
+        cancelBtn.setAttribute("aria-busy", "true");
+        cancelBtn.textContent = "Cancelling…";
+        try {
+          await getApi().post(`/api/bookings/${b.booking_id}/cancel`, {});
+          await loadBookings();
+        } catch (err) {
+          showMessage(messageBox, "error", err.message || "Failed to cancel booking.");
+          cancelBtn.disabled = false;
+          cancelBtn.removeAttribute("aria-busy");
+          cancelBtn.textContent = "Cancel";
+        } finally {
+          isCancelling = false;
+        }
+      });
+      actions.append(cancelBtn);
     }
 
     body.append(actions);

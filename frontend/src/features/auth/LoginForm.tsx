@@ -49,8 +49,13 @@ export function LoginForm({ register = false }: { register?: boolean }) {
     }
   }
   return (
-    <div className="narrow">
+    <div className="narrow auth-wrap">
       <h1>{register ? "Create an account" : "Log in"}</h1>
+      {register && (
+        <p className="muted">
+          An account ID and a password are all that is needed.
+        </p>
+      )}
       {message && (
         <p
           className={
@@ -103,7 +108,8 @@ export function LoginForm({ register = false }: { register?: boolean }) {
           {register ? "Register" : "Log in"}
         </button>
       </form>
-      <p>
+      <p className="muted auth-switch">
+        {register ? "Already registered? " : "No account yet? "}
         <a href={(register ? "/login.html" : "/register.html") + query}>
           {register ? "Log in" : "Register"}
         </a>

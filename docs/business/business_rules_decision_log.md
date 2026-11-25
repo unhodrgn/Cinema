@@ -29,15 +29,15 @@ Where this document clarifies or extends an earlier underspecified point, the de
 
 The same detail-row release and parent-history retention principle applies when a booking expires under D3: set status to `EXPIRED`, delete its `BOOKING_SEATS` rows, and retain the parent booking record.
 
-### D2 — Editing a screening after a booking exists
+### D2 — Editing and deleting screenings or movies after bookings/start
 
-**Decision: Option A — Do not allow any modification once at least one booking record exists for the screening.**
+**Decision: Do not allow screening modifications once any booking exists or once the screening has started; allow conditional deletion of unstarted, unbooked screenings and movies.**
 
-1. An administrator may modify a screening only when no row in `BOOKINGS` references that screening.
-2. If any booking record exists, reject every modification to that screening, including changes to its movie, room, start time, end time, or ticket price.
-3. The rule applies regardless of booking status: `BOOKED`, `CANCELLED`, or `EXPIRED`.
+1. An administrator may modify a screening only when it has not yet started (`starts_at > clock_timestamp()`) and no row in `BOOKINGS` references that screening (saving identical values on an unstarted booked screening is treated as a no-op).
+2. If any booking record exists, reject every actual modification to that screening, including changes to its movie, room, start time, end time, or ticket price (`UC001`).
+3. The booking-protection rule applies regardless of booking status: `BOOKED`, `CANCELLED`, or `EXPIRED`.
 4. This rule preserves the integrity of existing booking history and avoids changing the screening context associated with a past booking.
-5. Adding a new screening remains allowed when all existing screening rules are satisfied. This decision does not add screening deletion functionality.
+5. Adding a new screening remains allowed when all existing screening rules are satisfied. An administrator may delete a screening only if it has not yet started and has no `BOOKINGS` rows of any status (`DELETE /api/admin/screenings/{id}`). An administrator may delete a movie (`DELETE /api/admin/movies/{id}`) together with its upcoming unbooked screenings in one transaction, provided none of its screenings have started or have any booking records.
 
 ### D3 — Expiration of unpaid bookings
 
@@ -78,10 +78,11 @@ No full name, email address, phone number, or other registration field is requir
 **Movie attributes to support:**
 - `title` — 영화 제목
 - `genre` — 장르
-- `duration` — 상영 시간 (minutes)
+- `duration_minutes` (business term `duration`) — 상영 시간 (minutes)
 - `rating` — 관람 등급
 - `synopsis` — 줄거리
 - `release_date` — 개봉일
+- `poster_url` — 포스터 경로 (optional, relative path `/images/posters/<name>.(jpg|png)`)
 
 The database may also contain a generated movie identifier/primary key. That identifier is a technical key, not an additional user-entered movie attribute.
 
@@ -131,7 +132,7 @@ Update `docs/business/unit_business_description.md` to reflect the approved deci
 |---|---|
 | CM-01 | Keep account ID and password as login inputs. Use role-specific access checks for `CUSTOMER` and `ADMIN`. |
 | C-01 | Registration inputs are only account ID and password. Assign `CUSTOMER` server-side. Say password is stored as a secure one-way hash (`해시 처리`), not merely “encrypted”. |
-| C-02 | Movie list/detail supports the six approved movie attributes: title, genre, duration, rating, synopsis, release date. |
+| C-02 | Movie list/detail supports the six core movie attributes (`title`, `genre`, `duration_minutes`, `rating`, `synopsis`, `release_date`) plus optional `poster_url`. |
 | C-02–C-05 | Explicitly state that login is not required for these lookup/selection functions. Selecting seats does not reserve them. |
 | C-04 | An unpaid `BOOKED` reservation blocks the seat only until its expiry deadline; paid `BOOKED` reservations continue to block it. Cancelled and expired bookings do not block seats. Expiration must be processed before availability is returned. |
 | C-05 | Seat selection is provisional only. It does not hold seats or start the 10-minute payment timer. |
@@ -139,8 +140,8 @@ Update `docs/business/unit_business_description.md` to reflect the approved deci
 | C-07 | Accept simulated payment only before `expires_at` and only for a `BOOKED` + `UNPAID` booking owned by the logged-in customer. On success set payment status to `PAID`. Reject payment at or after expiry. |
 | C-08 | Keep cancelled and expired parent booking records visible. Since D1 removes booking-seat rows, do not promise to show exact seats for `CANCELLED` or `EXPIRED` records. |
 | C-09 | On customer cancellation before screening start, set `CANCELLED`, delete all associated booking-seat detail rows, and retain the parent booking. No partial-seat cancellation. Do not allow cancellation of an `EXPIRED` booking. |
-| A-01 | Use the six approved movie attributes. Do not introduce unapproved mandatory profile or movie fields. |
-| A-02 | Before modifying a screening, check whether any booking row references it. If one or more rows exist, reject all modifications, including price changes. If no booking exists, validate room/time overlap and other existing rules. |
+| A-01 | Use the supported movie attributes (6 core attributes + optional `poster_url`) and support adding, editing, and conditionally deleting movies (blocked if any screening has started or has bookings). |
+| A-02 | Reject edits to started screenings or actual modifications to screenings referenced by any booking row (`BOOKED`, `CANCELLED`, `EXPIRED`), including price changes. Support deleting unstarted screenings that have no booking records. |
 | A-03 | Include cancelled and expired booking summaries in the global list, but do not promise exact seat details for those records because their detail rows are deleted. |
 
 For C-08 and A-03, retain booking-level fields such as booking ID, customer, movie/screening reference, booking time, total amount, booking status, and payment status where available. Seat details are shown only while corresponding detail rows still exist.
@@ -156,7 +157,7 @@ Member A must use this section as an approved business-rule input when designing
 | Entity/table | Required data or behavior |
 |---|---|
 | `USERS` | Unique account ID/username, password hash, role (`CUSTOMER` or `ADMIN`). Public registration creates `CUSTOMER` only. |
-| `MOVIES` | Title, genre, duration, rating, synopsis, release date. |
+| `MOVIES` | Title, genre, duration, rating, synopsis, release date, optional poster URL (`poster_url`). |
 | `SCREENINGS` | Movie, room, start time, end time, and per-seat ticket price. |
 | `BOOKINGS` | Customer, screening, booking timestamp, expiration timestamp, total amount, booking status, payment status. |
 | `BOOKING_SEATS` | Booking, selected seat, and price snapshot per seat. Rows exist only while the booking is active; delete all rows on cancellation or expiration. |
@@ -172,7 +173,7 @@ Member A must use this section as an approved business-rule input when designing
 7. Expiry processing must be safe to run more than once (idempotent). It must only expire rows still in `BOOKED` + `UNPAID` state whose deadline has passed.
 8. When expiring or cancelling a booking, update the parent booking status and delete all associated `BOOKING_SEATS` rows in the same transaction.
 9. Do not store a global seat status in `SEATS`; availability is determined per screening from active booking details.
-10. For the `(screening, seat)` uniqueness rule, do not assume `UNIQUE(booking_id, seat_id)` alone is sufficient. The schema must enforce uniqueness across different bookings for the same screening and seat, using a normalized design with an appropriate database trigger (PostgreSQL) or another verified equivalent.
+10. For the `(screening, seat)` uniqueness rule, `booking_seats` stores `showtime_id` constrained by a composite FK to `bookings(booking_id, showtime_id)` with an immediate `UNIQUE(showtime_id, seat_id)` constraint (migration `0003_booking_integrity.sql`) alongside the validation triggers.
 
 ### 5.3 Recommended status and timestamp domains
 
@@ -182,11 +183,11 @@ Member A must use this section as an approved business-rule input when designing
 - `expires_at`: timestamp ten minutes after `booked_at`.
 - Per-seat ticket price snapshot: stored with the booking-seat detail while that detail exists.
 
-The DBMS is PostgreSQL (see B01 Project Overview, section 7.1). A should use one consistent date/time representation and timezone convention, and document it in the domain definition.
+The DBMS is PostgreSQL 18 (see B01 Project Overview, section 7.1), accessed via `psycopg2`. All timestamps use `timestamptz` with `Asia/Seoul` as the business time zone.
 
 ### 5.4 Important implementation note for Member B
 
-The database can store `expires_at`, but the application must also enforce expiry. Before payment, seat-availability calculation, and booking confirmation, B must ensure overdue unpaid bookings are transitioned to `EXPIRED` and their seat details are released. A periodic cleanup mechanism may be added if needed, but the deadline must be enforced even when a customer attempts payment exactly at or after the 10-minute boundary.
+Request-time expiration is implemented via `expire_overdue_bookings()` (called on seat availability, customer booking history, and admin booking lists) and built directly into `create_booking()`, `pay_booking()`, and `cancel_booking()`. There is no background scheduler or cron job.
 
 ---
 
@@ -199,15 +200,12 @@ The following are not specified here and must not be silently invented as busine
 - A specific movie rating vocabulary.
 - A specific genre list.
 - Refund behavior or refund processing.
-- Screening deletion.
 - Partial-seat cancellation.
 
-Technical choices needed to implement the approved rules (for example, exact SQL trigger definitions, column types, and the mechanism used to run expiry cleanup) belong in the database/application design and must preserve the decisions above.
+Technical choices needed to implement the approved rules (for example, exact SQL trigger definitions, column types, and request-time expiry invocation) belong in the database/application design and must preserve the decisions above.
 
 ---
 
 ## 7. Approval and change control
 
-The six decisions D1–D6 were explicitly selected by the project owner on 2026-11-17. Member A should design the database against Section 5. Member B should revise B03 against Section 4. Any later change to these decisions must be recorded as a new version of this log and reflected consistently in B03, the logical/physical data models, and the application.
-
-**Technical wording note (2026-11-20).** The project DBMS was changed from SQLite to PostgreSQL on 2026-11-20 (see B01 Project Overview, section 7.1). Only the SQLite-specific technical wording in sections 5.2 (item 10) and 5.3 was aligned to PostgreSQL. Decisions D1–D6 and all business rules are unchanged, so this log remains version 1.0.
+The six decisions D1–D6 were explicitly selected by the project owner on 2026-11-17. Subsequent alignments (PostgreSQL 18 migration, `poster_url` support, conditional movie/screening deletion, migration `0003` composite FK + immediate unique index, migration `0004` finite money checks) are reflected across B01–B03, `docs/database/*`, `docs/api/api_contract.md`, and the application codebase.

@@ -17,6 +17,9 @@ function Checkout() {
   const path = "/api/bookings/" + id;
   const [booking, setBooking] = useState<Booking>();
   const [busy, setBusy] = useState(false);
+  const [pendingAction, setPendingAction] = useState<
+    "pay" | "cancel" | "expiry" | null
+  >(null);
   const inFlight = useRef(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -30,6 +33,7 @@ function Checkout() {
     if (inFlight.current) return;
     inFlight.current = true;
     setBusy(true);
+    setPendingAction("expiry");
     setError("");
     try {
       const result = await confirmExpiry({
@@ -44,6 +48,7 @@ function Checkout() {
     } finally {
       inFlight.current = false;
       setBusy(false);
+      setPendingAction(null);
     }
   }
   async function change(action: "pay" | "cancel") {
@@ -55,6 +60,7 @@ function Checkout() {
       return;
     inFlight.current = true;
     setBusy(true);
+    setPendingAction(action);
     setNotice("");
     setError("");
     try {
@@ -77,12 +83,13 @@ function Checkout() {
     } finally {
       inFlight.current = false;
       setBusy(false);
+      setPendingAction(null);
     }
   }
   const problem = isIdText(id) ? error : "Invalid or missing booking ID.";
   const paid = booking?.payment_status === "PAID";
   return (
-    <div className="narrow">
+    <div className="narrow-wide">
       <BookingSteps current={paid ? "Payment" : "Booking"} />
       <h1>Booking Details</h1>
       {problem && (
@@ -116,23 +123,29 @@ function Checkout() {
                 <button
                   className="button"
                   disabled={busy}
+                  aria-busy={pendingAction === "pay" || undefined}
                   onClick={() => change("pay")}
                 >
-                  Pay Now
+                  {pendingAction === "pay" ? "Processing…" : "Pay Now"}
                 </button>
               </div>
             )}
         </>
       )}
-      <div className="booking-actions">
+      <div
+        className={
+          booking ? "booking-actions" : "booking-actions booking-actions-bare"
+        }
+      >
         {booking?.status === "BOOKED" &&
           Date.parse(booking.starts_at) > Date.now() && (
             <button
               className="button button-danger"
               disabled={busy}
+              aria-busy={pendingAction === "cancel" || undefined}
               onClick={() => change("cancel")}
             >
-              Cancel Booking
+              {pendingAction === "cancel" ? "Cancelling…" : "Cancel Booking"}
             </button>
           )}
         <a className="button button-secondary" href="/bookings.html">

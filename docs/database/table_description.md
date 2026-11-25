@@ -1,6 +1,6 @@
 # 테이블 기술서 (Table Description)
 
-**기준:** `backend/migrations/0001_baseline.sql` + `0003_booking_integrity.sql` + `0004_finite_money.sql` (PostgreSQL 18.7에서 검증). 업무 규칙은 BR-DL-001(D1~D6)과 B01~B05를 따른다.
+**기준:** `backend/migrations/0001_baseline.sql` + `0002_movie_delete_permissions.sql` + `0003_booking_integrity.sql` + `0004_finite_money.sql` (PostgreSQL 18.7에서 검증). 업무 규칙은 BR-DL-001(D1~D6)과 B01~B05를 따른다.
 **논리 명칭 ↔ 물리 테이블:** USERS=`users`, MOVIES=`movies`, ROOMS=`theater_rooms`, SEATS=`seats`, SCREENINGS=`showtimes`, BOOKINGS=`bookings`, BOOKING_SEATS=`booking_seats`.
 
 모든 기본키(`*_id`)는 `bigint GENERATED ALWAYS AS IDENTITY`이다.
@@ -15,7 +15,7 @@
 | `role` | varchar(10) | N | `'CUSTOMER'` | CHECK ∈ {`CUSTOMER`,`ADMIN`}. `GUEST` 없음 (D4) |
 | `created_at` | timestamptz | N | `now()` | 기술 컬럼 |
 
-## 2. movies — 영화 (MOVIES) — 승인된 6개 속성 (D5)
+## 2. movies — 영화 (MOVIES) — 기본 6개 속성 + 선택적 포스터 경로 (D5)
 
 | 컬럼 | 타입 | NULL | 제약 / 설명 |
 |---|---|---|---|
@@ -102,6 +102,7 @@
 
 `idx_showtimes_movie_start`(movie_id, starts_at), `idx_showtimes_room_start`(room_id, starts_at), `idx_bookings_user`(user_id, booked_at DESC), `idx_bookings_showtime_status`(showtime_id, status), `idx_booking_seats_seat`(seat_id), `idx_bookings_pending_expiry`(expires_at) WHERE `status='BOOKED' AND payment_status='UNPAID'` (만료 처리 탐색용 기술 인덱스). 부모의 `bookings_id_showtime_key`와 활성 배정의 `booking_seats_showtime_seat_key`는 고유 B-tree 인덱스를 생성한다.
 
-## 9. 함수 (응용 프로그램 호출용)
+## 9. 함수 및 런타임 권한 (응용 프로그램 호출용)
 
 `create_booking(user_id, showtime_id, seat_ids[])`, `pay_booking(booking_id, user_id)`, `cancel_booking(booking_id, user_id)`, `expire_overdue_bookings()` — 사용 방법은 `postgresql_flask_integration_contract.md` 참조.
+런타임 역할 `cinema_api`에는 `compose-role.sql`과 `0002_movie_delete_permissions.sql`을 통해 `movies`, `showtimes`에 대한 `DELETE` 권한이 함께 부여된다.

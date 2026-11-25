@@ -1,6 +1,6 @@
 # 물리적 데이터 모델 (Physical Data Model)
 
-**DBMS:** PostgreSQL 18 (18.7에서 검증) · **확장:** `btree_gist` · **DDL:** `backend/migrations/0001_baseline.sql` + `0003_booking_integrity.sql` + `0004_finite_money.sql` · **시드:** `backend/seeds/demo.sql`
+**DBMS:** PostgreSQL 18 (18.7에서 검증) · **확장:** `btree_gist` · **DDL:** `backend/migrations/0001_baseline.sql` + `0002_movie_delete_permissions.sql` + `0003_booking_integrity.sql` + `0004_finite_money.sql` · **시드:** `backend/seeds/demo.sql`
 컬럼별 타입·제약은 `table_description.md`, 도메인은 `domain_definition.md`에 있다. 이 문서는 구현 구조를 요약한다.
 
 ## 1. 물리 ERD
@@ -91,4 +91,4 @@ erDiagram
 
 ## 4. 시드 데이터 (데모 데이터이며 업무 규칙이 아님)
 
-계정 3개(관리자 1, 고객 2; 해시는 Member A 제공, 평문 비밀번호는 미문서·미검증), 영화 6편(장르·등급·개봉일은 데모 값), 상영관 5개, 좌석 250석, 상영 일정 280회(실행일부터 Asia/Seoul 기준 14일, 하루 20회, 방마다 10·13·16·19시), `ends_at` = 시작 + 영화 상영 시간, 좌석당 가격 12000.00(데모 값, D6 #6).
+계정 3개(관리자 1 `admin`, 고객 2 `customer1`·`customer2`; 비밀번호는 루트 `README.md` 및 `backend/seeds/demo.sql` 참조), 영화 6편(장르·등급·개봉일·포스터 경로는 데모 값), 상영관 5개, 좌석 250석, 상영 일정 280회(실행일부터 Asia/Seoul 기준 14일, 하루 20회, 방마다 10·13·16·19시), `ends_at` = 시작 + 영화 상영 시간, 좌석당 가격 12000.00(데모 값, D6 #6).

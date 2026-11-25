@@ -55,11 +55,27 @@
 
 * { box-sizing: border-box; }
 
+::selection {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
+  display: flex;
+  flex-direction: column;
   font: 16px/1.5 var(--font-body);
+  min-height: 100dvh;
+}
+
+#root {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  min-height: 100dvh;
+  width: 100%;
 }
 
 [hidden] { display: none !important; }
@@ -105,6 +121,7 @@ body {
   min-height: 44px;
   padding: 0 0.5rem;
   text-decoration: none;
+  text-underline-offset: 0.2em;
 }
 .nav-link:hover { color: var(--accent-link); text-decoration: underline; }
 .nav-link[aria-current="page"] { color: var(--accent-link); }
@@ -122,11 +139,24 @@ body {
 .nav-button:hover { border-color: var(--text); }
 
 .container {
+  flex: 1 0 auto;
   margin: 0 auto;
   max-width: 64rem;
   padding: 1.5rem 1rem 3rem;
+  width: 100%;
 }
-.narrow { max-width: 30rem; }
+.narrow {
+  margin-inline: auto;
+  max-width: 30rem;
+  width: 100%;
+}
+.narrow-wide {
+  margin-inline: auto;
+  max-width: 44rem;
+  width: 100%;
+}
+.auth-wrap { padding-block: clamp(0.5rem, 5vh, 3.5rem) 1rem; }
+.auth-switch { margin-top: 1rem; }
 
 .site-footer {
   border-top: 1px solid var(--border);
@@ -217,12 +247,21 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .badge-wait, .badge-neutral { background: var(--wait-bg); color: var(--wait-text); }
 .badge-rating { border: 1px solid var(--border-strong); color: var(--text); margin-left: 0.6rem; }
 
-.message { border-radius: var(--radius); margin: 0.75rem 0 0; padding: 0.6rem 0.9rem; }
+.message { border-radius: var(--radius); margin: 0.75rem 0 0; padding: 0.75rem 1rem; }
+.message > p:first-child { margin-top: 0; }
+.message > p:last-child { margin-bottom: 0; }
+.message .button { margin-top: 0.5rem; }
 .message-info { background: var(--wait-bg); color: var(--wait-text); }
 .message-success { background: var(--ok-bg); color: var(--ok-text); }
 .message-error { background: var(--error-bg); color: var(--error-text); }
 
 /* ---------- forms: errors are text next to the field, never colour alone ---------- */
+.form-grid {
+  display: grid;
+  gap: 0 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.form-grid .field-full { grid-column: 1 / -1; }
 .form .field { margin-bottom: 1rem; }
 .form label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
 .form input, .form select, .form textarea, .toolbar input, .toolbar select {
@@ -320,9 +359,9 @@ section + section { margin-top: 2rem; }
 #home-sections .section-head { margin-top: 0; }
 #home-sections { margin-top: 2rem; }
 
-.poster-grid { display: grid; gap: 1.25rem 1rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr)); }
+.poster-grid { display: grid; gap: 1.25rem 1rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 8.75rem), 1fr)); }
 .movie-tile .movie-title { font-size: 1.3rem; line-height: 1.15; margin: 0.5rem 0 0.1rem; }
-.movie-tile .movie-title a { color: var(--text); text-decoration: none; }
+.movie-tile .movie-title a { color: var(--text); text-decoration: none; text-underline-offset: 0.2em; }
 .movie-tile .movie-title a:hover { color: var(--accent-link); text-decoration: underline; }
 .movie-tile .muted { margin: 0; }
 
@@ -341,12 +380,13 @@ section + section { margin-top: 2rem; }
   text-decoration: none;
 }
 a.chip:hover { border-color: var(--accent-link); }
-.chip-time { font-family: var(--font-display); font-size: 1.3rem; letter-spacing: 0.04em; }
+.chip-time { font-family: var(--font-display); font-size: 1.3rem; font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
 .chip-title { font-size: 0.9rem; }
 .chip-closed { border-color: var(--border); color: var(--muted); }
 .chip-closed .chip-time { text-decoration: line-through; }
 .chip-list-stacked { flex-direction: column; }
 .chip-list-stacked li, .chip-list-stacked .chip { width: 100%; }
+.chip-list-stacked .chip-time { flex: none; min-width: 3rem; }
 .hall-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); }
 .hall.card { margin-top: 0; }
 
@@ -366,9 +406,9 @@ a.chip:hover { border-color: var(--accent-link); }
   gap: 1.5rem 2rem;
   grid-template-columns: minmax(0, 15rem) minmax(0, 1fr);
 }
-.facts { display: grid; gap: 0.25rem 1rem; grid-template-columns: max-content 1fr; margin: 0 0 1rem; }
+.facts { display: grid; gap: 0.25rem 1rem; grid-template-columns: max-content minmax(0, 1fr); margin: 0 0 1rem; }
 .facts dt { color: var(--muted); font-weight: 600; }
-.facts dd { margin: 0; }
+.facts dd { font-variant-numeric: tabular-nums; margin: 0; overflow-wrap: anywhere; }
 
 .screening-list { list-style: none; margin: 0; padding: 0; }
 .screening-list.card { padding: 0.25rem 1.25rem; }
@@ -377,13 +417,21 @@ a.chip:hover { border-color: var(--accent-link); }
   border-bottom: 1px solid var(--border);
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem 1rem;
-  padding: 0.6rem 0;
+  gap: 0.35rem 1.25rem;
+  padding: 0.7rem 0;
 }
 .screening:last-child { border-bottom: 0; }
-.screening .time { font-family: var(--font-display); font-size: 1.3rem; letter-spacing: 0.04em; min-width: 8.5rem; }
+.screening .time {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  min-width: 8.5rem;
+  white-space: nowrap;
+}
+.screening > :last-child { margin-left: auto; }
 .screening-with-poster .poster { flex: none; width: 3.25rem; }
-.screening-movie { flex: 1 1 12rem; font-weight: 600; overflow-wrap: anywhere; }
+.screening-movie { flex: 1 1 12rem; font-weight: 600; overflow-wrap: anywhere; text-underline-offset: 0.2em; }
 
 /* ---------- steps: Seats > Booking > Payment ---------- */
 .steps { counter-reset: step; display: flex; flex-wrap: wrap; gap: 0.5rem; list-style: none; margin: 0 0 1rem; padding: 0; }
@@ -432,7 +480,7 @@ a.chip:hover { border-color: var(--accent-link); }
   letter-spacing: 0.5em;
   margin: 1rem auto 1.5rem;
   max-width: 28rem;
-  padding: 0.6rem 0 0.4rem;
+  padding: 0.6rem 0 0.4rem 0.5em;
   text-align: center;
 }
 
@@ -464,6 +512,7 @@ a.chip:hover { border-color: var(--accent-link); }
   cursor: pointer;
   display: inline-flex;
   font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
   justify-content: center;
   min-width: 0;
@@ -500,7 +549,7 @@ a.chip:hover { border-color: var(--accent-link); }
 .seat-summary-bar { margin-top: 0; position: sticky; top: 1rem; }
 .summary-list { display: grid; gap: 0.5rem 1rem; grid-template-columns: max-content minmax(0, 1fr); margin: 0 0 1rem; }
 .summary-list dt { color: var(--muted); }
-.summary-list dd { margin: 0; text-align: right; }
+.summary-list dd { font-variant-numeric: tabular-nums; margin: 0; text-align: right; }
 .summary-list strong { font-size: 1.3rem; }
 .seat-summary-bar .button { width: 100%; }
 
@@ -524,6 +573,8 @@ a.chip:hover { border-color: var(--accent-link); }
   margin-top: 1.25rem;
   padding-top: 1rem;
 }
+.booking-actions-bare { border-top: 0; padding-top: 0; }
+.countdown { font-variant-numeric: tabular-nums; }
 .booking-history-card { display: grid; gap: 1rem; grid-template-columns: 6rem minmax(0, 1fr); margin-top: 1rem; }
 
 .status-list, .seat-list { list-style: none; margin: 0; padding: 0; }
@@ -540,17 +591,18 @@ a.chip:hover { border-color: var(--accent-link); }
 
 /* ---------- admin: same tokens, calmer and denser ---------- */
 .section-gap { margin-top: 2rem; }
-.card-flush { padding: 0; }
+.card-flush { margin-top: 1rem; padding: 0; }
 .table-wrap { overflow-x: auto; }
 .empty-note { margin: 1rem; }
-.data-table { border-collapse: collapse; text-align: left; width: 100%; }
+.data-table { border-collapse: collapse; font-variant-numeric: tabular-nums; text-align: left; width: 100%; }
 .data-table thead { border-bottom: 2px solid var(--border); }
 .data-table th { color: var(--muted); font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; }
-.data-table th, .data-table td { padding: 0.45rem 0.7rem; vertical-align: top; }
+.data-table th, .data-table td { padding: 0.55rem 0.75rem; vertical-align: middle; }
 .data-table tbody tr { border-bottom: 1px solid var(--border); }
 .data-table tbody tr:last-child { border-bottom: 0; }
 .cell-strong { font-weight: 600; }
 .cell-actions { white-space: nowrap; }
+.table-actions { align-items: center; display: inline-flex; gap: 0.4rem; }
 .admin { font-size: 0.92rem; }
 .admin .container { max-width: 80rem; padding-top: 1rem; }
 .admin h1 { font-size: 1.9rem; }
@@ -558,12 +610,29 @@ a.chip:hover { border-color: var(--accent-link); }
 .admin .card { margin-top: 1rem; padding: 0.75rem 1rem; }
 .admin .card-flush { padding: 0; }
 
+/* ---------- wide screening grids ---------- */
+@media (min-width: 600px) {
+  .screening:not(.screening-with-poster) {
+    display: grid;
+    grid-template-columns: 8.5rem minmax(5rem, 8rem) minmax(0, 1fr) 8.75rem;
+  }
+  .screening:not(.screening-with-poster) > :last-child { justify-self: end; margin-left: 0; }
+}
+@media (min-width: 860px) {
+  .screening.screening-with-poster {
+    display: grid;
+    grid-template-columns: 3.25rem 8.5rem minmax(0, 1fr) minmax(4.5rem, 6.5rem) auto 8.75rem;
+  }
+  .screening.screening-with-poster > :last-child { justify-self: end; margin-left: 0; }
+}
+
 /* ---------- narrow screens ---------- */
-@media (max-width: 800px) {
+@media (max-width: 860px) {
   .seat-layout { grid-template-columns: minmax(0, 1fr); }
   .seat-summary-bar { position: static; }
 }
 @media (max-width: 640px) {
+  .form-grid { grid-template-columns: minmax(0, 1fr); }
   .hero { grid-template-columns: minmax(0, 1fr); padding: 1rem; }
   .hero > .poster { max-width: 11rem; }
   .hero-title { font-size: 2.6rem; }
@@ -583,7 +652,7 @@ a.chip:hover { border-color: var(--accent-link); }
     grid-template-columns: 3.25rem minmax(0, 1fr);
   }
   .screening-with-poster .poster { align-self: start; grid-row: span 5; }
-  .screening-with-poster :is(.button, .badge) { justify-self: start; }
+  .screening-with-poster :is(.button, .badge) { justify-self: start; margin-left: 0; }
   .booking-detail { grid-template-columns: 5.5rem minmax(0, 1fr); gap: 0.75rem; }
   .booking-history-card { grid-template-columns: 4.5rem minmax(0, 1fr); gap: 0.75rem; }
   .seat-map { padding: 0.75rem 0.5rem; }

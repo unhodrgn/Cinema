@@ -32,6 +32,7 @@ docker compose version
 docker info --format '{{.OSType}}'
 ```
 
+
 ### 2. Configure environment
 
 If `.env` does not exist yet, copy the example file.
@@ -51,7 +52,7 @@ if (-not (Test-Path -LiteralPath .env)) { Copy-Item backend/.env.example .env }
 For a new setup, run the following command to generate `SECRET_KEY` and `DB_PASSWORD`. This command works on both macOS and Windows.
 
 ```sh
-docker run --rm python:3.12-slim-bookworm python -c "import secrets; print('SECRET_KEY=' + secrets.token_hex(32)); print('DB_PASSWORD=' + secrets.token_hex(32))"
+docker run --rm python:3.12-slim-trixie python -c "import secrets; print('SECRET_KEY=' + secrets.token_hex(32)); print('DB_PASSWORD=' + secrets.token_hex(32))"
 ```
 
 Open `.env` in an editor and fill in the two generated values for their corresponding keys. If using an already initialized PostgreSQL volume, `DB_PASSWORD` must match the password of the `cinema_api` role in that volume. The Compose API connects internally to `db:5432/cinema`.

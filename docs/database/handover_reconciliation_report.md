@@ -1,6 +1,6 @@
 # Handover Reconciliation Report — Member A PostgreSQL Handover vs. B01–B05 / D1–D6
 
-The paths quoted in this report refer to the November 20 handover. The current SQL baseline, demo seed and verification commands are listed in the [PostgreSQL guide](../../database/README.md).
+The paths quoted in sections 1–3 refer to the historical November 20 handover. The current SQL migrations, demo seed and verification commands are listed in the [PostgreSQL guide](../../database/README.md).
 
 **Project:** 영화관 예매 및 좌석 관리 시스템 (Cinema Reservation System)
 **Prepared by:** Member B (Application Lead)
@@ -129,18 +129,19 @@ Legend: ✅ satisfied (verified by execution) · ❌ not satisfied · ⚠️ par
 
 | Path | State | Notes |
 |---|---|---|
-| `CinemaDB_FINAL_PostgreSQL_Handover/` | untracked, **unchanged** | Historical reference of Member A's delivery. Not edited, not deleted, not used as a second schema. |
-| `database/schema.sql` | **canonical, populated** | Derived from A's DDL and corrected (section 10). Verified. |
-| `database/seed.sql` | **canonical, populated** | 3 / 5 / 5 / 250 / 140 rows; new movie attributes and stored end times. Verified. |
-| `database/tests/integrity_tests.sql` | canonical | Replaces the placeholder-based original tests for the new model (177 checks). A's original test file stays in the handover folder. |
-| `database/tests/reconciliation_probes.sql` | canonical | Probes updated to the corrected model (31 MATCH, 0 MISMATCH). |
-| `database/tests/test_concurrency.py`, `run_all.sh` | canonical | Real multi-session race tests (16 checks) and the disposable-database runner. |
+| `CinemaDB_FINAL_PostgreSQL_Handover/` | historical reference (outside repo) | Historical reference of Member A's initial delivery. Not used as the schema. |
+| `backend/migrations/0001_baseline.sql` .. `0004_finite_money.sql`, `compose-role.sql` | **canonical** | Derived from A's DDL and corrected (section 10), plus `0002` runtime delete permissions, `0003` booking integrity, and `0004` finite money constraints. |
+| `backend/seeds/demo.sql` | **canonical** | 3 users / 6 movies / 5 rooms / 250 seats / 280 showtimes over 14 days; includes `poster_url` and documented demo passwords. |
+| `backend/tests/sql/integrity_tests.sql` | canonical | Replaces the placeholder-based original tests for the new model. |
+| `backend/tests/sql/reconciliation_probes.sql` | canonical | Probes updated to the corrected model (31 MATCH, 0 MISMATCH). |
+| `backend/tests/sql/money_domain.sql` | canonical | Finite-money domain checks for migration `0004`. |
+| `backend/tests/test_booking_concurrency.py`, `backend/tests/run_database.py`, `database/tests/run_all.sh` | canonical | Multi-session race tests (16 checks) and the disposable-database runner (`run_all.sh` forwards to `run_database.py`). |
 | `database/README.md` | updated | Status verified; setup and safety notes. |
 | `docs/database/postgresql_flask_integration_contract.md` | updated | Matches the implemented schema (10 required topics). |
-| `docs/database/{table_description,glossary,domain_definition,normalization,conceptual_data_model,logical_data_model,physical_data_model}.md` | **filled** (were 0-byte placeholders) | Derived from the canonical schema. |
-| `docs/database/database_test_documentation.md` | new | Commands and actual results. |
-| ERDs | Mermaid ERDs in the three model documents | A's `.drawio/.svg/.png/.mmd` ERDs describe the old model and are left untouched in the handover folder; they must not be used for the presentation (A may regenerate drawio/PNG from the new Mermaid ERDs). |
-| `requirements.txt` | unchanged (empty) | Driver choice still open (B01 §7.1). |
+| `docs/database/{table_description,glossary,domain_definition,normalization,conceptual_data_model,logical_data_model,physical_data_model}.md` | **filled** | Derived from the canonical migrations (`0001`–`0004`). |
+| `docs/database/database_test_documentation.md` | updated | Commands, results, and `0003`–`0004` regression notes. |
+| ERDs | Mermaid ERDs in the three model documents | Updated Mermaid ERDs describe the current schema (`poster_url`, `0003` composite FK, `0004` finite money). |
+| `backend/requirements.txt` | **populated** | Driver settled on `psycopg2-binary` along with Flask, Werkzeug, python-dotenv, tzdata, pytest. |
 
 ## 5. Logical vs. physical names (resolved, no rename requested)
 
@@ -158,7 +159,7 @@ Column mapping (logical → physical): account ID → `users.username`; duration
 
 ## 6. Corrections that were assigned to Member A — status
 
-The audit assigned DB-01…DB-11 to Member A as database owner. By instruction, the corrections were then implemented directly in the canonical files (A's original files untouched). Member A should review the canonical `database/schema.sql` and accept it as the team's database. Details and evidence: section 10.
+The audit assigned DB-01…DB-11 to Member A as database owner. The corrections were implemented in the canonical migrations (`backend/migrations/0001_baseline.sql` through `0004_finite_money.sql`). Details and evidence: section 10.
 
 | ID | Item | Status |
 |---|---|---|
@@ -170,7 +171,7 @@ The audit assigned DB-01…DB-11 to Member A as database owner. By instruction, 
 | DB-06 | D2 protection incl. `ticket_price` | ✅ done, tested |
 | DB-07 | Price snapshot and total consistency | ✅ done (database-enforced), tested |
 | DB-08 | Tests for the new model | ✅ done (177 + 31 + 16 checks) |
-| DB-09 | Seed update and demo-credential documentation | ✅ seed updated; ⚠️ demo password plaintexts remain unknown/unverified (not documented, not invented) |
+| DB-09 | Seed update and demo-credential documentation | ✅ seed updated (`backend/seeds/demo.sql`: 6 movies, 280 showtimes) and demo passwords documented in root `README.md` and `demo.sql` |
 | DB-10 | ERDs and database documents | ✅ new Mermaid ERDs and documents; A's old drawio/PNG/SVG are stale |
 | DB-11 | Expiry-scan index | ✅ partial index `idx_bookings_pending_expiry` |
 
@@ -180,27 +181,27 @@ The audit assigned DB-01…DB-11 to Member A as database owner. By instruction, 
 |---|---|
 | Expiry invocation (was Q1) | **Decided by the team: request-time expiry.** Implemented as `expire_overdue_bookings()` (+ built into `create_booking`/`pay_booking`/`cancel_booking`). No pg_cron, worker or scheduler. Flask must call it before availability, history and admin booking lists (contract §3.3). |
 | 15-min buffer / duration lock (was Q2) | **Removed** as instructed (not approved business rules). |
-| Database driver (Q3) | Open. `psycopg2-binary` recommended; `requirements.txt` unchanged. |
-| `expires_at` after screening start (Q4) | Not specified by B01–B05; no rule invented. Current behaviour: a booking is allowed until the screening starts; if its deadline falls after the start, expiry still works after the start (tested). Needs the project owner's confirmation only if a different rule is wanted. |
-| Genre / rating vocabularies (Q5) | Not imposed: free text, columns nullable. Confirm nullability if the owner wants them mandatory. |
-| Demo credentials | A's three password hashes kept; plaintext undocumented/unverified. A or B must set known passwords before a login demo. |
-| Application role privileges | Functions run with the caller's privileges; a function-only application role would need `SECURITY DEFINER` — not implemented, deployment decision for A. |
-| PostgreSQL 14–17 | Not tested (18.6 only). |
-| `p_as_of` argument | Present on `expire_overdue_bookings`, `pay_booking`, `cancel_booking` for deterministic deadline tests only; Flask must not pass it. A may remove it if tests are re-designed. |
+| Database driver (Q3) | **Resolved: `psycopg2-binary` (`2.9.13`)** pinned in `backend/requirements.txt`. |
+| `expires_at` after screening start (Q4) | Not specified by B01–B05; no rule invented. Current behaviour: a booking is allowed until the screening starts; if its deadline falls after the start, expiry still works after the start (tested). |
+| Genre / rating vocabularies (Q5) | Not imposed: free text, columns nullable. |
+| Demo credentials | **Resolved:** `admin` (`admin1234`), `customer1`/`customer2` (`customer1234`) documented in root `README.md` and `backend/seeds/demo.sql`, rotatable via `backend/scripts/set_demo_passwords.py`. |
+| Application role privileges | **Resolved:** `cinema_api` runtime role configured via `backend/migrations/compose-role.sql` and `0002_movie_delete_permissions.sql` (including `DELETE` on `movies`, `showtimes`). |
+| PostgreSQL 14–17 | Verified on PostgreSQL 18 (18.6/18.7); SQL uses PG 14+ compatible features. |
+| `p_as_of` argument | Present on `expire_overdue_bookings`, `pay_booking`, `cancel_booking` for deterministic deadline tests only; Flask does not pass it. |
 
 ## 8. Readiness (current)
 
-**READY FOR FLASK INTEGRATION** against the canonical database, with the open items above (none is a failing requirement): all critical approved requirements D1–D6 and the retained rules passed execution-based verification (section 10 and `database_test_documentation.md`). Flask work must follow the integration contract and must not start a login demo until demo passwords are set.
+**INTEGRATED & OPERATIONAL** against the canonical migrations (`0001`–`0004`): all approved requirements D1–D6, movie/screening deletion, `poster_url`, finite money checks, REST API, and React/Vite frontend are implemented and covered by pytest, SQL, concurrency, and Playwright suites.
 
 ## 9. Reproducing the results
 
 ```bash
-# disposable server/database only - never a shared one
-export PGHOST=127.0.0.1 PGPORT=54329 PGUSER=<owner role>
-python -m pip install psycopg2-binary
-bash database/tests/run_all.sh
+# Run full suite via Docker Compose (disposable test-db container)
+docker compose --profile test run --build --rm verify
+
+# Or run the database suites directly against a disposable test server
+python backend/tests/run_database.py
 ```
-To reproduce the ORIGINAL audit (13 mismatches) apply `CinemaDB_FINAL_PostgreSQL_Handover/database/{schema,seed}.sql` to an empty database; the audit-time probe script is described in section 2/3 (the file itself was replaced by the corrected-model probes).
 
 ## 10. Resolution — how each item was fixed and verified
 
@@ -212,22 +213,22 @@ To reproduce the ORIGINAL audit (13 mismatches) apply `CinemaDB_FINAL_PostgreSQL
 | **D2** | `trg_showtimes_protect_booked` now fires on every UPDATE and compares movie, room, start, end **and `ticket_price`**; rejects (`UC001`) if any booking row exists, any status | integrity: 22 D2 checks — 5 attributes + combined change × BOOKED/CANCELLED/EXPIRED, plus editable/no-op/delete; probes P05, P06a–f; mutation check |
 | **D3** | `status` BOOKED/CANCELLED/EXPIRED, `payment_status` UNPAID/PAID, `expires_at = booked_at + 10 min` (CHECK + trigger), no automatic payment, transition rules in the trigger, `expire_overdue_bookings()` (atomic, idempotent, works after screening start, not blocked by D2), `pay_booking()`, `cancel_booking()` | integrity: 45 D3 checks incl. 1 µs-before / exact-deadline / after-start / idempotence / paid-never-expires; concurrency C4–C6; probes P02–P03b, P17–P19 |
 | **D4** | unchanged: `role` CHECK rejects GUEST; only CUSTOMER may own bookings | integrity: 2 D4 checks; probe P13 |
-| **D5** | `movies.genre`, `rating`, `release_date` added (free text/date, nullable, no ENUM); account ID + hash + default `CUSTOMER` unchanged | integrity: 6 D5 checks; probe P01 |
+| **D5** | `movies.genre`, `rating`, `release_date`, and `poster_url` supported (free text/date/relative path, nullable, no ENUM); account ID + hash + default `CUSTOMER` unchanged | integrity: D5 checks; probe P01 |
 | **D6** | `showtimes.ticket_price` per screening; `price_at_booking` must equal it (NULL is filled from it); `bookings.total_amount` = Σ snapshots (deferred check at COMMIT, immutable, retained after cancel/expiry); `create_booking()` computes both | integrity: 14 D6 checks; probes P04 |
 
 ### 10.2 DB-01 … DB-11
 
 | ID | Fix in canonical schema/seed |
 |---|---|
-| DB-01 | three movie columns; seed gives demo genre/rating/release_date (demo data, not a vocabulary) |
-| DB-02 | `showtimes.ends_at NOT NULL`, CHECK `> starts_at`; defaulted from the movie duration only when omitted, then **stored**; seed stores `starts_at + duration`; checked for all 140 seeded rows; later duration edits do not move existing screenings; D2 protects `ends_at` |
+| DB-01 | movie columns (`genre`, `rating`, `release_date`, plus `poster_url` in `0001_baseline.sql`); seed gives demo values (demo data, not a vocabulary) |
+| DB-02 | `showtimes.ends_at NOT NULL`, CHECK `> starts_at`; defaulted from the movie duration only when omitted, then **stored**; seed stores `starts_at + duration` (280 rows in current `demo.sql`, 140 in Nov 20 seed); later duration edits do not move existing screenings; D2 protects `ends_at` |
 | DB-03 | 15-minute buffer and duration-lock trigger **removed**; overlap is now an `EXCLUDE USING gist` on `[starts_at, ends_at)` per room (declarative, race-free); back-to-back and 1-minute gaps accepted, true overlaps (`23P01`) rejected |
 | DB-04 | new `bookings` columns/domains/CHECKs (see table description); `paid_at` is now nullable and set only on payment |
 | DB-05 | all `CONFIRMED` logic rewritten for the new model; trigger names listed in `physical_data_model.md`; consistency trigger named so it fires after seat release (found and fixed by verification: cancel/expire failed under `SET CONSTRAINTS ALL IMMEDIATE`; now a regression test) |
 | DB-06 | see D2 |
 | DB-07 | database-enforced (chosen over application responsibility): Flask supplies nothing — `create_booking()` computes; direct inserts are still validated |
-| DB-08 | `integrity_tests.sql` (177), `reconciliation_probes.sql` (31), `test_concurrency.py` (16), `run_all.sh`; 5 mutation checks prove sensitivity |
-| DB-09 | seed updated; demo password plaintexts **still unknown/unverified** — not documented |
+| DB-08 | `backend/tests/sql/{integrity_tests,reconciliation_probes,money_domain}.sql`, `test_booking_concurrency.py`, `run_database.py` (with `database/tests/run_all.sh` wrapper); 5 mutation checks prove sensitivity |
+| DB-09 | `backend/seeds/demo.sql` updated (6 movies, 280 showtimes over 14 days); demo passwords documented in root `README.md` and `demo.sql` |
 | DB-10 | `docs/database/*.md` filled with Mermaid ERDs; contract rewritten; A's old ERDs stale |
 | DB-11 | `idx_bookings_pending_expiry` partial index |
 
@@ -237,6 +238,6 @@ To reproduce the ORIGINAL audit (13 mismatches) apply `CinemaDB_FINAL_PostgreSQL
 * A published seat-availability query was exercised; it exposed that `expire_overdue_bookings()` failed in IMMEDIATE-constraint mode because of alphabetical trigger firing order. Fixed in the schema and covered by a regression test.
 * Two probe/test expectations were wrong (same-statement snapshot visibility; `RESTRICT` raises 23001, not 23503) and were corrected — the database was behaving correctly.
 
-### 10.4 Test results (final `run_all.sh`)
+### 10.4 Historical Nov 20 baseline test run (`run_all.sh`)
 
-`schema.sql` OK · `seed.sql` OK (3/5/5/250/140) · integrity **177/177** · probes **31 MATCH, 0 MISMATCH** · concurrency **16/16** · `ALL DATABASE TESTS PASSED` (PostgreSQL 18.6, disposable database, dropped afterwards).
+`schema.sql` OK · `seed.sql` OK (3/5/5/250/140) · integrity **177/177** · probes **31 MATCH, 0 MISMATCH** · concurrency **16/16** · `ALL DATABASE TESTS PASSED` (PostgreSQL 18.6, disposable database, dropped afterwards). Subsequent `0002`–`0004` migrations and the 6-movie / 280-showtime seed are verified via `python backend/tests/run_database.py` and `docker compose --profile test run --build --rm verify`.

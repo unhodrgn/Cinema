@@ -1,7 +1,7 @@
 # PostgreSQL ↔ Flask Integration Contract
 
 **Project:** 영화관 예매 및 좌석 관리 시스템 (Cinema Reservation System)
-**Applies to:** `backend/migrations/0001_baseline.sql`, `0003_booking_integrity.sql`, `0004_finite_money.sql` and `backend/seeds/demo.sql` · verified on PostgreSQL 18.7
+**Applies to:** `backend/migrations/0001_baseline.sql`, `0002_movie_delete_permissions.sql`, `0003_booking_integrity.sql`, `0004_finite_money.sql` and `backend/seeds/demo.sql` · verified on PostgreSQL 18.7
 **Authority:** B01–B05 and BR-DL-001 (D1–D6). This contract implements them; it changes none of them.
 **Supersedes:** `CinemaDB_FINAL_PostgreSQL_Handover/docs/05_Integration_Contract_KO.md` (kept unchanged as history; outdated — it still describes `CONFIRMED`, `paid_at` auto-payment and no expiry).
 
@@ -28,7 +28,7 @@ All keys are `bigint GENERATED ALWAYS AS IDENTITY` (never supply an id on INSERT
 | Table | Columns (all `NOT NULL` unless marked *null*) |
 |---|---|
 | `users` | `user_id`, `username varchar(60) UNIQUE` (= account ID), `password_hash text`, `role` ∈ {`CUSTOMER`,`ADMIN`} default `CUSTOMER`, `created_at timestamptz` |
-| `movies` | `movie_id`, `title varchar(200)`, `genre varchar(100)` *null*, `duration_minutes integer` (1–300), `rating varchar(50)` *null*, `synopsis text` *null*, `release_date date` *null* |
+| `movies` | `movie_id`, `title varchar(200)`, `genre varchar(100)` *null*, `duration_minutes integer` (1–300), `rating varchar(50)` *null*, `synopsis text` *null*, `release_date date` *null*, `poster_url varchar(255)` *null* |
 | `theater_rooms` | `room_id`, `room_name varchar(60) UNIQUE` |
 | `seats` | `seat_id`, `room_id` → `theater_rooms`, `seat_row char(1)` A–E, `seat_number smallint` 1–10, `UNIQUE(room_id, seat_row, seat_number)` |
 | `showtimes` | `showtime_id`, `movie_id` → `movies`, `room_id` → `theater_rooms`, `starts_at timestamptz`, `ends_at timestamptz` (> `starts_at`), `ticket_price numeric(10,2)` ≥ 0 |
@@ -201,5 +201,5 @@ Enforced by the database (do not duplicate as the only guard, but still validate
 * Driver: Flask uses psycopg2 and parameterized SQL. Dependencies are pinned in `backend/requirements.txt`.
 * Configuration through environment variables (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`); `.env` is git-ignored; never commit credentials.
 * The functions and triggers run with the caller's privileges. The Flask runtime role needs `EXECUTE`, `SELECT` on all application tables, `INSERT` on `users`, `INSERT/UPDATE` on `bookings`, `INSERT/DELETE` on `booking_seats` and `INSERT/UPDATE/DELETE` on `movies` and `showtimes`. The baseline creates no roles. Fresh Compose volumes apply `backend/migrations/compose-role.sql`, `backend/migrations/0002_movie_delete_permissions.sql` then `backend/migrations/0003_booking_integrity.sql` and `backend/migrations/0004_finite_money.sql`. Use a non-owner, non-superuser application role for an externally managed database. Use the owner role for setup and tests.
-* Create the database empty, then: `psql -X -v ON_ERROR_STOP=1 -d <db> -f backend/migrations/0001_baseline.sql` then `… -f backend/migrations/0003_booking_integrity.sql`, then `… -f backend/migrations/0004_finite_money.sql`, then `… -f backend/seeds/demo.sql` (once). Tests: `bash database/tests/run_all.sh` on a **disposable** database only.
+* Create the database empty, then: `psql -X -v ON_ERROR_STOP=1 -d <db> -f backend/migrations/0001_baseline.sql`, then `0003_booking_integrity.sql`, `0004_finite_money.sql`, and (for the runtime role) `0002_movie_delete_permissions.sql`, then `backend/seeds/demo.sql` (once). Tests: `docker compose --profile test run --build --rm verify` or `python backend/tests/run_database.py` on a **disposable** database only.
 * Timestamps are `timestamptz`; the seed uses 14 consecutive `Asia/Seoul` days starting on the day it is run.

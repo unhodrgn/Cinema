@@ -53,7 +53,9 @@ export function MovieCard({
           <a href={href}>{movie.title}</a>
         </Title>
         <p className="muted">{movieFacts(movie)}</p>
-        {!tile && <p className="synopsis">{movie.synopsis}</p>}
+        {!tile && movie.synopsis && (
+          <p className="synopsis">{movie.synopsis}</p>
+        )}
       </div>
     </article>
   );

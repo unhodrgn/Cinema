@@ -422,3 +422,84 @@ def test_concurrent_seat_booking_exactly_one_wins(customer, customer2, public_cl
             assert count == 1, "Exactly one active booking must exist in PostgreSQL"
     finally:
         conn.close()
+
+
+# --- API-01: Seat count & room capacity validation ---
+
+
+def test_booking_exceeding_max_capacity_returns_400_not_500(customer, booking_db):
+    conn = booking_db.connect()
+    try:
+        spare = create_spare_room_screening(conn, starts_in_hours=60, ticket_price=Decimal("99999999.99"))
+    finally:
+        conn.close()
+
+    sid = spare["showtime_id"]
+    for count in (51, 150):
+        resp = customer["client"].post(
+            "/api/bookings",
+            {"screening_id": sid, "seat_ids": list(range(1, count + 1))},
+        )
+        assert resp.status_code == 400
+        body = resp.get_json()
+        assert body["error"]["code"] == "validation_error"
+        assert "seat_ids" in body["error"]["fields"]
+
+
+def test_booking_exceeding_smaller_room_capacity_returns_400(customer, booking_db):
+    conn = booking_db.connect()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO theater_rooms(room_name) VALUES (%s) RETURNING room_id", (f"Tiny_{uuid.uuid4().hex[:8]}",))
+            room_id = cur.fetchone()[0]
+            cur.execute(
+                "INSERT INTO seats(room_id, seat_row, seat_number) VALUES (%s, 'A', 1), (%s, 'A', 2) RETURNING seat_id",
+                (room_id, room_id),
+            )
+            # PostgreSQL multi-row INSERT RETURNING returns both rows
+            seat_ids = [row[0] for row in cur.fetchall()]
+            cur.execute("SELECT movie_id FROM movies ORDER BY movie_id LIMIT 1")
+            movie_id = cur.fetchone()[0]
+            cur.execute(
+                "INSERT INTO showtimes(movie_id, room_id, starts_at, ends_at, ticket_price) "
+                "VALUES (%s, %s, now() + interval '72 hours', now() + interval '74 hours', 12000) RETURNING showtime_id",
+                (movie_id, room_id),
+            )
+            sid = cur.fetchone()[0]
+        conn.commit()
+    finally:
+        conn.close()
+
+    resp = customer["client"].post(
+        "/api/bookings",
+        {"screening_id": sid, "seat_ids": [seat_ids[0], seat_ids[1], 999999]},
+    )
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["error"]["code"] == "validation_error"
+    assert "2 seats" in body["error"]["fields"]["seat_ids"]
+
+    conn = booking_db.connect()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT count(*) FROM bookings WHERE showtime_id = %s", (sid,))
+            assert cur.fetchone()[0] == 0
+    finally:
+        conn.close()
+
+
+def test_booking_full_50_seat_room_capacity_succeeds(customer, booking_db):
+    conn = booking_db.connect()
+    try:
+        spare = create_spare_room_screening(conn, starts_in_hours=84, ticket_price=Decimal("99999999.99"))
+    finally:
+        conn.close()
+
+    resp = customer["client"].post(
+        "/api/bookings",
+        {"screening_id": spare["showtime_id"], "seat_ids": spare["seat_ids"]},
+    )
+    assert resp.status_code == 201
+    booking = resp.get_json()["booking"]
+    assert len(booking["seats"]) == 50
+    assert booking["total_amount"] == "4999999999.50"

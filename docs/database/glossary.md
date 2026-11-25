@@ -5,7 +5,7 @@
 | 사용자 계정 | User / `users` | 계정 ID와 비밀번호 해시, 역할을 가진 로그인 계정. 역할은 `CUSTOMER`, `ADMIN`뿐이다. |
 | 비회원 방문자 | Unauthenticated visitor | 로그인하지 않은 접근을 뜻한다. 별도의 계정 역할이 아니며 데이터베이스에 행이 없다 (D4). |
 | 계정 ID | Account ID / `users.username` | 유일한 로그인 식별자 (D5). |
-| 영화 | Movie / `movies` | 제목, 장르, 상영 시간, 관람 등급, 줄거리, 개봉일의 6개 승인 속성을 가진 영화 정보 (D5). |
+| 영화 | Movie / `movies` | 제목, 장르, 상영 시간, 관람 등급, 줄거리, 개봉일의 기본 6개 속성과 선택적 포스터 경로(`poster_url`)를 가진 영화 정보 (D5). |
 | 상영관 | Theater room (ROOMS) / `theater_rooms` | 영화를 상영하는 공간. 5개. |
 | 좌석 | Seat / `seats` | 상영관에 고정된 행(A~E)과 번호(1~10)의 위치. 상영관당 50석, 총 250석. |
 | 상영 일정 | Screening (SCREENINGS) / `showtimes` | 영화·상영관·시작 시각·종료 시각·좌석당 가격이 정해진 하나의 상영. |

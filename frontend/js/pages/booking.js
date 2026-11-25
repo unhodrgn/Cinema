@@ -49,6 +49,7 @@ async function main() {
 
   let countdown = null;
   let deadlineChecked = false; // the post-deadline check ran once; do not repeat it forever
+  let isActionInFlight = false;
 
   function stopTimer() {
     if (countdown) {
@@ -64,7 +65,7 @@ async function main() {
     payButton.disabled = true;
     if (deadlineChecked) {
       countdownTimer.textContent = "Time elapsed. Press Pay Now to check the booking status.";
-      payButton.disabled = false;
+      if (!isActionInFlight) payButton.disabled = false;
       return;
     }
     deadlineChecked = true;
@@ -81,20 +82,20 @@ async function main() {
     });
     if (!booking) {
       countdownTimer.textContent = "Time elapsed. The booking status could not be loaded; reload the page.";
-      payButton.disabled = false;
+      if (!isActionInFlight) payButton.disabled = false;
       return;
     }
     render(booking);
     if (booking.status === "EXPIRED") {
       showMessage(messageBox, "error", EXPIRED_TEXT);
-    } else if (stillOpen) {
+    } else if (stillOpen && !isActionInFlight) {
       payButton.disabled = false; // the server still allows payment: let the user try
     }
   }
 
   function startCountdown(expiresAtIso) {
     stopTimer();
-    payButton.disabled = false;
+    payButton.disabled = isActionInFlight;
     countdown = createCountdown({
       expiresAtIso,
       onTick: (text) => {
@@ -169,7 +170,12 @@ async function main() {
   }
 
   payButton.addEventListener("click", async () => {
+    if (isActionInFlight) return;
+    isActionInFlight = true;
     payButton.disabled = true;
+    cancelButton.disabled = true;
+    payButton.setAttribute("aria-busy", "true");
+    payButton.textContent = "Processing…";
     clear(messageBox);
     try {
       const response = await getApi().post(`/api/bookings/${bookingId}/pay`, {});
@@ -183,15 +189,24 @@ async function main() {
       showMessage(messageBox, "error", err.message || "Payment failed.");
       await loadBooking();
     } finally {
+      isActionInFlight = false;
+      payButton.removeAttribute("aria-busy");
+      payButton.textContent = "Pay Now (Simulated)";
       payButton.disabled = false;
+      cancelButton.disabled = false;
     }
   });
 
   cancelButton.addEventListener("click", async () => {
+    if (isActionInFlight) return;
     if (!globalThis.confirm("Are you sure you want to cancel this booking? Released seats will be made available for others.")) {
       return;
     }
+    isActionInFlight = true;
     cancelButton.disabled = true;
+    payButton.disabled = true;
+    cancelButton.setAttribute("aria-busy", "true");
+    cancelButton.textContent = "Cancelling…";
     clear(messageBox);
     try {
       const response = await getApi().post(`/api/bookings/${bookingId}/cancel`, {});
@@ -205,7 +220,11 @@ async function main() {
       showMessage(messageBox, "error", err.message || "Cancellation failed.");
       await loadBooking();
     } finally {
+      isActionInFlight = false;
+      cancelButton.removeAttribute("aria-busy");
+      cancelButton.textContent = "Cancel Booking";
       cancelButton.disabled = false;
+      payButton.disabled = false;
     }
   });
 

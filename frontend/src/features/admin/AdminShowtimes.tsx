@@ -23,12 +23,14 @@ export function AdminShowtimes() {
   const [version, setVersion] = useState(0);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [failed, setFailed] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [removal, setRemoval] = useState<{ text: string; failed: boolean }>();
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     setErrors({});
+    setFailed(false);
     const form = new FormData(event.currentTarget);
     const body = {
       movie_id: Number(form.get("movie_id")),
@@ -45,11 +47,13 @@ export function AdminShowtimes() {
         );
       else await getApi().post("/api/admin/screenings", body);
       setMessage("Screening saved.");
+      setFailed(false);
       setEditing(undefined);
       setVersion((v) => v + 1);
       reload();
     } catch (e) {
       setMessage(errorMessage(e));
+      setFailed(true);
       setErrors((e as { fields?: Record<string, string> }).fields || {});
     } finally {
       setBusy(false);
@@ -96,10 +100,31 @@ export function AdminShowtimes() {
       {m.title}
     </option>
   ));
+  const statusText = error || movies.error || message;
+  const statusFailed = Boolean(error || movies.error) || failed;
+  const fieldKeys = new Set([
+    "movie_id",
+    "room_id",
+    "starts_at",
+    "ends_at",
+    "ticket_price",
+  ]);
+  const extraErrors = Object.entries(errors).filter(
+    ([field]) => !fieldKeys.has(field),
+  );
   return (
     <>
       <h1>Manage Screenings</h1>
-      <p role="status">{error || movies.error || message}</p>
+      {statusText && (
+        <p
+          className={
+            "message " + (statusFailed ? "message-error" : "message-success")
+          }
+          role={statusFailed ? "alert" : "status"}
+        >
+          {statusText}
+        </p>
+      )}
       <section className="card">
         <h2>
           {editing
@@ -111,69 +136,116 @@ export function AdminShowtimes() {
           className="form"
           onSubmit={save}
         >
-          <div className="field">
-            <label htmlFor="screening-movie">Movie</label>
-            <select
-              id="screening-movie"
-              name="movie_id"
-              required
-              defaultValue={editing?.movie_id || ""}
-            >
-              <option value="">Select a movie</option>
-              {options}
-            </select>
+          <div className="form-grid">
+            <div className="field">
+              <label htmlFor="screening-movie">Movie</label>
+              <select
+                id="screening-movie"
+                name="movie_id"
+                required
+                defaultValue={editing?.movie_id || ""}
+                aria-invalid={errors.movie_id ? true : undefined}
+                aria-describedby={
+                  errors.movie_id ? "screening-movie-error" : undefined
+                }
+              >
+                <option value="">Select a movie</option>
+                {options}
+              </select>
+              {errors.movie_id && (
+                <p className="field-error" id="screening-movie-error">
+                  {errors.movie_id}
+                </p>
+              )}
+            </div>
+            <div className="field">
+              <label htmlFor="screening-room">Room</label>
+              <select
+                id="screening-room"
+                name="room_id"
+                required
+                defaultValue={editing?.room_id || ""}
+                aria-invalid={errors.room_id ? true : undefined}
+                aria-describedby={
+                  errors.room_id ? "screening-room-error" : undefined
+                }
+              >
+                <option value="">Select a room</option>
+                {rooms.map((r) => (
+                  <option key={r.room_id} value={r.room_id}>
+                    {r.room_name}
+                  </option>
+                ))}
+              </select>
+              {errors.room_id && (
+                <p className="field-error" id="screening-room-error">
+                  {errors.room_id}
+                </p>
+              )}
+            </div>
+            <div className="field">
+              <label htmlFor="screening-start">Start time</label>
+              <input
+                id="screening-start"
+                type="datetime-local"
+                name="starts_at"
+                required
+                defaultValue={toInputDateTime(editing?.starts_at)}
+                aria-invalid={errors.starts_at ? true : undefined}
+                aria-describedby={
+                  errors.starts_at ? "screening-start-error" : undefined
+                }
+              />
+              {errors.starts_at && (
+                <p className="field-error" id="screening-start-error">
+                  {errors.starts_at}
+                </p>
+              )}
+            </div>
+            <div className="field">
+              <label htmlFor="screening-end">End time</label>
+              <input
+                id="screening-end"
+                type="datetime-local"
+                name="ends_at"
+                defaultValue={toInputDateTime(editing?.ends_at)}
+                aria-invalid={errors.ends_at ? true : undefined}
+                aria-describedby={
+                  errors.ends_at ? "screening-end-error" : undefined
+                }
+              />
+              {errors.ends_at && (
+                <p className="field-error" id="screening-end-error">
+                  {errors.ends_at}
+                </p>
+              )}
+            </div>
+            <div className="field">
+              <label htmlFor="screening-price">Ticket price</label>
+              <input
+                id="screening-price"
+                name="ticket_price"
+                type="number"
+                min="0"
+                step="0.01"
+                required
+                defaultValue={editing?.ticket_price}
+                aria-invalid={errors.ticket_price ? true : undefined}
+                aria-describedby={
+                  errors.ticket_price ? "screening-price-error" : undefined
+                }
+              />
+              {errors.ticket_price && (
+                <p className="field-error" id="screening-price-error">
+                  {errors.ticket_price}
+                </p>
+              )}
+            </div>
           </div>
-          <div className="field">
-            <label htmlFor="screening-room">Room</label>
-            <select
-              id="screening-room"
-              name="room_id"
-              required
-              defaultValue={editing?.room_id || ""}
-            >
-              <option value="">Select a room</option>
-              {rooms.map((r) => (
-                <option key={r.room_id} value={r.room_id}>
-                  {r.room_name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="screening-start">Start time</label>
-            <input
-              id="screening-start"
-              type="datetime-local"
-              name="starts_at"
-              required
-              defaultValue={toInputDateTime(editing?.starts_at)}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="screening-end">End time</label>
-            <input
-              id="screening-end"
-              type="datetime-local"
-              name="ends_at"
-              defaultValue={toInputDateTime(editing?.ends_at)}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="screening-price">Ticket price</label>
-            <input
-              id="screening-price"
-              name="ticket_price"
-              type="number"
-              min="0"
-              step="0.01"
-              required
-              defaultValue={editing?.ticket_price}
-            />
-          </div>
-          {Object.entries(errors).map(([field, text]) => (
-            <span key={field} className="field-error">
+          {extraErrors.map(([field, text]) => (
+            <p key={field} className="field-error">
               {text}
-            </span>
+            </p>
           ))}
           <div className="form-actions">
             <button
@@ -181,7 +253,7 @@ export function AdminShowtimes() {
               disabled={busy || !rooms.length || !movies.data}
             >
               Save Screening
-            </button>{" "}
+            </button>
             {editing && (
               <button
                 type="button"
@@ -191,6 +263,7 @@ export function AdminShowtimes() {
                   setEditing(undefined);
                   setErrors({});
                   setMessage("");
+                  setFailed(false);
                 }}
               >
                 Cancel Edit
@@ -199,98 +272,118 @@ export function AdminShowtimes() {
           </div>
         </form>
       </section>
-      <h2 className="section-gap">Screenings</h2>
-      <div className="toolbar">
-        <label htmlFor="screening-movie-filter">Filter by movie</label>
-        <select
-          id="screening-movie-filter"
-          disabled={busy}
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        >
-          <option value="">All Movies</option>
-          {options}
-        </select>
-      </div>
-      {removal && (
-        <p
-          className={
-            "message " + (removal.failed ? "message-error" : "message-success")
-          }
-          role={removal.failed ? "alert" : "status"}
-        >
-          {removal.text}
-        </p>
-      )}
-      {data && data.screenings.length === 0 && <p>No screenings found.</p>}
-      <div className="table-wrap">
-        <table className="data-table">
-          <thead>
-            <tr>
-              {[
-                "ID",
-                "Movie",
-                "Room",
-                "Screening",
-                "Price",
-                "Status",
-                "Actions",
-              ].map((label) => (
-                <th key={label}>{label}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {data?.screenings.map((s) => {
-              const lock = screeningEditLock(s);
-              return (
-                <tr key={s.showtime_id}>
-                  <td>{s.showtime_id}</td>
-                  <td>{s.title}</td>
-                  <td>{s.room_name}</td>
-                  <td>{formatDateTimeRange(s.starts_at, s.ends_at)}</td>
-                  <td>{formatMoney(s.ticket_price)}</td>
-                  <td>
-                    {s.has_bookings
-                      ? "Has bookings (locked)"
-                      : s.has_started
-                        ? "Started"
-                        : "Editable"}
-                  </td>
-                  <td className="cell-actions">
-                    <button
-                      className="button button-small button-secondary"
-                      disabled={busy || lock.disabled}
-                      title={lock.title || undefined}
-                      onClick={() => {
-                        setEditing(s);
-                        setErrors({});
-                        setMessage("");
-                        window.scrollTo(0, 0);
-                      }}
-                    >
-                      Edit
-                    </button>{" "}
-                    <button
-                      className="button button-small button-danger"
-                      type="button"
-                      disabled={busy || lock.disabled}
-                      title={
-                        lock.disabled
-                          ? "Only upcoming screenings without booking history can be deleted."
-                          : undefined
-                      }
-                      onClick={() => deleteScreening(s)}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <section className="section-gap">
+        <div className="section-head">
+          <h2>Screenings</h2>
+          <div className="toolbar toolbar-flush">
+            <label htmlFor="screening-movie-filter">Filter by movie</label>
+            <select
+              id="screening-movie-filter"
+              disabled={busy}
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            >
+              <option value="">All Movies</option>
+              {options}
+            </select>
+          </div>
+        </div>
+        {removal && (
+          <p
+            className={
+              "message " + (removal.failed ? "message-error" : "message-success")
+            }
+            role={removal.failed ? "alert" : "status"}
+          >
+            {removal.text}
+          </p>
+        )}
+        <div className="card card-flush">
+          {data && data.screenings.length === 0 ? (
+            <p className="muted empty-note">No screenings found.</p>
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    {[
+                      "ID",
+                      "Movie",
+                      "Room",
+                      "Screening",
+                      "Price",
+                      "Status",
+                      "Actions",
+                    ].map((label) => (
+                      <th key={label}>{label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {data?.screenings.map((s) => {
+                    const lock = screeningEditLock(s);
+                    return (
+                      <tr key={s.showtime_id}>
+                        <td>{s.showtime_id}</td>
+                        <td className="cell-strong">{s.title}</td>
+                        <td>{s.room_name}</td>
+                        <td>{formatDateTimeRange(s.starts_at, s.ends_at)}</td>
+                        <td>{formatMoney(s.ticket_price)}</td>
+                        <td>
+                          <div className="badges">
+                            {s.has_bookings ? (
+                              <span className="badge badge-wait">
+                                Has bookings (locked)
+                              </span>
+                            ) : s.has_started ? (
+                              <span className="badge badge-neutral">
+                                Started
+                              </span>
+                            ) : (
+                              <span className="badge badge-ok">Editable</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="cell-actions">
+                          <div className="table-actions">
+                            <button
+                              className="button button-small button-secondary"
+                              disabled={busy || lock.disabled}
+                              title={lock.title || undefined}
+                              onClick={() => {
+                                setEditing(s);
+                                setErrors({});
+                                setMessage("");
+                                setFailed(false);
+                                window.scrollTo(0, 0);
+                              }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="button button-small button-danger"
+                              type="button"
+                              disabled={busy || lock.disabled}
+                              title={
+                                lock.disabled
+                                  ? "Only upcoming screenings without booking history can be deleted."
+                                  : undefined
+                              }
+                              onClick={() => deleteScreening(s)}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
     </>
   );
 }

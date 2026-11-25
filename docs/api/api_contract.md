@@ -9,7 +9,7 @@
 ## 1. Architecture
 
 ```
- Browser ── static files ──────► Frontend server  :8080   frontend/server.py (HTML, CSS, JS only)
+ Browser ── static files ──────► Frontend server  :8080   frontend/server.py (React/Vite dist/, or dist-legacy/)
     │
     └──── JSON over HTTP ──────► Backend API      :5000   Flask, JSON only
                                       │
@@ -19,8 +19,8 @@
 | Layer | Does | Never does |
 |---|---|---|
 | **Frontend** (`frontend/`) | Pages, forms, provisional seat selection, rendering API data as text, holding the token. | Access PostgreSQL, contain SQL or credentials, import backend code, decide a business outcome. |
-| **Backend** (`app/`) | Authentication, authorization, validation, ownership checks, calling the database functions, translating database errors. | Render HTML, serve static files or templates. |
-| **Database** | Schema, constraints, triggers, `create_booking`, `pay_booking`, `cancel_booking`, `expire_overdue_bookings`, every deadline. | Change as part of this work. |
+| **Backend** (`backend/app/`) | Authentication, authorization, validation, ownership checks, calling the database functions, translating database errors. | Render HTML, serve static files or templates. |
+| **Database** (`backend/migrations/`) | Schema, constraints, triggers, `create_booking`, `pay_booking`, `cancel_booking`, `expire_overdue_bookings`, every deadline. | — |
 
 The three layers are separate processes with separate configuration. PostgreSQL is configured for the API only; the frontend device never needs a route to it.
 
@@ -108,7 +108,7 @@ Validation errors add a `fields` object (field name → fixed message):
 | 500 | `internal_error` | Server fault, including bugs the contract marks internal (`UC007`, `UC009`, `23001`) |
 | 503 | `database_unavailable` | The database cannot be reached |
 
-Other HTTP statuses use `http_error` (4xx) or `server_error` (5xx) with a fixed message. The SQLSTATE → `code` mapping is the one in `app/errors.py`, checked against section 6 of the database integration contract by the tests.
+Other HTTP statuses use `http_error` (4xx) or `server_error` (5xx) with a fixed message. The SQLSTATE → `code` mapping is the one in `backend/app/core/errors.py`, checked against section 6 of the database integration contract by the tests.
 
 ## 6. Authentication
 
@@ -171,7 +171,7 @@ Every route declares who may call it, and the application **refuses to start** i
 | `customer` | An authenticated account with role `CUSTOMER` | 401 without a valid token, 403 for `ADMIN` (an administrator is not a booking customer, B03) |
 | `admin` | An authenticated account with role `ADMIN` | 401 without a valid token, 403 for `CUSTOMER` |
 
-For every protected request the server verifies the token's signature and age, then loads the account from PostgreSQL (`app.auth.load_user`): a deleted account answers `401`, and a changed role applies on the very next request. If no user loader is registered the guards **fail closed** (401). The frontend's own hiding of admin pages is a convenience only; the backend is the authority.
+For every protected request the server verifies the token's signature and age, then loads the account from PostgreSQL (`app.api.v1.auth.load_user`): a deleted account answers `401`, and a changed role applies on the very next request. If no user loader is registered the guards **fail closed** (401). The frontend's own hiding of admin pages is a convenience only; the backend is the authority.
 
 ## 8. CORS
 
@@ -229,9 +229,9 @@ The frontend is another origin (another port, or another machine), so browsers e
 
 ### 11.1 Catalog shapes (T3, public: no login, D4)
 
-**Movie** (the six approved attributes, D5, plus the technical key): `movie_id`, `title`, `genre` (nullable), `duration_minutes` (B03 calls it *duration*), `rating` (nullable), `synopsis` (nullable), `release_date` (nullable, `YYYY-MM-DD`). Genre and rating are free text: no vocabulary is approved.
+**Movie** (the six core attributes, D5, optional poster path, plus the technical key): `movie_id`, `title`, `genre` (nullable), `duration_minutes` (B03 calls it *duration*), `rating` (nullable), `synopsis` (nullable), `release_date` (nullable, `YYYY-MM-DD`), `poster_url` (nullable, relative path `/images/posters/<name>.(jpg|png)`). Genre and rating are free text: no vocabulary is approved.
 
-**Screening:** `showtime_id`, `movie_id`, `title`, `room_id`, `room_name`, `starts_at`, `ends_at` (ISO 8601 with offset), `ticket_price` (decimal string, per screening, D6), `has_started` (boolean). `has_started` is computed by the database clock and is a display state only: the rule that a started screening cannot be booked (BR-12) is enforced by the database when a booking is made.
+**Screening:** `showtime_id`, `movie_id`, `title`, `poster_url` (nullable), `room_id`, `room_name`, `starts_at`, `ends_at` (ISO 8601 with offset), `ticket_price` (decimal string, per screening, D6), `has_started` (boolean). `has_started` is computed by the database clock and is a display state only: the rule that a started screening cannot be booked (BR-12) is enforced by the database when a booking is made.
 
 **`GET /api/screenings?movie_id=&date=`** lists the screenings that **start** on one calendar day of the cinema's time zone (`APP_TIMEZONE`, half-open `[00:00, next 00:00)`), ordered by start time then room.
 
@@ -254,7 +254,7 @@ A path id that is not a positive integer, or is larger than the database can hol
 
 **`POST /api/bookings`** creates a booking atomically via database function `create_booking()`.
 * Request body: `{"screening_id": 5, "seat_ids": [1, 2]}`.
-* Validates `screening_id` and non-empty `seat_ids` list.
+* Validates `screening_id`, non-empty unique `seat_ids` list, and that the seat count does not exceed the screening room's seat capacity (maximum 50 seats; otherwise `400 validation_error` with `fields.seat_ids`).
 * Sets `status = 'BOOKED'`, `payment_status = 'UNPAID'`, `expires_at = booked_at + 10 min`, and records price snapshots.
 * Answers `201 {"booking": {...}}`.
 * Fails with `409 seat_unavailable` if any seat is already booked or taken concurrently (`UC002`).
@@ -271,8 +271,8 @@ A path id that is not a positive integer, or is larger than the database can hol
 ### 11.4 Customer booking history and cancellation (T6, customer, C-08, C-09)
 
 **`GET /api/bookings`** returns all bookings belonging to the authenticated customer, running expiry first.
-* Sorted by `booked_at DESC`.
-* Each booking includes `seats: [{seat_id, seat_row, seat_number, price_at_booking}]` if `status == 'BOOKED'`, or `seats: []` if cancelled/expired (D1, D3).
+* Sorted by `booked_at DESC, booking_id DESC`.
+* Each booking includes `poster_url` (nullable) and `seats: [{seat_id, seat_row, seat_number, price_at_booking}]` if `status == 'BOOKED'`, or `seats: []` if cancelled/expired (D1, D3).
 * Answers `200 {"bookings": [...]}`.
 
 **`GET /api/bookings/{id}`** returns a single booking belonging to the customer, running expiry first.
@@ -299,10 +299,10 @@ A path id that is not a positive integer, or is larger than the database can hol
 * Requires `Policy.ADMIN`.
 
 **`POST /api/admin/movies`** creates a new movie.
-* Request body: `{"title": "...", "duration_minutes": 120, "genre": "...", "rating": "...", "synopsis": "...", "release_date": "YYYY-MM-DD"}`.
+* Request body: `{"title": "...", "duration_minutes": 120, "genre": "...", "rating": "...", "synopsis": "...", "release_date": "YYYY-MM-DD", "poster_url": "/images/posters/..."}`.
 * `title` (1..200 chars) and `duration_minutes` (1..300 integer) are required.
 * `genre` (text up to 100 chars, free text, D5) and `rating` (text up to 50 chars, free text, D5) are optional/nullable.
-* `synopsis` (text) and `release_date` (exactly `YYYY-MM-DD`, a real date; `20261120` is refused) are optional/nullable.
+* `synopsis` (text), `release_date` (exactly `YYYY-MM-DD`, a real date; `20261120` is refused), and `poster_url` (relative path matching `/images/posters/[A-Za-z0-9][A-Za-z0-9._-]*\.(jpg|png)`, max 255 chars) are optional/nullable.
 * Text is trimmed; a blank optional value is stored as `null`.
 * Answers `201 {"movie": {...}}`.
 * Requires `Policy.ADMIN`.

@@ -12,8 +12,10 @@ The original sections cover baseline `0001_baseline.sql` and `backend/seeds/demo
 
 | File | Kind | Content |
 |---|---|---|
-| `database/tests/run_all.sh` | runner | schema → seed → integrity → probes → concurrency on a disposable DB |
-| `backend/tests/sql/integrity_tests.sql` | SQL, one rolled-back transaction | 177 checks: seed, D1–D6, DB-02/03, seats, rollback, constraints, trigger-order regression |
+| `database/tests/run_all.sh` | legacy wrapper | forwards to `backend/tests/run_database.py` |
+| `backend/tests/run_database.py` | runner | migrations `0001`+`0003`+`0004` → seed → `money_domain.sql` → `integrity_tests.sql` → `reconciliation_probes.sql` → `test_booking_concurrency.py` on a disposable DB |
+| `backend/tests/sql/money_domain.sql` | SQL, rolled back | catalog checks and finite-money domain checks (`0004`) |
+| `backend/tests/sql/integrity_tests.sql` | SQL, one rolled-back transaction | checks for seed, D1–D6, DB-02/03, seats, rollback, constraints, trigger-order regression |
 | `backend/tests/sql/reconciliation_probes.sql` | SQL, rolled back | 31 probes with the audit's P-numbers; fails on any MISMATCH |
 | `backend/tests/test_booking_concurrency.py` | Python (psycopg2), real sessions | 16 checks, scenarios C1–C6 |
 
@@ -68,8 +70,7 @@ The new integrity suite also fails against Member A's original schema (`column s
 
 * These historical results used PostgreSQL 18.6; the baseline uses features available in 14 (identity columns, EXCLUDE with `btree_gist`, constraint triggers, `FOR UPDATE SKIP LOCKED`).
 * The exact-deadline checks use the functions' optional `p_as_of` argument (tests only); real-clock behaviour is covered by the 1.5-second pre-deadline payment, the post-deadline payments and the timed race C4.
-* Flask-level behaviour (sessions, authorisation, registration role, request-time expiry calls) is application scope and is **not** tested here.
-* Demo account passwords are unverified (see the contract §7); no login was tested.
+* Flask-level behaviour (sessions, authorisation, registration role, request-time expiry calls, demo account login) is covered by the pytest suite under `backend/tests/` and Playwright E2E tests under `frontend/e2e/`, not by the SQL-only suite above. Demo account credentials are documented in the root `README.md` and `backend/seeds/demo.sql`.
 
 ## 0003–0004 회귀 및 시연
 

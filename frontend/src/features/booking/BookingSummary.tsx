@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   formatDateTime,
   formatDateTimeRange,
@@ -7,7 +8,13 @@ import { seatLabel } from "../../../js/seats.js";
 import { Poster } from "../movies/MovieCard";
 import type { Booking } from "../../types/cinema";
 
-export function BookingSummary({ booking: b }: { booking: Booking }) {
+export function BookingSummary({
+  booking: b,
+  children,
+}: {
+  booking: Booking;
+  children?: ReactNode;
+}) {
   return (
     <article className="card booking-detail">
       <Poster title={b.title} url={b.poster_url} size="sm" />
@@ -58,6 +65,7 @@ export function BookingSummary({ booking: b }: { booking: Booking }) {
             </>
           )}
         </dl>
+        {children}
       </div>
     </article>
   );

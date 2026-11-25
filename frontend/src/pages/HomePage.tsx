@@ -27,7 +27,7 @@ function Times({
   screenings: Showtime[];
   titles?: boolean;
 }) {
-  if (!screenings.length) return <p>No screenings today.</p>;
+  if (!screenings.length) return <p className="muted">No screenings today.</p>;
   return (
     <ul className={titles ? "chip-list chip-list-stacked" : "chip-list"}>
       {screenings.map((s) => (
@@ -100,7 +100,8 @@ export function HomePage() {
       </div>
       <div className="section-head">
         <h2>
-          Today by hall <small>{schedule.data.date}</small>
+          Today by hall{" "}
+          <span className="muted">{schedule.data.date}</span>
         </h2>
         <a href="/screenings.html">Full schedule</a>
       </div>

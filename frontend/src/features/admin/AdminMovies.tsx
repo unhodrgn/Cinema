@@ -5,13 +5,13 @@ import { errorMessage } from "../../services/apiClient";
 import type { Movie } from "../../types/cinema";
 
 const fields = [
-  ["title", "Title", "text"],
-  ["duration_minutes", "Running time (minutes)", "number"],
-  ["genre", "Genre", "text"],
-  ["rating", "Rating", "text"],
-  ["release_date", "Release date", "date"],
-  ["poster_url", "Poster path", "text"],
-  ["synopsis", "Synopsis", "textarea"],
+  ["title", "Title", "text", true],
+  ["duration_minutes", "Running time (minutes)", "number", false],
+  ["release_date", "Release date", "date", false],
+  ["genre", "Genre", "text", false],
+  ["rating", "Rating", "text", false],
+  ["poster_url", "Poster path", "text", true],
+  ["synopsis", "Synopsis", "textarea", true],
 ] as const;
 export function AdminMovies() {
   const { data, error, reload } = useResource<{ movies: Movie[] }>(
@@ -20,6 +20,7 @@ export function AdminMovies() {
   const [editing, setEditing] = useState<Movie>();
   const [version, setVersion] = useState(0);
   const [message, setMessage] = useState("");
+  const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [removal, setRemoval] = useState<{ text: string; failed: boolean }>();
@@ -36,16 +37,19 @@ export function AdminMovies() {
     );
     setBusy(true);
     setErrors({});
+    setFailed(false);
     try {
       if (editing)
         await getApi().put("/api/admin/movies/" + editing.movie_id, body);
       else await getApi().post("/api/admin/movies", body);
       setMessage("Movie saved.");
+      setFailed(false);
       setEditing(undefined);
       setVersion((v) => v + 1);
       reload();
     } catch (e) {
       setMessage(errorMessage(e));
+      setFailed(true);
       setErrors((e as { fields?: Record<string, string> }).fields || {});
     } finally {
       setBusy(false);
@@ -79,10 +83,21 @@ export function AdminMovies() {
     }
   }
 
+  const statusText = error || message;
+  const statusFailed = Boolean(error) || failed;
   return (
     <>
       <h1>Manage Movies</h1>
-      <p role="status">{error || message}</p>
+      {statusText && (
+        <p
+          className={
+            "message " + (statusFailed ? "message-error" : "message-success")
+          }
+          role={statusFailed ? "alert" : "status"}
+        >
+          {statusText}
+        </p>
+      )}
       <section className="card">
         <h2>{editing ? "Edit Movie #" + editing.movie_id : "Add New Movie"}</h2>
         <form
@@ -90,39 +105,45 @@ export function AdminMovies() {
           className="form"
           onSubmit={save}
         >
-          {fields.map(([name, label, type]) => (
-            <div className="field" key={name}>
-              <label htmlFor={name}>{label}</label>
-              {type === "textarea" ? (
-                <textarea
-                  id={name}
-                  name={name}
-                  defaultValue={editing?.[name] || ""}
-                  aria-invalid={errors[name] ? true : undefined}
-                  aria-describedby={errors[name] ? name + "-error" : undefined}
-                />
-              ) : (
-                <input
-                  id={name}
-                  name={name}
-                  type={type}
-                  defaultValue={editing?.[name] ?? ""}
-                  required={name === "title" || type === "number"}
-                  aria-invalid={errors[name] ? true : undefined}
-                  aria-describedby={errors[name] ? name + "-error" : undefined}
-                />
-              )}
-              {errors[name] && (
-                <p className="field-error" id={name + "-error"}>
-                  {errors[name]}
-                </p>
-              )}
-            </div>
-          ))}
+          <div className="form-grid">
+            {fields.map(([name, label, type, full]) => (
+              <div
+                className={full ? "field field-full" : "field"}
+                key={name}
+              >
+                <label htmlFor={name}>{label}</label>
+                {type === "textarea" ? (
+                  <textarea
+                    id={name}
+                    name={name}
+                    rows={3}
+                    defaultValue={editing?.[name] || ""}
+                    aria-invalid={errors[name] ? true : undefined}
+                    aria-describedby={errors[name] ? name + "-error" : undefined}
+                  />
+                ) : (
+                  <input
+                    id={name}
+                    name={name}
+                    type={type}
+                    defaultValue={editing?.[name] ?? ""}
+                    required={name === "title" || type === "number"}
+                    aria-invalid={errors[name] ? true : undefined}
+                    aria-describedby={errors[name] ? name + "-error" : undefined}
+                  />
+                )}
+                {errors[name] && (
+                  <p className="field-error" id={name + "-error"}>
+                    {errors[name]}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
           <div className="form-actions">
             <button className="button" disabled={busy}>
               Save Movie
-            </button>{" "}
+            </button>
             {editing && (
               <button
                 type="button"
@@ -132,6 +153,7 @@ export function AdminMovies() {
                   setEditing(undefined);
                   setErrors({});
                   setMessage("");
+                  setFailed(false);
                 }}
               >
                 Cancel Edit
@@ -140,70 +162,81 @@ export function AdminMovies() {
           </div>
         </form>
       </section>
-      <h2 className="section-gap">All Movies</h2>
-      {removal && (
-        <p
-          className={
-            "message " + (removal.failed ? "message-error" : "message-success")
-          }
-          role={removal.failed ? "alert" : "status"}
-        >
-          {removal.text}
-        </p>
-      )}
-      <div className="table-wrap">
-        <table className="data-table">
-          <thead>
-            <tr>
-              {[
-                "ID",
-                "Title",
-                "Genre",
-                "Running time",
-                "Rating",
-                "Release date",
-                "Actions",
-              ].map((label) => (
-                <th key={label}>{label}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {data?.movies.map((m) => (
-              <tr key={m.movie_id}>
-                <td>{m.movie_id}</td>
-                <td>{m.title}</td>
-                <td>{m.genre}</td>
-                <td>{m.duration_minutes} min</td>
-                <td>{m.rating}</td>
-                <td>{m.release_date}</td>
-                <td className="cell-actions">
-                  <button
-                    className="button button-small button-secondary"
-                    disabled={busy}
-                    onClick={() => {
-                      setEditing(m);
-                      setErrors({});
-                      setMessage("");
-                      window.scrollTo(0, 0);
-                    }}
-                  >
-                    Edit
-                  </button>{" "}
-                  <button
-                    className="button button-small button-danger"
-                    disabled={busy}
-                    type="button"
-                    onClick={() => deleteMovie(m)}
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <section className="section-gap">
+        <h2>All Movies</h2>
+        {removal && (
+          <p
+            className={
+              "message " + (removal.failed ? "message-error" : "message-success")
+            }
+            role={removal.failed ? "alert" : "status"}
+          >
+            {removal.text}
+          </p>
+        )}
+        <div className="card card-flush">
+          {data && data.movies.length === 0 ? (
+            <p className="muted empty-note">No movies registered yet.</p>
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    {[
+                      "ID",
+                      "Title",
+                      "Genre",
+                      "Running time",
+                      "Rating",
+                      "Release date",
+                      "Actions",
+                    ].map((label) => (
+                      <th key={label}>{label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {data?.movies.map((m) => (
+                    <tr key={m.movie_id}>
+                      <td>{m.movie_id}</td>
+                      <td className="cell-strong">{m.title}</td>
+                      <td>{m.genre || "-"}</td>
+                      <td>{m.duration_minutes} min</td>
+                      <td>{m.rating || "-"}</td>
+                      <td>{m.release_date || "-"}</td>
+                      <td className="cell-actions">
+                        <div className="table-actions">
+                          <button
+                            className="button button-small button-secondary"
+                            disabled={busy}
+                            onClick={() => {
+                              setEditing(m);
+                              setErrors({});
+                              setMessage("");
+                              setFailed(false);
+                              window.scrollTo(0, 0);
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="button button-small button-danger"
+                            disabled={busy}
+                            type="button"
+                            onClick={() => deleteMovie(m)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
     </>
   );
 }

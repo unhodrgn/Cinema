@@ -1,5 +1,7 @@
 from app.core.errors import ValidationError
 
+MAX_SEATS_PER_BOOKING = 50
+
 
 def booking_request(body):
     problems = {}
@@ -13,6 +15,8 @@ def booking_request(body):
     raw_seats = body.get("seat_ids")
     if not isinstance(raw_seats, list) or len(raw_seats) == 0:
         problems["seat_ids"] = "At least one seat must be selected."
+    elif len(raw_seats) > MAX_SEATS_PER_BOOKING:
+        problems["seat_ids"] = f"Cannot book more than {MAX_SEATS_PER_BOOKING} seats in a single booking."
     else:
         seat_ids = []
         has_invalid = False

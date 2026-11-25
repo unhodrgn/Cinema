@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { BookingSummary } from "../features/booking/BookingSummary";
 import { RequireUser } from "../components/common/Navbar";
 import { useResource } from "../hooks/useResource";
@@ -10,28 +10,47 @@ function History() {
     "/api/bookings",
   );
   const [message, setMessage] = useState("");
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const inFlight = useRef(false);
   async function cancel(id: number) {
-    if (!confirm("Are you sure you want to cancel this booking?")) return;
+    if (
+      inFlight.current ||
+      !confirm("Are you sure you want to cancel this booking?")
+    )
+      return;
+    inFlight.current = true;
+    setCancellingId(id);
+    setMessage("");
     try {
       await post("/api/bookings/" + id + "/cancel");
       reload();
     } catch (e) {
       setMessage(errorMessage(e));
+    } finally {
+      inFlight.current = false;
+      setCancellingId(null);
     }
   }
   return (
     <>
       <h1>My Bookings</h1>
-      <p role="status">{error || message}</p>
+      {(error || message) && (
+        <p
+          className={error ? "message message-error" : "message message-info"}
+          role={error ? "alert" : "status"}
+        >
+          {error || message}
+        </p>
+      )}
+      {!data && !error && <p role="status">Loading bookings…</p>}
       {data && !data.bookings.length && (
-        <p>
+        <p className="card muted">
           You have no bookings yet.{" "}
           <a href="/screenings.html">Browse screening schedule</a>
         </p>
       )}
       {data?.bookings.map((b) => (
-        <section key={b.booking_id}>
-          <BookingSummary booking={b} />
+        <BookingSummary key={b.booking_id} booking={b}>
           <div className="booking-actions">
             <a
               className="button button-secondary"
@@ -47,13 +66,15 @@ function History() {
             {b.status === "BOOKED" && Date.parse(b.starts_at) > Date.now() && (
               <button
                 className="button button-danger"
+                disabled={cancellingId !== null}
+                aria-busy={cancellingId === b.booking_id || undefined}
                 onClick={() => cancel(b.booking_id)}
               >
-                Cancel
+                {cancellingId === b.booking_id ? "Cancelling…" : "Cancel"}
               </button>
             )}
           </div>
-        </section>
+        </BookingSummary>
       ))}
     </>
   );
