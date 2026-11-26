@@ -1,4 +1,4 @@
-"""Upgrade migration tests (0001 -> 0003 -> 0004), check_schema preflight, and lock timeout handling.
+"""Upgrade migration tests (0001 -> 0003 -> 0004 -> 0005), check_schema preflight, and lock timeout handling.
 
 Runs strictly against disposable PostgreSQL databases created and dropped by this module.
 """
@@ -19,6 +19,7 @@ MIGRATIONS = disposable_db.BACKEND_DIR / "migrations"
 M0001 = MIGRATIONS / "0001_baseline.sql"
 M0003 = MIGRATIONS / "0003_booking_integrity.sql"
 M0004 = MIGRATIONS / "0004_finite_money.sql"
+M0005 = MIGRATIONS / "0005_username_case_insensitive.sql"
 
 
 def _create_db(postgres_settings, sql_files):
@@ -44,6 +45,7 @@ def test_upgrade_0001_to_0003_to_0004_preserves_history_and_passes_check_schema(
                 assert any("booking_seats_showtime_seat_key" in item for item in missing_before)
                 assert any("showtimes_ticket_price_finite" in item for item in missing_before)
                 assert any("numeric(12,2)" in item for item in missing_before)
+                assert any("users_username_lower_key" in item for item in missing_before)
 
             with conn.cursor() as cur:
                 cur.execute(
@@ -68,6 +70,7 @@ def test_upgrade_0001_to_0003_to_0004_preserves_history_and_passes_check_schema(
 
         db.apply_sql_file(M0003)
         db.apply_sql_file(M0004)
+        db.apply_sql_file(M0005)
 
         conn = db.connect()
         try:
@@ -173,6 +176,45 @@ def test_migration_0004_aborts_with_23514_on_non_finite_money(postgres_settings)
                     "WHERE conname = 'showtimes_ticket_price_finite'"
                 )
                 assert cur.fetchone()[0] == 0
+        finally:
+            conn.close()
+    finally:
+        db.drop()
+
+
+@pytest.mark.parametrize(
+    "bad_usernames, sqlstate",
+    [
+        (("Customer1",), "23505"),  # differs from the seeded 'customer1' only by case
+        ((" padded ",), "23514"),  # leading/trailing spaces: could never be typed at login
+        (("ａｄｍｉｎ2",), "23514"),  # full-width letters: not NFKC
+    ],
+)
+def test_migration_0005_aborts_without_touching_data_when_account_ids_break_the_rule(
+    postgres_settings, bad_usernames, sqlstate
+):
+    db = _create_db(postgres_settings, (M0001, M0003, M0004, disposable_db.SEED_PATH))
+    try:
+        conn = db.connect()
+        try:
+            with conn.cursor() as cur:
+                for name in bad_usernames:
+                    cur.execute("INSERT INTO users(username, password_hash) VALUES (%s, 'x')", (name,))
+                cur.execute("SELECT count(*) FROM users")
+                users_before = cur.fetchone()[0]
+            conn.commit()
+
+            with pytest.raises(psycopg2.Error) as excinfo:
+                with conn.cursor() as cur:
+                    cur.execute(M0005.read_text(encoding="utf-8"))
+            assert excinfo.value.pgcode == sqlstate
+            conn.rollback()
+
+            with conn.cursor() as cur:
+                cur.execute("SELECT count(*) FROM pg_indexes WHERE indexname = 'users_username_lower_key'")
+                assert cur.fetchone()[0] == 0
+                cur.execute("SELECT count(*) FROM users")
+                assert cur.fetchone()[0] == users_before
         finally:
             conn.close()
     finally:

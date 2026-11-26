@@ -87,6 +87,14 @@ test("safeNext keeps only a plain or percent-encoded query and drops anything el
   }
 });
 
+test("safeNext keeps a multi-seat selection when the comma is percent-encoded (seats -> login -> back)", () => {
+  const next = "/seats.html?screening_id=264&selected=" + encodeURIComponent("1,2,3");
+  assert.equal(safeNext(next), next);
+  assert.equal(new URLSearchParams(safeNext(next).split("?")[1]).get("selected"), "1,2,3");
+  // A raw comma is still refused: the allow-list is not widened.
+  assert.equal(safeNext("/seats.html?screening_id=264&selected=1,2"), "/seats.html");
+});
+
 test("loginUrl carries next only when it is a known page other than home", () => {
   assert.equal(loginUrl("/"), "/login.html");
   assert.equal(loginUrl("https://evil.example"), "/login.html");

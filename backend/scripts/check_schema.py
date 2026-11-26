@@ -1,4 +1,4 @@
-"""Read-only preflight for an existing PostgreSQL database against migrations 0001, 0003 and 0004."""
+"""Read-only preflight for an existing PostgreSQL database against migrations 0001, 0003, 0004 and 0005."""
 from pathlib import Path
 import re
 
@@ -14,6 +14,7 @@ MIGRATION_0003_CONSTRAINTS = (
     "booking_seats_showtime_seat_key",
 )
 MIGRATION_0003_TRIGGERS = ("trg_bookings_z_version_showtime",)
+MIGRATION_0005_INDEXES = ("users_username_lower_key",)
 MIGRATION_0004_FINITE_CHECKS = (
     "showtimes_ticket_price_finite",
     "bookings_total_amount_finite",
@@ -73,6 +74,10 @@ def missing_objects(cursor):
     if not cursor.fetchone():
         missing.append("column booking_seats.showtime_id NOT NULL")
 
+    for name in MIGRATION_0005_INDEXES:
+        if name not in found_by_kind["index"]:
+            missing.append(f"index {name}")
+
     cursor.execute("SELECT 1 FROM pg_extension WHERE extname='btree_gist'")
     if not cursor.fetchone():
         missing.append("extension btree_gist")
@@ -95,7 +100,7 @@ def main():
         if missing:
             print("Missing or incompatible schema objects:", ", ".join(missing))
             return 1
-        print("Schema inventory (0001-0004) present. Compare schema definitions and grants on a restored copy before adoption.")
+        print("Schema inventory (0001-0005) present. Compare schema definitions and grants on a restored copy before adoption.")
         return 0
     finally:
         connection.close()

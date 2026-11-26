@@ -58,7 +58,7 @@ export function BookingPage() {
             "/seats.html?screening_id=" +
               id +
               "&selected=" +
-              formatSelectedSeats(seatIds),
+              encodeURIComponent(formatSelectedSeats(seatIds)),
           ),
         );
         return;

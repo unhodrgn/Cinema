@@ -1,6 +1,6 @@
 # PostgreSQL cho Cinema
 
-Schema hiện tại gồm [baseline 0001](../backend/migrations/0001_baseline.sql) cùng [migration 0003](../backend/migrations/0003_booking_integrity.sql) và [migration 0004](../backend/migrations/0004_finite_money.sql). Migration 0002 cấp quyền cho role runtime nếu dùng role đó. [Seed demo](../backend/seeds/demo.sql) và [quyền cho volume Compose mới](../backend/migrations/compose-role.sql) có vòng đời riêng. PostgreSQL cần extension `btree_gist`. Phiên bản dùng để kiểm chứng migration là PostgreSQL 18.
+Schema hiện tại gồm [baseline 0001](../backend/migrations/0001_baseline.sql) cùng [migration 0003](../backend/migrations/0003_booking_integrity.sql) [migration 0004](../backend/migrations/0004_finite_money.sql) và [migration 0005](../backend/migrations/0005_username_case_insensitive.sql). Migration 0002 cấp quyền cho role runtime nếu dùng role đó. [Seed demo](../backend/seeds/demo.sql) và [quyền cho volume Compose mới](../backend/migrations/compose-role.sql) có vòng đời riêng. PostgreSQL cần extension `btree_gist`. Phiên bản dùng để kiểm chứng migration là PostgreSQL 18.
 
 ## Tạo database mới
 
@@ -11,6 +11,7 @@ createdb cinema_demo
 psql -X -v ON_ERROR_STOP=1 -d cinema_demo -f backend/migrations/0001_baseline.sql
 psql -X -v ON_ERROR_STOP=1 -d cinema_demo -f backend/migrations/0003_booking_integrity.sql
 psql -X -v ON_ERROR_STOP=1 -d cinema_demo -f backend/migrations/0004_finite_money.sql
+psql -X -v ON_ERROR_STOP=1 -d cinema_demo -f backend/migrations/0005_username_case_insensitive.sql
 psql -X -v ON_ERROR_STOP=1 -d cinema_demo -f backend/seeds/demo.sql
 ```
 
@@ -29,7 +30,7 @@ docker compose exec -T db pg_dump -Fc -U cinema_owner -d cinema > cinema_pre_upg
 docker compose exec -T db pg_dumpall --globals-only --no-role-passwords -U cinema_owner > cinema_globals.sql
 ```
 
-3. Trên bản sao đã restore, chạy `python -m scripts.check_schema` từ `backend/` (phiên `readonly=True`) để kiểm tra bảng, hàm, trigger đang bật, index, constraint (gồm `0003` và `0004`), kiểu `bookings.total_amount numeric(12,2)`, `booking_seats.showtime_id NOT NULL`, extension `btree_gist` và cột `movies.poster_url`.
+3. Trên bản sao đã restore, chạy `python -m scripts.check_schema` từ `backend/` (phiên `readonly=True`) để kiểm tra bảng, hàm, trigger đang bật, index, constraint (gồm `0003`, `0004` và index `users_username_lower_key` của `0005`), kiểu `bookings.total_amount numeric(12,2)`, `booking_seats.showtime_id NOT NULL`, extension `btree_gist` và cột `movies.poster_url`.
 4. Đối chiếu định nghĩa bằng `pg_dump --schema-only --no-owner --no-privileges` giữa bản sao và một DB mới dựng từ cùng chuỗi migration trên cùng major version. Ngoài ra, **so sánh riêng grants của role runtime**, **constraints (`convalidated = true`)** và **fingerprint/số dòng** của 7 bảng trước và sau nâng cấp:
 
 ```sql
@@ -64,8 +65,9 @@ UNION ALL SELECT 'booking_seats', count(*), COALESCE(sum(price_at_booking), 0) F
 ```
 
 5. **Phân nhánh áp migration bằng owner (`cinema_owner`):**
-   - Nếu DB đang ở `0002` (chưa có `0003`): áp `0003_booking_integrity.sql` rồi `0004_finite_money.sql`.
-   - Nếu DB đã ở `0003`: chỉ áp `0004_finite_money.sql`.
+   - Nếu DB đang ở `0002` (chưa có `0003`): áp `0003_booking_integrity.sql`, `0004_finite_money.sql` rồi `0005_username_case_insensitive.sql`.
+   - Nếu DB đã ở `0003`: áp `0004_finite_money.sql` rồi `0005_username_case_insensitive.sql`.
+   - Nếu DB đã ở `0004`: chỉ áp `0005_username_case_insensitive.sql`.
    - Không bao giờ chạy lại `0001_baseline.sql` hoặc `backend/seeds/demo.sql` trên dữ liệu có sẵn.
 
 ## Quyền xóa phim trên database hiện hữu
@@ -102,6 +104,14 @@ docker compose exec -T db psql -X -v ON_ERROR_STOP=1 -U cinema_owner -d cinema <
 PowerShell dùng `Get-Content -Raw backend/migrations/0004_finite_money.sql |` rồi cùng lệnh `docker compose exec`. Với PostgreSQL tự quản lý dùng `psql -X -v ON_ERROR_STOP=1 -d <database> -f backend/migrations/0004_finite_money.sql`. File tự kiểm dữ liệu dưới khóa và dừng với 23514, báo số hàng theo từng bảng nếu gặp NaN, Infinity hoặc -Infinity. Không tự sửa dữ liệu. Nếu 0003 vừa commit và 0004 dừng, DB vẫn ở 0003.
 
 Trước khi mở writer, xác nhận ba constraint `showtimes_ticket_price_finite`, `bookings_total_amount_finite`, `booking_seats_price_at_booking_finite` đều có `convalidated = true`. Đối chiếu booking/seat history với trước migration, gọi `/health` và `/health/db`, rồi chạy smoke catalog, đặt/thanh toán/hủy trên suất được phép. Nếu cần phục hồi sau commit, dừng writer và restore trên cluster khác trước khi chuyển kết nối được duyệt. Không reset volume hay hạ precision.
+
+## Tên đăng nhập không phân biệt hoa/thường (0005)
+
+API lưu tên đăng nhập ở dạng NFKC đã cắt khoảng trắng hai đầu và so trùng không phân biệt hoa/thường (`Customer1`, ` customer1 ` và `ｃｕｓｔｏｍｅｒ１` là cùng tài khoản với `customer1`). `0005_username_case_insensitive.sql` thêm unique index `users_username_lower_key` trên `lower(username)`. File tự kiểm dữ liệu dưới khóa và dừng, không sửa dữ liệu: `23505` nếu có hai tên chỉ khác chữ hoa/thường, `23514` nếu có tên còn khoảng trắng hai đầu hoặc chưa ở dạng NFKC (tên đó sẽ không thể gõ lại khi đăng nhập). Câu truy vấn đối soát nằm trong HINT của lỗi.
+
+```sh
+docker compose exec -T db psql -X -v ON_ERROR_STOP=1 -U cinema_owner -d cinema < backend/migrations/0005_username_case_insensitive.sql
+```
 
 ## Kiểm chứng độc lập
 

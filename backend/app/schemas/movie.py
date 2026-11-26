@@ -71,6 +71,11 @@ def validate_movie_input(body):
             if poster_url and (len(poster_url) > 255 or not POSTER_PATH.fullmatch(poster_url)):
                 problems["poster_url"] = POSTER_PROBLEM
 
+    # PostgreSQL cannot store NUL (0x00); psycopg2 would raise ValueError -> HTTP 500.
+    for name, value in (("title", title), ("genre", genre), ("rating", rating), ("synopsis", synopsis)):
+        if name not in problems and isinstance(value, str) and "\x00" in value:
+            problems[name] = "Text must not contain NUL (0x00) characters."
+
     if problems:
         raise ValidationError(problems)
 

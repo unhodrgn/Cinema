@@ -13,6 +13,8 @@ Business rules (B03 C-01, CM-01, CM-02; D4, D5):
 Passwords, hashes and tokens are never logged and never returned.
 """
 
+import unicodedata
+
 import psycopg2
 from flask import Blueprint, g, jsonify
 
@@ -42,6 +44,14 @@ def has_control_characters(text):
     """True if ``text`` contains an ASCII control character (including NUL, which
     PostgreSQL cannot store)."""
     return any(ord(character) < 32 or ord(character) == 127 for character in text)
+
+
+def normalize_username(value):
+    """The canonical account ID: NFKC (full-width letters and compatibility forms become plain
+    ones) with leading and trailing whitespace removed. Uniqueness and login then compare it
+    ignoring case (``users_username_lower_key``). Non-text values are returned unchanged for
+    the validators to reject."""
+    return unicodedata.normalize("NFKC", value).strip() if isinstance(value, str) else value
 
 
 def check_username(value):
@@ -75,7 +85,7 @@ def _credential_fields(body, for_registration):
     ``user_id``, ...) is ignored. For login the password length is not validated here: a
     too-long password simply cannot match (see ``login``).
     """
-    username, password = body.get("username"), body.get("password")
+    username, password = normalize_username(body.get("username")), body.get("password")
     if for_registration:
         problems = {"username": check_username(username), "password": check_password(password)}
     else:
@@ -125,7 +135,8 @@ def register():
             )
             row = cur.fetchone()
     except psycopg2.errors.UniqueViolation:
-        # The only unique column besides the generated key is username (BR: unique account ID).
+        # The only unique constraints besides the generated key are on username (BR: unique
+        # account ID, compared ignoring case).
         raise AppError(
             SQLSTATE_ERRORS["23505"], fields={"username": "This account ID is already in use."}
         ) from None
@@ -143,7 +154,7 @@ def login():
     if len(username) <= USERNAME_MAX_LENGTH and "\x00" not in username:
         with transaction() as cur:
             cur.execute(
-                "SELECT user_id, username, password_hash, role FROM users WHERE username = %s",
+                "SELECT user_id, username, password_hash, role FROM users WHERE lower(username) = lower(%s)",
                 (username,),
             )
             row = cur.fetchone()

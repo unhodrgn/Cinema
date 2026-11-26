@@ -194,7 +194,7 @@ async function main() {
       if (failed) return;
 
       const seatIds = Array.from(selectedSeats);
-      const returnDestination = `/seats.html?screening_id=${screeningId}&selected=${formatSelectedSeats(seatIds)}`;
+      const returnDestination = `/seats.html?screening_id=${screeningId}&selected=${encodeURIComponent(formatSelectedSeats(seatIds))}`;
 
       if (!user) {
         // Provisional seat selection preserved across login

@@ -20,6 +20,7 @@ services:
       - ./backend/migrations/0002_movie_delete_permissions.sql:/docker-entrypoint-initdb.d/30-movie-delete-permissions.sql:ro
       - ./backend/migrations/0003_booking_integrity.sql:/docker-entrypoint-initdb.d/40-booking-integrity.sql:ro
       - ./backend/migrations/0004_finite_money.sql:/docker-entrypoint-initdb.d/50-finite-money.sql:ro
+      - ./backend/migrations/0005_username_case_insensitive.sql:/docker-entrypoint-initdb.d/60-username-case-insensitive.sql:ro
       - ./backend/seeds/demo.sql:/opt/cinema/demo.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U cinema_owner -d cinema && psql -U cinema_owner -d cinema -Atqc \"SELECT EXISTS (SELECT FROM pg_roles WHERE rolname='cinema_api')\" | grep -qx t"]

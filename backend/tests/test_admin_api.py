@@ -386,6 +386,18 @@ def test_update_movie_validates_like_create_and_keeps_the_old_data(admin):
     assert admin.get(f"/api/admin/movies/{created['movie_id']}").get_json()["movie"]["title"] == "Keep me"
 
 
+@pytest.mark.parametrize("field", ["title", "genre", "rating", "synopsis"])
+def test_movie_text_with_a_nul_character_is_a_400_not_a_500(admin, field):
+    # PostgreSQL cannot store 0x00; this used to reach psycopg2 and answer 500 internal_error.
+    body = movie_body()
+    body[field] = "a\x00b"
+    response = admin.post("/api/admin/movies", body)
+    assert response.status_code == 400
+    assert field in error_of(response)["fields"]
+    created = admin.post("/api/admin/movies", movie_body()).get_json()["movie"]
+    assert admin.put(f"/api/admin/movies/{created['movie_id']}", body).status_code == 400
+
+
 def test_editing_a_movie_with_booked_screenings_is_allowed(admin, customer):
     # Only the screening is protected by D2 (no movie-duration lock exists: decision log).
     movie = admin.post("/api/admin/movies", movie_body(title="Booked movie", duration_minutes=100)).get_json()["movie"]

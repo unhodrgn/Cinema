@@ -10,7 +10,7 @@
 | 컬럼 | 타입 | NULL | 기본값 | 제약 / 설명 |
 |---|---|---|---|---|
 | `user_id` | bigint | N | identity | PK |
-| `username` | varchar(60) | N | | UNIQUE. 계정 ID (D5) |
+| `username` | varchar(60) | N | | UNIQUE 및 `lower(username)` 고유 인덱스(대소문자 무시, 0005). 계정 ID (D5) |
 | `password_hash` | text | N | | 일방향 해시만 저장 (D5) |
 | `role` | varchar(10) | N | `'CUSTOMER'` | CHECK ∈ {`CUSTOMER`,`ADMIN`}. `GUEST` 없음 (D4) |
 | `created_at` | timestamptz | N | `now()` | 기술 컬럼 |

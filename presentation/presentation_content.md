@@ -2,8 +2,9 @@
 
 **Tên dự án:** 영화관 예매 및 좌석 관리 시스템 (Hệ thống Đặt vé & Quản lý Ghế Rạp chiếu phim — Cinema Reservation System)  
 **Thời lượng mục tiêu:** 15 phút thuyết trình + 5–10 phút hỏi đáp (Q&A)  
-**Đối tượng tham gia:** Thành viên A (Database Lead) & Thành viên B (Application Lead)  
-**Tài liệu đối chiếu:** `important.md`, `chia_viec.md`, `README.md`, `docs/business/*`, `docs/database/*`, `docs/api/api_contract.md`, `docs/project/Project_progress.md`, `backend/migrations/*`, `database/demo/*`
+**Đối tượng tham gia:** Thành viên A (Database Lead) — **응오후인느** (소프트웨어학과) & Thành viên B (Application Lead) — **응웬치롱** (AI소프트웨어학과). Cả hai cùng trình bày và demo.  
+**Ngôn ngữ slide & thuyết trình:** tiếng Hàn — bản PPT: `presentation/cinema_presentation_ko.pptx`  
+**Tài liệu đối chiếu:** `presentation/important.md` (yêu cầu của môn học), `chia_viec.md`, `README.md`, `docs/business/*`, `docs/database/*`, `docs/api/api_contract.md`, `PROJECT_PROGRESS.md`, `backend/migrations/*`, `database/demo/*`
 
 ---
 
@@ -14,21 +15,34 @@ Bài thuyết trình được xây dựng theo **mạch câu chuyện (Storytell
 | Slide | Chủ đề (Việt / Hàn) | Thời lượng | Mốc thời gian | Đáp ứng yêu cầu `important.md` |
 |---|---|---|---|---|
 | **01** | Trang bìa & Giới thiệu nhóm (`프로젝트 소개`) | 0:30 | 00:00 – 00:30 | Mở đầu mạch lạc |
-| **02** | Bài toán & Quy mô hệ thống (`배경 및 시스템 규모`) | 0:45 | 00:30 – 01:15 | Đặt vấn đề từ bản chất dữ liệu |
-| **03** | Môi trường phát triển, DBMS & Công cụ (`개발 환경 및 기술 스택`) | 0:45 | 01:15 – 02:00 | Giải thích cấu hình ban đầu, DBMS, ngôn ngữ, công cụ |
-| **04** | Kiến trúc tách biệt Logic & Vật lý (`논리적·물리적 분리 아키텍처`) | 0:50 | 02:00 – 02:50 | Chứng minh DB/Backend/Frontend tách rời độc lập |
-| **05** | Phân tích nghiệp vụ & 6 Quyết định cốt lõi (`업무 분석 및 D1–D6`) | 0:55 | 02:50 – 03:45 | Câu chuyện từ 기획 → 분석, 14 chức năng, BR-01~15 |
-| **06** | Thiết kế dữ liệu: Conceptual → Logical → 3NF (`데이터 모델링 및 정규화`) | 1:00 | 03:45 – 04:45 | ERD 7 bảng, chuẩn hóa & *Controlled Redundancy* |
-| **07** | Thiết kế vật lý & Động cơ toàn vẹn PostgreSQL (`물리 설계 및 무결성 엔진`) | 1:00 | 04:45 – 05:45 | Tính năng lõi: `btree_gist`, Trigger, Lock, Snapshot giá |
-| **08** | Đối soát bàn giao & Tiến hóa Schema `0001–0004` (`교차 검증 및 고도화`) | 1:00 | 05:45 – 06:45 | Độ vững chắc thiết kế: phát hiện & sửa lỗi MVCC/NaN |
-| **09** | Hiện thực hóa Backend API & Bảo mật (`백엔드 REST API 및 보안`) | 0:50 | 06:45 – 07:35 | Fail-closed policy, Token, SQLSTATE, chống SQLi/XSS |
-| **10** | Hiện thực hóa Frontend SPA & Trải nghiệm (`프런트엔드 및 사용자 흐름`) | 0:40 | 07:35 – 08:15 | React 19 + TS + Vite, Responsive, Legacy UI fallback |
-| **11** | Kiểm chứng đa tầng & Kết quả (`다층 검증 및 테스트 결과`) | 1:00 | 08:15 – 09:15 | SQL Integrity, Concurrency, Pytest, Node, Playwright |
-| **12** | **Live Demo 1:** Trải nghiệm Web UI (`웹 애플리케이션 시연`) | 2:00 | 09:15 – 11:15 | Luồng Customer & Admin thực tế trên Docker Compose |
-| **13** | **Live Demo 2:** Kịch bản SQL trực tiếp (`SQL 데이터 제어 시연`) | 2:00 | 11:15 – 13:15 | Chứng minh trạng thái, ngoại lệ, quyền `cinema_api`, đồng thời |
+| **02** | Bài toán & Quy mô hệ thống (`배경 및 시스템 규모`) | 0:35 | 00:30 – 01:05 | Đặt vấn đề từ bản chất dữ liệu |
+| **03** | Môi trường phát triển, DBMS & Công cụ (`개발 환경 및 기술 스택`) | 0:35 | 01:05 – 01:40 | Giải thích cấu hình ban đầu, DBMS, ngôn ngữ, công cụ |
+| **04** | Kiến trúc tách biệt Logic & Vật lý (`논리적·물리적 분리 아키텍처`) | 0:50 | 01:40 – 02:30 | Chứng minh DB/Backend/Frontend tách rời độc lập |
+| **05** | Phân tích nghiệp vụ & 6 Quyết định cốt lõi (`업무 분석 및 D1–D6`) | 0:55 | 02:30 – 03:25 | Câu chuyện từ 기획 → 분석, 14 chức năng, BR-01~15 |
+| **06** | Thiết kế dữ liệu: Conceptual → Logical → 3NF (`데이터 모델링 및 정규화`) | 0:50 | 03:25 – 04:15 | ERD 7 bảng, chuẩn hóa & *Controlled Redundancy* |
+| **07** | Thiết kế vật lý & Động cơ toàn vẹn PostgreSQL (`물리 설계 및 무결성 엔진`) | 1:00 | 04:15 – 05:15 | Tính năng lõi: `btree_gist`, Trigger, Lock, Snapshot giá |
+| **08** | Đối soát bàn giao & Tiến hóa Schema `0001–0005` (`교차 검증 및 고도화`) | 0:50 | 05:15 – 06:05 | Độ vững chắc thiết kế: phát hiện & sửa lỗi MVCC/NaN |
+| **09** | Hiện thực hóa Backend API & Bảo mật (`백엔드 REST API 및 보안`) | 0:40 | 06:05 – 06:45 | Fail-closed policy, Token, SQLSTATE, chống SQLi/XSS |
+| **10** | Hiện thực hóa Frontend SPA & Trải nghiệm (`프런트엔드 및 사용자 흐름`) | 0:30 | 06:45 – 07:15 | React 19 + TS + Vite, Responsive, Legacy UI fallback |
+| **11** | Kiểm chứng đa tầng & Kết quả (`다층 검증 및 테스트 결과`) | 0:50 | 07:15 – 08:05 | SQL Integrity, Concurrency, Pytest, Node, Playwright |
+| **12** | **Live Demo 1:** Trải nghiệm Web UI (`웹 애플리케이션 시연`) | 2:00 | 08:05 – 10:05 | Luồng Customer & Admin thực tế trên Docker Compose |
+| **13** | **Live Demo 2:** Kịch bản SQL trực tiếp (`SQL 데이터 제어 시연`) | 3:10 | 10:05 – 13:15 | Chứng minh trạng thái, ngoại lệ, quyền `cinema_api`, đồng thời |
 | **14** | **Slide trọng tâm:** Làm việc nhóm trong kỷ nguyên AI (`AI 시대의 팀 프로젝트 의미`) | 1:15 | 13:15 – 14:30 | Câu hỏi bắt buộc cuối/giữa bài dựa trên trải nghiệm thật |
 | **15** | Tổng kết & Định hướng (`결론 및 Q&A`) | 0:30 | 14:30 – 15:00 | Chốt giá trị dự án & mở phần hỏi đáp |
 | **16** | *Phụ lục:* Bộ câu hỏi Q&A dự kiến & Checklist trước giờ G | — | Q&A (5–10p) | Dự phòng phản biện kỹ thuật |
+
+**Phân công trình bày & demo** (vai trò A/B suy từ lịch sử commit: commit `fix(db)` / `docs(db)` của 응오후인느, commit backend/giao diện của 응웬치롱; nhóm có thể đổi lại):
+
+| Người nói | Slide | Thời lượng |
+|---|---|---|
+| **응웬치롱** (B) | 01 – 05 (mở đầu, bài toán, môi trường, kiến trúc, nghiệp vụ) | 3:25 |
+| **응오후인느** (A) | 06 – 08 (mô hình dữ liệu, thiết kế vật lý, đối soát & migration) | 2:40 |
+| **응웬치롱** (B) | 09 – 12 (backend, frontend, kiểm thử, **Live Demo 1 Web UI**) | 4:00 |
+| **응오후인느** (A) | 13 (**Live Demo 2 SQL**) | 3:10 |
+| Cả hai | 14 (AI 시대 팀 프로젝트): 응오후인느 nói ý 1–2 (hợp đồng, đối soát chéo), 응웬치롱 nói ý 3 và thông điệp chốt | 1:15 |
+| **응웬치롱** (B) | 15 (kết luận, mời Q&A) | 0:30 |
+
+Tổng: 응웬치롱 ≈ 8:30, 응오후인느 ≈ 6:30. Q&A: câu hỏi DB/SQL do 응오후인느 trả lời, câu hỏi API/UI/kiểm thử do 응웬치롱 trả lời.
 
 ---
 
@@ -42,8 +56,9 @@ Bài thuyết trình được xây dựng theo **mạch câu chuyện (Storytell
 - **Tên dự án:** Cinema Reservation System (영화관 예매 및 좌석 관리 시스템)
 - **Thời gian thực hiện:** 17/11/2026 – 29/11/2026
 - **Thành viên & Vai trò:**
-  - **Thành viên A (Database Lead):** Thiết kế ERD, Chuẩn hóa, DDL/Triggers/Constraints PostgreSQL, Dữ liệu mẫu & Kiểm thử DB
-  - **Thành viên B (Application Lead):** Phân tích nghiệp vụ, REST API (Flask), Giao diện (React + TypeScript), Tích hợp & Đóng gói Docker
+  - **Thành viên A (Database Lead) — 응오후인느 (소프트웨어학과):** Thiết kế ERD, Chuẩn hóa, DDL/Triggers/Constraints PostgreSQL, Dữ liệu mẫu & Kiểm thử DB
+  - **Thành viên B (Application Lead) — 응웬치롱 (AI소프트웨어학과):** Phân tích nghiệp vụ, REST API (Flask), Giao diện (React + TypeScript), Tích hợp & Đóng gói Docker
+  - **Người trình bày & demo:** cả hai (xem bảng phân công ở mục 0). 응웬치롱 demo Web UI (Slide 12), 응오후인느 demo SQL (Slide 13).
 - **Thông điệp chính:** *"Không chỉ xây dựng web đặt vé — mà xây dựng một hệ thống đặt vé không thể bán trùng ghế, không thể chồng lịch chiếu và bảo toàn lịch sử giao dịch ngay ở tầng Database."*
 
 ### Lời thoại thuyết trình (Speaker Notes)
@@ -56,7 +71,7 @@ Bài thuyết trình được xây dựng theo **mạch câu chuyện (Storytell
 ## SLIDE 2 — Bài toán & Quy mô Hệ thống
 
 * **Tiêu đề PPT gợi ý:** `01. 프로젝트 배경 및 시스템 규모 (Bối cảnh & Quy mô hệ thống)`
-* **Thời lượng:** 00:30 – 01:15
+* **Thời lượng:** 00:30 – 01:05
 
 ### Nội dung hiển thị trên Slide
 - **Vấn đề cốt lõi của nghiệp vụ đặt vé rạp chiếu phim:**
@@ -82,21 +97,22 @@ Bài thuyết trình được xây dựng theo **mạch câu chuyện (Storytell
 ## SLIDE 3 — Môi trường Phát triển, DBMS & Công cụ
 
 * **Tiêu đề PPT gợi ý:** `02. 초기 환경 설정 및 기술 스택 (Cấu hình ban đầu & Tech Stack)`
-* **Thời lượng:** 01:15 – 02:00
+* **Thời lượng:** 01:05 – 01:40
 
 ### Nội dung hiển thị trên Slide
 
 | Thành phần | Công nghệ & Phiên bản | Vai trò trong hệ thống |
 |---|---|---|
-| **DBMS** | **PostgreSQL 18** (`18.6`/`18.7`, tương thích `14+`) + extension `btree_gist` | Lưu trữ quan hệ, ràng buộc khai báo, Trigger, Function giao dịch, khóa đồng thời |
+| **DBMS** | **PostgreSQL 18** (`18.6`, tương thích `14+`) + extension `btree_gist` | Lưu trữ quan hệ, ràng buộc khai báo, Trigger, Function giao dịch, khóa đồng thời |
 | **Backend API** | **Python 3.12**, **Flask 3.1.3**, **`psycopg2-binary 2.9.13`**, `Werkzeug`, `itsdangerous`, `python-dotenv`, `tzdata` | REST API thuần JSON, xác thực Bearer Token, mapping mã lỗi `SQLSTATE` |
 | **Frontend UI** | **React 19.3.1**, **TypeScript 5.9.3**, **Vite 7.3.8** (+ bản dự phòng `legacy` HTML/JS) | Giao diện SPA 12 trang, gọi API qua HTTP, kiểm tra kiểu tĩnh |
 | **Container & Runtime** | **Docker Compose v2** (`db`, `api`, `frontend`, profile `test` với `test-db` trên `tmpfs` & `verify`) | Đóng gói độc lập, tự động chạy migration, khởi tạo 1 lệnh |
-| **Kiểm thử & Tài liệu** | **pytest 9.2.0**, **Node test runner**, **Playwright 1.65.1**, `psql`, **Git/GitHub**, Mermaid | Test đa tầng (SQL, Concurrency, API, Unit JS, E2E trình duyệt) |
+| **Kiểm thử & Tài liệu** | **pytest 9.2.0**, **Node test runner**, **Playwright 1.65.1**, `psql`, Mermaid | Test đa tầng (SQL, Concurrency, API, Unit JS, E2E trình duyệt) |
+| **Làm việc nhóm** | **Git/GitHub** (nhánh + pull request), bảng phân công `chia_viec.md` | Phối hợp giữa Thành viên A và B |
 
 - **Thiết lập môi trường ban đầu (`README.md`):**
   1. Tạo `.env` từ `backend/.env.example`, sinh `SECRET_KEY` và `DB_PASSWORD` ngẫu nhiên.
-  2. `docker compose up --build -d --wait` → Tự động khởi tạo DB, áp dụng tuần tự `0001` → `compose-role` → `0002` → `0003` → `0004`.
+  2. `docker compose up --build -d --wait` → Tự động khởi tạo DB, áp dụng tuần tự `0001` → `compose-role` → `0002` → `0003` → `0004` → `0005`.
   3. Nạp `backend/seeds/demo.sql` **duy nhất 1 lần** trên DB trống (có cơ chế khóa bảng & chặn chạy đè nếu DB đã có dữ liệu).
 
 ### Lời thoại thuyết trình (Speaker Notes)
@@ -105,13 +121,14 @@ Bài thuyết trình được xây dựng theo **mạch câu chuyện (Storytell
 > - Tầng **Backend** sử dụng **Python 3.12** với **Flask 3.1.3** và driver **`psycopg2-binary`** làm việc trực tiếp bằng SQL tham số hóa — không dùng ORM ẩn, để kiểm soát chính xác ranh giới giao dịch (`transaction`) và bắt trực tiếp mã `SQLSTATE` từ PostgreSQL.
 > - Tầng **Frontend** được xây dựng bằng **React 19, TypeScript và Vite** (đồng thời giữ một bản UI HTML/JS dự phòng có thể chuyển qua biến môi trường `CINEMA_LEGACY_UI=1`).
 > - Toàn bộ hệ thống được đóng gói bằng **Docker Compose** gồm 3 service chính (`db`, `api`, `frontend`) và 1 profile `test` chuyên biệt chạy DB tạm trên `tmpfs`. Khi cài đặt lần đầu, chỉ cần sinh khóa bí mật vào `.env`, bật Compose để tự động chạy chuỗi migration `0001` đến `0004`, và nạp `demo.sql` một lần duy nhất.
+> - Về làm việc nhóm: nhóm dùng Git/GitHub (nhánh, pull request) và bảng phân công `chia_viec.md`.
 
 ---
 
 ## SLIDE 4 — Kiến trúc Tách biệt Logic & Vật lý
 
 * **Tiêu đề PPT gợi ý:** `03. 논리적·물리적 분리 아키텍처 (Kiến trúc tách biệt 3 tầng)`
-* **Thời lượng:** 02:00 – 02:50
+* **Thời lượng:** 01:40 – 02:30
 
 ### Nội dung hiển thị trên Slide
 
@@ -145,7 +162,7 @@ Bài thuyết trình được xây dựng theo **mạch câu chuyện (Storytell
 ## SLIDE 5 — Phân tích Nghiệp vụ & 6 Quyết định Cốt lõi (`BR-DL-001`)
 
 * **Tiêu đề PPT gợi ý:** `04. 업무 기능 분석 및 핵심 규칙 결정 (BR-DL-001: D1–D6)`
-* **Thời lượng:** 02:50 – 03:45
+* **Thời lượng:** 02:30 – 03:25
 
 ### Nội dung hiển thị trên Slide
 - **14 Chức năng nghiệp vụ (`business_function.md`) & 15 Quy tắc (`BR-01 ~ BR-15`):**
@@ -160,7 +177,7 @@ Bài thuyết trình được xây dựng theo **mạch câu chuyện (Storytell
 | **D2** | Khóa sửa/xóa suất có lịch sử | Suất chiếu có **bất kỳ** booking nào (`BOOKED`/`CANCELLED`/`EXPIRED`) bị **khóa sửa toàn bộ 5 thuộc tính** (`UC001`). Chỉ xóa được suất/phim chưa chiếu và chưa từng có booking. |
 | **D3** | Hết hạn sau **10 phút** | `expires_at = booked_at + 10 min`. Chưa trả quá hạn → `EXPIRED` + xóa `booking_seats`. Triển khai bằng **request-time expiry** (`expire_overdue_bookings()`), không dùng cron ngoài. |
 | **D4** | Khách xem không cần đăng nhập | `C-02 ~ C-05` mở công khai; chỉ buộc đăng nhập `CUSTOMER` tại `C-06` (xác nhận đặt). Không tồn tại role `GUEST`. |
-| **D5** | Dữ liệu đăng ký & Phim | Đăng ký chỉ nhận `username` + `password` (hash một chiều, tự gán `CUSTOMER`). Phim gồm 6 thuộc tính chuẩn + `poster_url` tùy chọn. |
+| **D5** | Dữ liệu đăng ký & Phim | Đăng ký chỉ nhận `username` + `password` (hash một chiều, tự gán `CUSTOMER`); tên đăng nhập chuẩn hóa NFKC, cắt khoảng trắng, không phân biệt hoa/thường (`0005`). Phim gồm 6 thuộc tính chuẩn + `poster_url` tùy chọn. |
 | **D6** | Giá vé theo từng suất chiếu | Không dùng giá cố định toàn rạp; lưu `ticket_price` ở `showtimes`, snapshot `price_at_booking` ở `booking_seats` và tổng `total_amount` ở `bookings`. |
 
 ### Lời thoại thuyết trình (Speaker Notes)
@@ -175,7 +192,7 @@ Bài thuyết trình được xây dựng theo **mạch câu chuyện (Storytell
 ## SLIDE 6 — Thiết kế Dữ liệu: Conceptual → Logical → 3NF
 
 * **Tiêu đề PPT gợi ý:** `05. 데이터 모델링 및 정규화 (Mô hình dữ liệu & Chuẩn hóa 1NF–3NF)`
-* **Thời lượng:** 03:45 – 04:45
+* **Thời lượng:** 03:25 – 04:15
 
 ### Nội dung hiển thị trên Slide
 - **7 Thực thể / Bảng cốt lõi (Logical ↔ Physical mapping):**
@@ -209,10 +226,10 @@ Bài thuyết trình được xây dựng theo **mạch câu chuyện (Storytell
 ## SLIDE 7 — Thiết kế Vật lý & Động cơ Toàn vẹn PostgreSQL
 
 * **Tiêu đề PPT gợi ý:** `06. 물리 설계 및 DB 무결성 엔진 (Thiết kế vật lý & Bảo vệ toàn vẹn)`
-* **Thời lượng:** 04:45 – 05:45
+* **Thời lượng:** 04:15 – 05:15
 
 ### Nội dung hiển thị trên Slide
-**Điểm nổi bật kỹ thuật: Đẩy toàn bộ quy tắc bất biến xuống tầng PostgreSQL (`0001`–`0004`)**
+**Điểm nổi bật kỹ thuật: Đẩy toàn bộ quy tắc bất biến xuống tầng PostgreSQL (`0001`–`0005`)**
 
 1. **Chống chồng lịch chiếu không cần Lock thủ công (`BR-04`):**
    - `EXCLUDE USING gist (room_id WITH =, tstzrange(starts_at, ends_at, '[)') WITH &&)` → Từ chối chồng lấn với `23P01`, cho phép xếp suất nối tiếp sát giờ (`12:00` kết thúc, `12:00` bắt đầu).
@@ -234,10 +251,10 @@ Bài thuyết trình được xây dựng theo **mạch câu chuyện (Storytell
 
 ---
 
-## SLIDE 8 — Câu chuyện Thực tế: Đối soát & Tiến hóa Schema (`0001` → `0004`)
+## SLIDE 8 — Câu chuyện Thực tế: Đối soát & Tiến hóa Schema (`0001` → `0005`)
 
 * **Tiêu đề PPT gợi ý:** `07. 교차 검증 및 스키마 고도화 (Đối soát bàn giao & 4 lần nâng cấp Migration)`
-* **Thời lượng:** 05:45 – 06:45
+* **Thời lượng:** 05:15 – 06:05
 
 ### Nội dung hiển thị trên Slide
 **Quá trình phát hiện & xử lý lỗi qua kiểm chứng thực tế (`handover_reconciliation_report.md`):**
@@ -247,24 +264,25 @@ Bài thuyết trình được xây dựng theo **mạch câu chuyện (Storytell
    - Kết quả: Chốt 11 đầu mục chỉnh sửa `DB-01 ~ DB-11` thành **`0001_baseline.sql`**.
 2. **Phát hiện lỗi thứ tự Trigger theo bảng chữ cái (`SET CONSTRAINTS ALL IMMEDIATE`):**
    - Trong PostgreSQL, các `AFTER` trigger cùng sự kiện chạy theo **thứ tự alphabet**. Ban đầu trigger kiểm tra nhất quán chạy trước `trg_bookings_release_seats` → lỗi khi hủy/hết hạn ở chế độ `IMMEDIATE`. Đã đổi tên thành `trg_bookings_z_consistency` và thêm regression test.
-3. **Chuỗi nâng cấp `0002` → `0003` → `0004`:**
+3. **Chuỗi nâng cấp `0002` → `0003` → `0004` → `0005`:**
    - **`0002_movie_delete_permissions.sql`:** Cấp quyền `DELETE` trên `movies`, `showtimes` cho runtime role `cinema_api` để hỗ trợ xóa phim/suất có điều kiện.
    - **`0003_booking_integrity.sql`:** Đưa `showtime_id` lên `booking_seats` thành `UNIQUE(showtime_id, seat_id)` tức thời (chặn kẽ hở MVCC snapshot), thêm `trg_bookings_z_version_showtime` đánh dấu phiên bản suất khi có vé đầu tiên, và mở rộng `total_amount` từ `numeric(10,2)` lên **`numeric(12,2)`** (đủ chứa 50 ghế × `99,999,999.99` = `4,999,999,999.50`).
    - **`0004_finite_money.sql`:** Trong PostgreSQL, `'NaN'::numeric >= 0` trả về `TRUE`! Đã bổ sung 3 ràng buộc `CHECK (... NOT IN ('NaN', 'Infinity', '-Infinity'))` để khóa chặt miền tiền tệ.
+   - **`0005_username_case_insensitive.sql`:** Qua rà soát đối kháng, `Customer1`, ` customer1 ` và `ａｄｍｉｎ` (full-width) từng đăng ký được thành tài khoản riêng. Nay API chuẩn hóa NFKC + cắt khoảng trắng và so trùng không phân biệt hoa/thường; DB có unique index `users_username_lower_key` trên `lower(username)`. Migration tự kiểm dữ liệu và dừng (23505/23514) nếu có tên trùng hoặc chưa chuẩn hóa, không sửa dữ liệu.
 
 ### Lời thoại thuyết trình (Speaker Notes)
 > Hệ thống vững chắc hiện tại không tự nhiên sinh ra trong lần code đầu tiên, mà là kết quả của quá trình **đối soát chéo và sửa lỗi liên tục**.
 >
 > Khi Thành viên A bàn giao bản Database đầu tiên ngày 20/11, Thành viên B đã viết một bộ **Reconciliation Probes** chạy kiểm tra từng quy tắc D1–D6 và phát hiện **13 điểm lệch**: bản cũ vẫn dùng trạng thái `CONFIRMED`, chưa có hạn 10 phút, chưa khóa giá vé trong trigger `D2`, thậm chí có thêm quy tắc "nghỉ 15 phút giữa 2 suất" không nằm trong đặc tả. Sau khi đối soát qua `DB-01` đến `DB-11`, nhóm thống nhất bản chuẩn `0001_baseline.sql`.
 >
-> Tiếp đó, quá trình kiểm thử sâu tiếp tục giúp nhóm phát hiện và nâng cấp qua 3 migration: `0002` bổ sung quyền xóa phim có điều kiện cho role `cinema_api`; `0003` bổ sung `UNIQUE` tức thời theo `(showtime_id, seat_id)` chống kẽ hở MVCC giữa các mức cô lập giao dịch và nâng `total_amount` lên `numeric(12,2)` để không tràn số khi đặt cả phòng 50 ghế; và `0004` xử lý một bẫy đặc thù của PostgreSQL: kiểu `numeric` coi `'NaN' >= 0` là hợp lệ, nên nhóm đã thêm 3 ràng buộc từ chối `NaN` và vô cực ở tầng DB.
+> Tiếp đó, quá trình kiểm thử sâu tiếp tục giúp nhóm phát hiện và nâng cấp qua 4 migration: `0002` bổ sung quyền xóa phim có điều kiện cho role `cinema_api`; `0003` bổ sung `UNIQUE` tức thời theo `(showtime_id, seat_id)` chống kẽ hở MVCC giữa các mức cô lập giao dịch và nâng `total_amount` lên `numeric(12,2)` để không tràn số khi đặt cả phòng 50 ghế; và `0004` xử lý một bẫy đặc thù của PostgreSQL: kiểu `numeric` coi `'NaN' >= 0` là hợp lệ, nên nhóm đã thêm 3 ràng buộc từ chối `NaN` và vô cực ở tầng DB; cuối cùng `0005` chuẩn hóa tên đăng nhập (NFKC, cắt khoảng trắng, không phân biệt hoa/thường) sau khi rà soát đối kháng cho thấy `Customer1` hay `ａｄｍｉｎ` từng đăng ký được thành tài khoản riêng.
 
 ---
 
 ## SLIDE 9 — Hiện thực hóa Backend API & Bảo mật
 
 * **Tiêu đề PPT gợi ý:** `08. 백엔드 REST API 및 다층 보안 (Backend REST API & Bảo mật)`
-* **Thời lượng:** 06:45 – 07:35
+* **Thời lượng:** 06:05 – 06:45
 
 ### Nội dung hiển thị trên Slide
 - **28 REST Endpoints (`docs/api/api_contract.md`):**
@@ -277,6 +295,7 @@ Bài thuyết trình được xây dựng theo **mạch câu chuyện (Storytell
   - **Fail-Closed Route Policies:** Mọi route bắt buộc gắn `@policy(PUBLIC | AUTHENTICATED | CUSTOMER | ADMIN)` — `create_app()` **từ chối khởi động** nếu có route quên phân quyền.
   - **Stateless Token + Live DB Lookup:** Token `itsdangerous` (`URLSafeTimedSerializer`, mặc định 8 giờ) chỉ chứa `user_id` (không lưu role/username); mỗi request đều tải lại dòng `users` hiện tại từ PostgreSQL nên tài khoản bị đổi role hoặc bị xóa sẽ mất hiệu lực ngay lập tức.
   - **Chống lộ thông tin & Lỗi chuẩn hóa:** Mapping `e.pgcode` (`UC001~UC011`, `23P01`, `23505`, `23514`, `23503`, `22003`) sang JSON `{"error": {"code", "message"}}` — không bao giờ trả SQL, stack trace hay tên cột ra client. Sai ID hoặc sai mật khẩu trả cùng thông báo `401 invalid_credentials` và thực hiện hash giả để tránh timing attack.
+  - **Tự thử lại giao dịch (`40001` / `40P01`):** `run_retryable_transaction()` (`backend/app/core/database.py`) chạy lại toàn bộ thao tác trong một transaction mới, tối đa 3 lần, khi PostgreSQL báo serialization failure (`40001`) hoặc deadlock (`40P01`); áp dụng cho đặt vé (`booking_service.reserve`), thanh toán (`payment_service.pay`) và hủy vé (`bookings.cancel_booking`).
   - **Bảo mật HTTP & Injection:** 100% SQL tham số hóa (`%s`), `MAX_CONTENT_LENGTH = 64 KiB`, header `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`.
 
 ### Lời thoại thuyết trình (Speaker Notes)
@@ -285,13 +304,15 @@ Bài thuyết trình được xây dựng theo **mạch câu chuyện (Storytell
 > Điểm nhấn của Backend là thiết kế bảo mật theo nguyên tắc **Fail-Closed**: mỗi endpoint bắt buộc khai báo một trong 4 mức quyền (`PUBLIC`, `AUTHENTICATED`, `CUSTOMER`, `ADMIN`); nếu lập trình viên lỡ thêm một route mà quên gắn phân quyền, hàm `check_route_policies()` sẽ chặn không cho Flask khởi động. Token xác thực được ký bằng `itsdangerous` chỉ chứa duy nhất `user_id`, không lưu `role`, và ở mỗi request API đều truy vấn lại bảng `users` thực tế.
 >
 > Toàn bộ lỗi từ PostgreSQL được dịch thông qua mã `pgcode` (`UC001` đến `UC011` và các mã chuẩn `23xxx`) thành thông báo JSON an toàn cho người dùng, tuyệt đối không làm rò rỉ câu lệnh SQL hay tên ràng buộc. Kèm theo đó là truy vấn tham số hóa hoàn toàn để chống SQL Injection và các header bảo mật chặt chẽ trên mọi phản hồi.
+>
+> Ngoài ra, khi PostgreSQL hủy một giao dịch vì xung đột tuần tự hóa (`40001`) hoặc deadlock (`40P01`), backend không báo lỗi ngay mà chạy lại toàn bộ thao tác trong một transaction mới, tối đa 3 lần. Cơ chế này chỉ dùng cho các thao tác an toàn khi chạy lại từ đầu: đặt vé, thanh toán và hủy vé.
 
 ---
 
 ## SLIDE 10 — Hiện thực hóa Frontend SPA & Trải nghiệm Người dùng
 
 * **Tiêu đề PPT gợi ý:** `09. 프런트엔드 SPA 및 사용자 흐름 (Giao diện React/TS & Trải nghiệm)`
-* **Thời lượng:** 07:35 – 08:15
+* **Thời lượng:** 06:45 – 07:15
 
 ### Nội dung hiển thị trên Slide
 - **Kiến trúc Frontend (`frontend/src/`):**
@@ -317,7 +338,7 @@ Bài thuyết trình được xây dựng theo **mạch câu chuyện (Storytell
 ## SLIDE 11 — Kiểm chứng Đa tầng & Kết quả Kiểm thử
 
 * **Tiêu đề PPT gợi ý:** `10. 다층 검증 전략 및 테스트 결과 (Kiểm thử toàn diện & Kết quả)`
-* **Thời lượng:** 08:15 – 09:15
+* **Thời lượng:** 07:15 – 08:05
 
 ### Nội dung hiển thị trên Slide
 **Hệ thống được kiểm thử độc lập trên 5 tầng qua `docker compose --profile test run --build --rm verify` và `backend/tests/verify.py`:**
@@ -326,22 +347,22 @@ Bài thuyết trình được xây dựng theo **mạch câu chuyện (Storytell
 |---|---|---|
 | **1. SQL Toàn vẹn & Đối soát** | `integrity_tests.sql`, `reconciliation_probes.sql`, `money_domain.sql` | **177** kiểm tra toàn vẹn (baseline `run_all.sh`), **31/31 MATCH** (0 mismatch), kiểm tra `0004` miền tiền tệ; **5 mutation checks** xác nhận bộ test phát hiện được lỗi cố tình cài vào. |
 | **2. Đồng thời đa phiên DB** | `test_booking_concurrency.py` (6 kịch bản `C1–C6`, đa luồng `psycopg2`) | **16/16 checks PASS**: 8 phiên tranh 1 ghế (1 thắng, 7 `UC002`), khóa 2 phiên `C2`, 40 luồng trả tiền vs 2 luồng hết hạn tại mốc 10 phút (`C4`), trả tiền vs hủy (`C5`), 5 luồng hết hạn song song (`C6`). |
-| **3. Backend API & Bảo mật** | `pytest` (`test_access_matrix`, `test_booking_flow`, `test_security_injection.py`, ...) | Bản Linux Compose `verify` đạt **1.356 pytest** (skip 1 test đặc thù Windows); Windows clean checkout đạt **1.354** (skip 2 symlink). Bổ sung active SQLi & Stored XSS suite (`test_security_injection.py`). |
-| **4. Logic Frontend** | `npm test` (Node test runner) + `npm run build` (`tsc --noEmit`) | **120/120 Node tests PASS**; kiểm tra type TypeScript không lỗi. |
+| **3. Backend API & Bảo mật** | `pytest` (`test_access_matrix`, `test_booking_flow`, `test_security_injection.py`, ...) | **1.409 pytest đạt**, skip 1 (ca chỉ dành cho Windows) — chạy `verify` trên Docker Compose ngày 26/11/2026 sau commit `80092c6`. Bổ sung active SQLi & Stored XSS suite (`test_security_injection.py`) và `test_migration_upgrade.py` (4 test nâng cấp `0001→0003→0004` trên DB tạm). |
+| **4. Logic Frontend** | `npm test` (Node test runner) + `npm run build` (`tsc --noEmit`) | **121/121 Node tests PASS**; kiểm tra type TypeScript không lỗi. |
 | **5. E2E Trình duyệt & DB Dump/Restore** | Playwright (`reservation.spec.ts` — 6 luồng), `pg_dump -Fc` / `pg_restore` | **6/6 luồng E2E PASS** (mobile `320px`/`375px`, desktop `1440px`, `UI-01` double-click/bàn phím/retry/reload-Back-Forward & `SEC-01` XSS); đối chiếu checksum cả 7 bảng sau backup/restore khớp 100%. |
 
 ### Lời thoại thuyết trình (Speaker Notes)
 > Nhóm không chỉ kiểm tra bằng tay trên giao diện, mà xây dựng một đường ống kiểm chứng tự động 5 tầng chạy trên database cô lập hoàn toàn qua lệnh `docker compose --profile test run --build --rm verify`:
 > - Ở tầng SQL, **177 kiểm tra toàn vẹn** và **31 đầu dò đối soát** đều đạt, kèm **5 bài test đột biến (mutation checks)** — tức là nhóm cố tình làm hỏng trigger rồi chạy lại test để chắc chắn bộ test thực sự bắt được lỗi.
 > - Ở tầng đồng thời, `test_booking_concurrency.py` chạy **6 kịch bản đa phiên thật (`C1–C6`)**, như cho 8 kết nối tranh nhau 1 ghế, hoặc cho 40 luồng thanh toán đụng độ với 2 luồng hết hạn ngay tại mốc 10 phút để chứng minh không bao giờ có ca thanh toán muộn nào lọt qua.
-> - Ở tầng ứng dụng, bản kiểm thử Compose đạt **>1.360 ca pytest**, **120 bài Node test**, **6 kịch bản Playwright E2E** chạy HTTP thật trên cả mobile lẫn desktop (gồm chống nhấn đúp/retry/Back-Forward `UI-01` và XSS `SEC-01`), cùng suite `test_security_injection.py` chủ động kiểm tra SQL Injection và Stored XSS trên toàn bộ các endpoint. Sau tất cả, nhóm còn kiểm tra `pg_dump` và `pg_restore` để xác nhận checksum toàn bộ 7 bảng khớp 100%.
+> - Ở tầng ứng dụng, bản kiểm thử Compose đạt **1.409 ca pytest**, **121 bài Node test**, **6 kịch bản Playwright E2E** chạy HTTP thật trên cả mobile lẫn desktop (gồm chống nhấn đúp/retry/Back-Forward `UI-01` và XSS `SEC-01`), cùng suite `test_security_injection.py` chủ động kiểm tra SQL Injection và Stored XSS trên toàn bộ các endpoint. Sau tất cả, nhóm còn kiểm tra `pg_dump` và `pg_restore` để xác nhận checksum toàn bộ 7 bảng khớp 100%.
 
 ---
 
 ## SLIDE 12 — Kịch bản Live Demo 1: Trải nghiệm Web UI (2 Phút)
 
 * **Tiêu đề PPT gợi ý:** `11. 실시간 시연 ① — 웹 애플리케이션 (Demo trực tiếp trên Web UI)`
-* **Thời lượng:** 09:15 – 11:15
+* **Thời lượng:** 08:05 – 10:05
 
 ### Nội dung hiển thị trên Slide
 **Môi trường:** `http://localhost:8080` (Frontend) ↔ `http://localhost:5000/health/db` (API + PostgreSQL Compose)
@@ -349,7 +370,7 @@ Bài thuyết trình được xây dựng theo **mạch câu chuyện (Storytell
 - **Bước 1 — Khách vãng lai → Đặt vé & Thanh toán (60 giây):**
   1. Mở trang chủ `http://localhost:8080` (chưa đăng nhập) → vào một phim → chọn suất chiếu tương lai → chọn ghế `A1, A2`.
   2. Bấm **Proceed to booking** → hệ thống chuyển sang `/login.html?next=...`, đăng nhập bằng `customer1` / `customer1234` → **ghế `A1, A2` vẫn giữ nguyên**.
-  3. Xác nhận đặt vé (`BOOKED` + `UNPAID`, thấy đồng hồ đếm ngược 10 phút và tổng `₩24,000`).
+  3. Xác nhận đặt vé (`BOOKED` + `UNPAID`, thấy đồng hồ đếm ngược 10 phút và tổng `₩24,000` = 2 ghế × ₩12,000 — giá demo của dữ liệu mẫu, không phải mức giá đã được nhóm duyệt).
   4. Bấm **Pay Now** → trạng thái chuyển `PAID`.
   5. Vào **My Bookings** → bấm **Cancel** (xác nhận hộp thoại) → trạng thái chuyển `CANCELLED` (giữ `PAID` và tổng tiền). Quay lại suất chiếu đó → `A1, A2` đã mở lại màu trống (`available`)!
 - **Bước 2 — Quản trị viên & Quy tắc bảo vệ D2 (60 giây):**
@@ -362,15 +383,15 @@ Bài thuyết trình được xây dựng theo **mạch câu chuyện (Storytell
 > Bây giờ nhóm xin chuyển sang phần **Demo trực tiếp**. Trước tiên là luồng ứng dụng web đang chạy trên 3 container Docker tách biệt tại `localhost:8080`.
 > *(Thao tác theo từng bước trên màn hình và thuyết minh ngắn gọn)*:
 > - Hiện em chưa đăng nhập, vẫn có thể xem 6 phim, chọn một suất chiếu ngày mai và chọn ghế `A1, A2`. Khi bấm đặt vé, hệ thống yêu cầu đăng nhập. Em đăng nhập bằng tài khoản `customer1` — ngay lập tức trang web đưa quay lại đúng 2 ghế vừa chọn.
-> - Sau khi bấm xác nhận, vé được tạo ở trạng thái `BOOKED / UNPAID`, hiện tổng tiền `₩24,000` và hạn thanh toán 10 phút. Em bấm thanh toán mô phỏng (`Pay Now`) để chuyển sang `PAID`. Tiếp theo, em vào *My Bookings* và hủy vé này: trạng thái thành `CANCELLED` nhưng lịch sử tiền và trạng thái `PAID` vẫn giữ nguyên, còn khi mở lại sơ đồ ghế suất chiếu vừa rồi thì ghế `A1, A2` đã xanh trở lại.
+> - Sau khi bấm xác nhận, vé được tạo ở trạng thái `BOOKED / UNPAID`, hiện tổng tiền `₩24,000` (giá demo 12.000 mỗi ghế) và hạn thanh toán 10 phút. Em bấm thanh toán mô phỏng (`Pay Now`) để chuyển sang `PAID`. Tiếp theo, em vào *My Bookings* và hủy vé này: trạng thái thành `CANCELLED` nhưng lịch sử tiền và trạng thái `PAID` vẫn giữ nguyên, còn khi mở lại sơ đồ ghế suất chiếu vừa rồi thì ghế `A1, A2` đã xanh trở lại.
 > - Bây giờ em chuyển sang quyền `admin`: tạo nhanh một phim mới, sau đó thử tạo một suất chiếu cố tình trùng giờ trong Hall 1 — hệ thống lập tức từ chối do ràng buộc `EXCLUDE` của PostgreSQL. Cuối cùng, khi thử sửa giá của suất chiếu vừa có lịch sử hủy vé lúc nãy, hệ thống cũng chặn theo quy tắc `D2`, và trong trang *All Bookings* chúng ta vẫn tra cứu được đầy đủ vé `CANCELLED` đó.
 
 ---
 
-## SLIDE 13 — Kịch bản Live Demo 2: Chứng minh trực tiếp bằng SQL (2 Phút)
+## SLIDE 13 — Kịch bản Live Demo 2: Chứng minh trực tiếp bằng SQL (3 Phút 10 Giây)
 
 * **Tiêu đề PPT gợi ý:** `12. 실시간 시연 ② — SQL 데이터 제어 및 예외·권한 검증 (Demo SQL trực tiếp)`
-* **Thời lượng:** 11:15 – 13:15
+* **Thời lượng:** 10:05 – 13:15
 
 ### Nội dung hiển thị trên Slide
 **Bộ script chuẩn bị sẵn trong `database/demo/` (chạy trên DB cô lập `cinema_test_demo`, tự động `ROLLBACK` sạch dữ liệu mẫu):**
@@ -385,17 +406,23 @@ Bài thuyết trình được xây dựng theo **mạch câu chuyện (Storytell
    - Đặt ghế thuộc phòng khác (`seat_id = 51` ở Hall 2 cho suất Hall 1) → **`UC003`**
    - Thêm suất chiếu trùng giờ cùng phòng → **`23P01`** (`EXCLUDE USING gist`)
    - Nhập giá `'NaN'::numeric` hoặc `-1` → **`23514`** (`0004` finite money + non-negative check)
-3. **`database/demo/permissions.sql` — Kiểm tra phân quyền tối thiểu (`cinema_api`):**
-   - `SET LOCAL ROLE cinema_api`: cho phép `INSERT` `showtimes`, nhưng `DELETE FROM bookings` bị từ chối với **`42501` (`insufficient_privilege`)**.
-4. *(Dự phòng nếu Q&A hỏi về tranh chấp 2 phiên)* **`concurrency_prepare.sql` + `concurrency_a.sql` / `concurrency_b.sql`:**
+3. **`database/demo/permissions_grants.sql` — Role, GRANT/REVOKE và truy vấn kiểm tra quyền (`cinema_api`):**
+   - Thuộc tính role `cinema_api`: có `LOGIN`, không phải superuser, không tạo được DB/role.
+   - Bảng quyền `has_table_privilege` theo 7 bảng × `SELECT/INSERT/UPDATE/DELETE/TRUNCATE`, và danh sách quyền từ `information_schema.role_table_grants`.
+   - Chạy trực tiếp `REVOKE INSERT ON showtimes` → `has_table_privilege` đổi `true → false`, rồi `GRANT INSERT` trả lại (trong transaction, `ROLLBACK` ở cuối).
+   - `SET LOCAL ROLE cinema_api`: đọc được `movies`, nhưng `DELETE bookings`, `UPDATE seats`, `UPDATE users` đều bị từ chối với **`42501` (`insufficient_privilege`)**.
+4. *(Dự phòng, đã có từ trước)* **`database/demo/permissions.sql`:** `SET LOCAL ROLE cinema_api`, cho phép `INSERT` `showtimes`, từ chối `DELETE FROM bookings` (`42501`).
+5. *(Dự phòng nếu Q&A hỏi về tranh chấp 2 phiên)* **`concurrency_prepare.sql` + `concurrency_a.sql` / `concurrency_b.sql`:**
    - Phiên A giữ lock chưa commit; Phiên B chờ cho đến khi A commit và lập tức bị đẩy ra với **`UC002`**, chỉ còn đúng 1 ghế được giữ.
+
+- **Phân bổ 3:10 (đề xuất, cần tập lại):** `main.sql` ~0:55 · `exceptions.sql` ~0:50 · `permissions_grants.sql` ~1:05 · dự phòng ~0:20. `database/demo/README.md` ghi kịch bản chính 3–4 phút, nên khi thiếu giờ thì bỏ `permissions.sql` cũ và các script `concurrency_*` (để dành cho Q&A).
 
 ### Lời thoại thuyết trình (Speaker Notes)
 > Theo đúng yêu cầu chuẩn bị script SQL kiểm soát dữ liệu và kiểm tra ngoại lệ, nhóm đã chuẩn bị sẵn bộ script trong thư mục `database/demo/` chạy trên một database cô lập tên `cinema_test_demo`.
-> *(Chạy lần lượt `main.sql`, `exceptions.sql`, `permissions.sql` trên terminal đã mở sẵn)*:
+> *(Chạy lần lượt `main.sql`, `exceptions.sql`, `permissions_grants.sql` trên terminal đã mở sẵn)*:
 > - Đầu tiên, `main.sql` thực thi trực tiếp các hàm PostgreSQL: tạo vé 2 ghế (`24,000.00`), thanh toán, rồi hủy. Như thấy trên kết quả `SELECT`, `bookings` vẫn giữ nguyên `CANCELLED / PAID / 24,000.00` nhưng `active_seats` bằng `0`, nên khách hàng số 3 ngay lập tức đặt lại được ghế số 1.
 > - Thứ hai, `exceptions.sql` chứng minh ngay cả khi gọi thẳng SQL không qua Flask API, PostgreSQL vẫn tự chặn toàn bộ vi phạm: trùng ghế báo `UC002`, ghế sai phòng báo `UC003`, trùng lịch phòng báo `23P01`, và giá `'NaN'` hay số âm báo `23514`.
-> - Cuối cùng, `permissions.sql` chuyển sang role `cinema_api` mà Backend đang dùng: `SHOW` cho thấy `can_delete_history = false` và lệnh `DELETE FROM bookings` bị chặn ngay với mã `42501`. *(Nếu còn thời gian hoặc vào phần Q&A, nhóm cũng có sẵn kịch bản 2 terminal `concurrency_a.sql` và `concurrency_b.sql` để trình diễn trực tiếp cơ chế lock đa phiên).*
+> - Cuối cùng, `permissions_grants.sql` trả lời phần phân quyền: bảng quyền thực tế của role `cinema_api` mà Backend dùng; sau đó nhóm chạy `REVOKE INSERT` trên `showtimes` để thấy `has_table_privilege` đổi từ `true` sang `false`, rồi `GRANT` lại; cuối cùng chuyển sang `SET LOCAL ROLE cinema_api` và thử `DELETE bookings`, `UPDATE seats`, `UPDATE users` — cả ba bị chặn với mã `42501`. *(Nếu còn thời gian hoặc vào phần Q&A, nhóm có sẵn `permissions.sql` và kịch bản 2 terminal `concurrency_a.sql` / `concurrency_b.sql` để trình diễn cơ chế lock đa phiên.)*
 
 ---
 
@@ -443,10 +470,10 @@ Bài thuyết trình được xây dựng theo **mạch câu chuyện (Storytell
 
 ### Nội dung hiển thị trên Slide
 - **Những gì hệ thống đã đạt được:**
-  - Thiết kế CSDL chuẩn hóa 3NF, bảo vệ toàn vẹn và đồng thời ngay tại tầng PostgreSQL 18 (`0001`–`0004`).
+  - Thiết kế CSDL chuẩn hóa 3NF, bảo vệ toàn vẹn và đồng thời ngay tại tầng PostgreSQL 18 (`0001`–`0005`).
   - Kiến trúc 3 tầng tách biệt vật lý & logic hoàn chỉnh trên Docker Compose.
   - Đầy đủ 14 đơn vị nghiệp vụ, 28 API endpoints, 12 trang React/TS + bản UI dự phòng.
-  - Kiểm chứng toàn diện: 177 SQL integrity checks, 31 reconciliation probes, 16 concurrency checks, >1.360 pytest, 120 Node tests, 6 Playwright E2E, upgrade migration `0001→0003→0004`, active SQLi/XSS & dump/restore checksum.
+  - Kiểm chứng toàn diện: 177 SQL integrity checks, 31 reconciliation probes, 16 concurrency checks, 1.409 pytest, 121 Node tests, 6 Playwright E2E, upgrade migration `0001→0003→0004→0005`, active SQLi/XSS & dump/restore checksum.
 - **Hướng mở rộng (nằm ngoài phạm vi MVP hiện tại):**
   - Tích hợp cổng thanh toán thật & luồng hoàn tiền cho vé `CANCELLED + PAID`.
   - Cơ chế thu hồi token phía server (Token Revocation / Redis) & HTTPS Reverse Proxy.
@@ -497,15 +524,45 @@ docker compose exec -T db psql -X -v ON_ERROR_STOP=1 -U cinema_owner -d cinema -
 - **Mở sẵn 2 tab hoặc 2 profile trình duyệt** (1 tab đăng nhập sẵn hoặc chuẩn bị sẵn `customer1`/`customer1234`, 1 tab ẩn danh hoặc chuẩn bị sẵn `admin`/`admin1234`).
 - **Xác nhận có suất chiếu tương lai** trong `http://localhost:8080/screenings.html` (nếu seed chạy từ ngày trước đó và cần thêm suất mới cho demo, tạo sẵn 1 suất tương lai trong *Screenings (Admin)*).
 
-### 2. Chuẩn bị Terminal Sẵn Sàng cho SQL Demo (`cinema_test_demo`)
-Không chạy `database/demo/*.sql` lên database đang phục vụ Web UI! Chạy trên database cô lập `cinema_test_demo` (hoặc tạo mới trên một PostgreSQL test instance/port riêng):
-```powershell
-# Tạo DB cô lập cinema_test_demo và áp dụng 0001 -> 0003 -> 0004 + compose-role/0002 + seed
-# (Tham khảo hướng dẫn chi tiết tại database/demo/README.md)
+### 2. Chuẩn bị DB cô lập cho SQL Demo (`cinema_test_demo`)
+Không chạy `database/demo/*.sql` lên database đang phục vụ Web UI (`cinema`): các script có `guard.sql` chỉ chạy trên DB tên `cinema_test_*` đã có ràng buộc `0004`.
 
-# Mở sẵn terminal tại root để khi tới Slide 13 chỉ việc bấm mũi tên lên / Enter:
-psql -X -v ON_ERROR_STOP=1 -d cinema_test_demo -f database/demo/main.sql
-psql -X -v ON_ERROR_STOP=1 -d cinema_test_demo -f database/demo/exceptions.sql
-psql -X -v ON_ERROR_STOP=1 -d cinema_test_demo -f database/demo/permissions.sql
+> **Đã chạy thử ngày 26/11/2026** trên Docker Compose (máy Windows của nhóm): các bước dựng DB và cả 3 script `main.sql`, `exceptions.sql`, `permissions_grants.sql` đều kết thúc exit 0 và `ROLLBACK`. Vẫn nên chạy lại trên đúng máy trình chiếu trước giờ G.
+
+`db` trong Compose không mở cổng ra máy chủ, nên dùng `psql` bên trong container (không cần cài `psql` trên máy):
+
+```powershell
+# Từ thư mục gốc dự án: chép script demo vào container, rồi mở shell trong container
+docker compose cp database/demo db:/tmp/demo
+docker compose exec db sh
 ```
-- Lưu ý: cả 3 script `main.sql`, `exceptions.sql`, `permissions.sql` đều kết thúc bằng `ROLLBACK;` nên có thể chạy thử lại nhiều lần mà không làm bẩn dữ liệu (riêng kịch bản 2 terminal `concurrency_a.sql` / `concurrency_b.sql` sẽ `COMMIT` phiên A để quan sát).
+```sh
+# Trong shell của container `db` (một lần):
+psql -X -v ON_ERROR_STOP=1 -U cinema_owner -d postgres -c "CREATE DATABASE cinema_test_demo"
+for f in /docker-entrypoint-initdb.d/10-schema.sql \
+         /docker-entrypoint-initdb.d/40-booking-integrity.sql \
+         /docker-entrypoint-initdb.d/50-finite-money.sql \
+         /opt/cinema/demo.sql; do
+  psql -X -v ON_ERROR_STOP=1 -U cinema_owner -d cinema_test_demo -f "$f" || break
+done
+# Role cinema_api đã tồn tại ở mức cluster; chỉ cấp lại GRANT cho DB mới (bỏ CREATE ROLE và \getenv):
+grep -vE 'CREATE ROLE|getenv' /docker-entrypoint-initdb.d/20-runtime-role.sql \
+  | psql -X -v ON_ERROR_STOP=1 -U cinema_owner -d cinema_test_demo
+psql -X -v ON_ERROR_STOP=1 -U cinema_owner -d cinema_test_demo -f /docker-entrypoint-initdb.d/30-movie-delete-permissions.sql
+
+# Mở sẵn terminal này; tới Slide 13 chỉ việc chạy lần lượt:
+cd /tmp/demo
+psql -X -v ON_ERROR_STOP=1 -U cinema_owner -d cinema_test_demo -f main.sql
+psql -X -v ON_ERROR_STOP=1 -U cinema_owner -d cinema_test_demo -f exceptions.sql
+psql -X -v ON_ERROR_STOP=1 -U cinema_owner -d cinema_test_demo -f permissions_grants.sql
+```
+- Dự phòng: `permissions.sql`; kịch bản 2 terminal `concurrency_prepare.sql`, `concurrency_a.sql`, `concurrency_b.sql` (xem `database/demo/README.md`).
+- Cả 4 script `main.sql`, `exceptions.sql`, `permissions.sql`, `permissions_grants.sql` đều kết thúc bằng `ROLLBACK;` nên chạy lại nhiều lần được. Riêng `concurrency_a.sql` sẽ `COMMIT`: muốn trở về trạng thái đầu, chạy `DROP DATABASE cinema_test_demo` rồi dựng lại bằng các lệnh ở trên.
+- Nếu đã có sẵn một PostgreSQL test riêng (cổng riêng), có thể dùng `psql -d cinema_test_demo -f database/demo/<file>.sql` như trong `database/demo/README.md`.
+
+### 3. Thông tin còn thiếu (không có trong dự án)
+- [x] Tên Thành viên A và B; ai trình bày, ai demo (mục 0).
+- [x] Công cụ làm việc nhóm: chỉ Git/GitHub (Slide 3).
+- [ ] Phương án dự phòng khi Docker/DB lỗi lúc demo (ảnh chụp màn hình hoặc video quay sẵn).
+- [x] Số pytest sau commit `80092c6`: 1.409 đạt, skip 1 (`verify` ngày 26/11/2026), đã điền Slide 11 và 15.
+- [ ] Ngày giờ thuyết trình và máy trình chiếu thật, để chạy thử toàn bộ checklist. (Bản theo dõi tiến độ cũ, đã xóa ở commit `a9ed9f1`, ghi "01/12 hoặc 03/12/2026"; chưa có xác nhận mới.)

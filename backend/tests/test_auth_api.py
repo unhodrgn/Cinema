@@ -208,6 +208,33 @@ def test_a_duplicate_account_id_is_a_409_and_creates_nothing(client, owner):
     assert "users_username_key" not in text and "duplicate key" not in text and "INSERT" not in text
 
 
+@pytest.mark.parametrize(
+    "variant",
+    ["Customer1", "CUSTOMER1", " customer1 ", "\tcustomer1\n", "\u3000customer1\u3000", "ｃｕｓｔｏｍｅｒ１"],
+)
+def test_an_account_id_that_differs_only_by_case_spaces_or_width_is_the_same_account(client, owner, variant):
+    response = register(client, variant)
+
+    assert response.status_code == 409
+    assert error_of(response)["code"] == "duplicate_value"
+    assert count_users(owner, "customer1") == 1
+
+
+def test_the_full_width_lookalike_of_admin_cannot_be_registered(client):
+    assert register(client, "ａｄｍｉｎ").status_code == 409
+
+
+def test_the_account_id_is_stored_normalized_and_found_ignoring_case_and_spaces(client, owner):
+    name = unique("Mixed")
+    body = register(client, f"  {name}  ").get_json()
+    assert body["user"]["username"] == name  # trimmed, case kept as typed
+    assert db_row(owner, name)[1] == name
+
+    for variant in (name, name.upper(), name.lower(), f" {name.lower()} "):
+        assert login(client, variant).status_code == 200, variant
+    assert login(client, name + "x").status_code == 401
+
+
 def test_the_seeded_account_ids_are_taken(client):
     for name in ("admin", "customer1", "customer2"):
         assert register(client, name).status_code == 409
