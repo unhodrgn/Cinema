@@ -1,12 +1,12 @@
 # 도메인 정의서 (Domain Definition)
 
-**기준:** `backend/migrations/0001_baseline.sql` + `0003_booking_integrity.sql` + `0004_finite_money.sql` + `0005_username_case_insensitive.sql`. 승인되지 않은 값 목록(장르, 관람 등급)은 정의하지 않는다 (BR-DL-001 §6).
+**기준:** `backend/migrations/0001_baseline.sql` + `0003_booking_integrity.sql` + `0004_finite_money.sql` + `0005_username_case_insensitive.sql` + `0006_username_validation.sql`. 승인되지 않은 값 목록(장르, 관람 등급)은 정의하지 않는다 (BR-DL-001 §6).
 
 | 도메인 | 적용 컬럼 | PostgreSQL 타입 | 허용 범위 / 형식 | 검증 수단 |
 |---|---|---|---|---|
 | 식별자 | 모든 PK `*_id` | bigint | identity 자동 생성 | `GENERATED ALWAYS AS IDENTITY`, PK |
 | 참조 식별자 | `room_id`, `movie_id`, `user_id`, `showtime_id`, `booking_id`, `seat_id` | bigint | 부모 행 존재 | FK |
-| 계정 ID | `users.username` | varchar(60) | 유일(대소문자 구분 없음). API가 NFKC 정규화와 양끝 공백 제거 후 저장. 최소 길이는 승인되지 않음 | UNIQUE, UNIQUE INDEX `users_username_lower_key` (`lower(username)`), NOT NULL |
+| 계정 ID | `users.username` | varchar | 가입 시 공백·제어·보이지 않는 문자 거부. NFKC 후 최대 60자. 첫 글자는 Unicode 문자 또는 십진 숫자. 일반 ID는 뒤에 `_`, `-`, `.`, `+` 허용. `@`가 있으면 일반 ASCII 이메일 형식. 빈 값 금지 | NOT NULL, UNIQUE, `users_username_lower_key` (0005), `users_username_format_check` (0006) |
 | 비밀번호 해시 | `users.password_hash` | text | 일방향 해시 문자열(평문 금지). 해시 생성은 Flask 책임 | NOT NULL |
 | 권한 | `users.role` | varchar(10) | `CUSTOMER`, `ADMIN` (기본 `CUSTOMER`). `GUEST` 없음 | CHECK |
 | 영화 제목 | `movies.title` | varchar(200) | 문자열 | NOT NULL |

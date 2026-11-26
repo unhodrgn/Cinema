@@ -245,3 +245,5 @@ python backend/tests/run_database.py
 ---
 
 **Addendum 2026-11-26.** After this report, migration `0005_username_case_insensitive.sql` (account IDs: NFKC-normalized, trimmed, unique ignoring letter case; index `users_username_lower_key`) was added and approved by the project owner (decision D5 in `business_rules_decision_log.md`). The canonical migration set is now `0001`–`0005`; the status above describes `0001`–`0004` as audited on the original date.
+
+**0006 branch update.** This handover reconciliation records the earlier 0005 behavior. The current branch policy rejects edge whitespace during registration and requires the validated format CHECK; see [the current account ID domain](domain_definition.md).

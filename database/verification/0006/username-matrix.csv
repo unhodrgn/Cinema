@@ -1,0 +1,29 @@
+Test ID,Case,Raw input (escaped),API HTTP,Direct SQL rejects raw INSERT and UPDATE,Login after successful registration,Result
+U-01,one letter,'q',201,False,200,PASS
+U-02,Korean,'\ud55c\uae00\uad00\uac1d',201,False,200,PASS
+U-03,Vietnamese,'\u0110i\u1ec7n\u1ea2nh',201,False,200,PASS
+U-04,Vietnamese decomposed,'Nhe\u0323',201,True,200,PASS
+U-05,Unicode decimal,'\u0668\uad00\uac1d',201,False,200,PASS
+U-06,NFKC width,'\uff21\uff55\uff44\uff49\uff54\uff11\uff12',201,True,200,PASS
+U-07,valid email,'Cinema.One+2@sample.test',201,False,200,PASS
+U-08,max 60,'Qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',201,False,200,PASS
+U-09,60 supplementary-plane letters,'\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400\U00010400',201,False,200,PASS
+U-10,max 61,'Qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',400,True,N/A,PASS
+U-11,trailing space past storage limit,'ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ ',400,True,N/A,PASS
+U-12,NFKC expansion over 60,'\ufb03\ufb03\ufb03\ufb03\ufb03\ufb03\ufb03\ufb03\ufb03\ufb03\ufb03\ufb03\ufb03\ufb03\ufb03\ufb03\ufb03\ufb03\ufb03\ufb03\ufb03',400,True,N/A,PASS
+U-13,leading special,'_audit',400,True,N/A,PASS
+U-14,leading compatibility symbol,'\u24d0udit',400,True,N/A,PASS
+U-15,NFKC email punctuation,'\uff21udit\uff20sample.test',201,True,200,PASS
+U-16,leading space,' audit',400,True,N/A,PASS
+U-17,trailing space,'audit ',400,True,N/A,PASS
+U-18,internal space,'audit one',400,True,N/A,PASS
+U-19,NBSP,'audit\xa0one',400,True,N/A,PASS
+U-20,tab,'audit\t',400,True,N/A,PASS
+U-21,zero width,'audit\u200b',400,True,N/A,PASS
+U-22,Hangul filler,'\uac00\u3164',400,True,N/A,PASS
+U-23,variation selector,'\uac00\ufe0f',400,True,N/A,PASS
+U-24,two @,'who@@sample.test',400,True,N/A,PASS
+U-25,email without dotted domain,'who@local',400,True,N/A,PASS
+U-26,email empty label,'who@sample..test',400,True,N/A,PASS
+U-27,email domain begins hyphen,'who@-sample.test',400,True,N/A,PASS
+U-28,internationalized email,'\uc544\uc774\ub514@sample.test',400,True,N/A,PASS

@@ -165,7 +165,7 @@ def build_page(kind):
         seen.add((parent, child))
         special = "exitX=0.15;exitY=0;exitDx=0;exitDy=0;entryX=0.85;entryY=1;entryDx=0;entryDy=0;" if (parent, child) == ("theater_rooms", "showtimes") else None
         edge(parts, ids[parent], ids[child], REL_LABEL.get((parent, child), ""), special)
-    title = "물리적 데이터 모델 (Physical): PostgreSQL 18, 마이그레이션 0001~0005" if kind == "physical" else "논리적 데이터 모델 (Logical): 엔티티·속성·관계 (3NF)"
+    title = "물리적 데이터 모델 (Physical): PostgreSQL 18, 마이그레이션 0001~0006" if kind == "physical" else "논리적 데이터 모델 (Logical): 엔티티·속성·관계 (3NF)"
     parts.append(f'<mxCell id="{nid()}" value={q(title)} style="text;html=1;fontSize=22;fontStyle=1;fontColor=#14161B;align=left;" vertex="1" parent="1"><mxGeometry x="40" y="8" width="1400" height="36" as="geometry"/></mxCell>')
     legend = ("<b>범례</b><br>PK 기본키 · FK 외래키 · UK 후보키(유일)<br>NN NOT NULL<br>관계선: 1(부모) — 0..N(자식), 크로우풋 표기<br>"
               "<br>통제된 중복: bookings.total_amount, booking_seats.showtime_id, booking_seats.price_at_booking, showtimes.ends_at")

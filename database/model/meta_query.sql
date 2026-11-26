@@ -1,4 +1,4 @@
--- 모델 파일(gen_drawio.py)의 입력. 마이그레이션 0001~0005를 적용한 빈 DB에서 실행하고
+-- 모델 파일(gen_drawio.py)의 입력. 마이그레이션 0001~0006를 적용한 빈 DB에서 실행하고
 -- 결과(JSON 한 줄)를 meta.json 으로 저장한다 (psql -At -f meta_query.sql).
 select json_build_object(
  'columns', (select json_agg(json_build_object('t',c.relname,'n',a.attname,'type',format_type(a.atttypid,a.atttypmod),'notnull',a.attnotnull,'default',pg_get_expr(d.adbin,d.adrelid),'ident',a.attidentity,'ord',a.attnum) order by c.relname,a.attnum)

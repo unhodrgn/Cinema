@@ -1,0 +1,11 @@
+Recreated website snapshot at 0005 on the isolated server
+ERROR:  Migration 0006 stopped: 2 account ID(s) violate the policy
+HINT:  Review the affected accounts on an isolated restored copy; this migration changes no account data.
+CONTEXT:  PL/pgSQL function inline_code_block line 8 at RAISE
+0006 refused two invalid rows and left 0005 in place
+ERROR:  Expected account identities or dependency checks failed; no accounts deleted
+CONTEXT:  PL/pgSQL function inline_code_block line 18 at RAISE
+Cleanup refused changed identity and deleted zero accounts
+users_username_format_check|t
+CREATE UNIQUE INDEX users_username_lower_key ON public.users USING btree (lower((username)::text))
+0005 → 0006 verified; 3 retained accounts, booking data, and all sequence values unchanged

@@ -29,7 +29,7 @@ from app.core.passwords import (
     verify_password,
 )
 from app.core.security import Policy, issue_token, policy
-
+from app.core.username_policy import registration_username
 from app.models.user import public_user
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
@@ -37,34 +37,15 @@ bp = Blueprint("auth", __name__, url_prefix="/auth")
 _BEARER_CHALLENGE = {"WWW-Authenticate": "Bearer"}
 
 
-# --- validation (pure; technical limits only, no business password policy) ------------
-
-
-def has_control_characters(text):
-    """True if ``text`` contains an ASCII control character (including NUL, which
-    PostgreSQL cannot store)."""
-    return any(ord(character) < 32 or ord(character) == 127 for character in text)
+# --- validation ---------------------------------------------------------------------
 
 
 def normalize_username(value):
-    """The canonical account ID: NFKC (full-width letters and compatibility forms become plain
-    ones) with leading and trailing whitespace removed. Uniqueness and login then compare it
+    """The historical login lookup: NFKC (full-width letters and compatibility forms become plain
+    ones) with leading and trailing whitespace removed. Login then compares it
     ignoring case (``users_username_lower_key``). Non-text values are returned unchanged for
     the validators to reject."""
     return unicodedata.normalize("NFKC", value).strip() if isinstance(value, str) else value
-
-
-def check_username(value):
-    """A fixed error message for an unusable account ID, or None."""
-    if value is None or (isinstance(value, str) and value.strip() == ""):
-        return "Account ID is required."
-    if not isinstance(value, str):
-        return "Account ID must be text."
-    if len(value) > USERNAME_MAX_LENGTH:
-        return f"Account ID must be at most {USERNAME_MAX_LENGTH} characters."
-    if has_control_characters(value):
-        return "Account ID must not contain control characters."
-    return None
 
 
 def check_password(value, enforce_length=True):
@@ -85,10 +66,12 @@ def _credential_fields(body, for_registration):
     ``user_id``, ...) is ignored. For login the password length is not validated here: a
     too-long password simply cannot match (see ``login``).
     """
-    username, password = normalize_username(body.get("username")), body.get("password")
+    raw_username, password = body.get("username"), body.get("password")
     if for_registration:
-        problems = {"username": check_username(username), "password": check_password(password)}
+        username, username_error = registration_username(raw_username)
+        problems = {"username": username_error, "password": check_password(password)}
     else:
+        username = normalize_username(raw_username)
         problems = {
             "username": "Account ID is required."
             if username is None or (isinstance(username, str) and username.strip() == "")
@@ -140,6 +123,10 @@ def register():
         raise AppError(
             SQLSTATE_ERRORS["23505"], fields={"username": "This account ID is already in use."}
         ) from None
+    except psycopg2.errors.CheckViolation as exc:
+        if exc.diag.constraint_name != "users_username_format_check":
+            raise
+        raise ValidationError({"username": "Account ID has an invalid format."}) from None
     return jsonify(user=public_user(row)), 201
 
 

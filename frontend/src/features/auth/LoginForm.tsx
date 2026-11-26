@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { registrationUsernameError } from "../../../js/username-policy.js";
 import { safeNext } from "../../../js/auth.js";
 import { auth, errorMessage } from "../../services/apiClient";
 import { useSession } from "../../components/common/Navbar";
@@ -25,6 +26,13 @@ export function LoginForm({ register = false }: { register?: boolean }) {
     const data = new FormData(form);
     const name = String(data.get("username"));
     const password = String(data.get("password"));
+    const usernameError = register ? registrationUsernameError(name) : "";
+    if (usernameError) {
+      setFields({ username: usernameError });
+      setMessage("");
+      setFailed(false);
+      return;
+    }
     setBusy(true);
     setFields({});
     setMessage("");
@@ -73,7 +81,6 @@ export function LoginForm({ register = false }: { register?: boolean }) {
             id="username"
             name="username"
             required
-            maxLength={60}
             autoComplete="username"
             autoCapitalize="none"
             spellCheck={false}

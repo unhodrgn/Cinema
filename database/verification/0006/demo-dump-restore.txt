@@ -1,0 +1,3 @@
+cinema_artifacts_0006|0|6|5|250|280|0|1
+cinema_artifact_custom|0|6|5|250|280|0|1
+cinema_artifact_plain|0|6|5|250|280|0|1

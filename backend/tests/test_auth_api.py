@@ -7,6 +7,8 @@ leaks" rules. Needs a disposable PostgreSQL (explicit TEST_DB_PORT); skipped oth
 
 import json
 import logging
+import subprocess
+import unicodedata
 import re
 import threading
 import uuid
@@ -16,12 +18,14 @@ from types import SimpleNamespace
 
 import itsdangerous.timed
 import pytest
+from psycopg2.errors import CheckViolation
 from flask import g, jsonify
 from itsdangerous import URLSafeTimedSerializer
 
 import disposable_db
 from app import create_app
 from app.core import passwords, security
+from app.core.username_policy import registration_username
 from app.core.security import Policy, policy
 from helpers import ApiClient
 
@@ -210,9 +214,9 @@ def test_a_duplicate_account_id_is_a_409_and_creates_nothing(client, owner):
 
 @pytest.mark.parametrize(
     "variant",
-    ["Customer1", "CUSTOMER1", " customer1 ", "\tcustomer1\n", "\u3000customer1\u3000", "ｃｕｓｔｏｍｅｒ１"],
+    ["Customer1", "CUSTOMER1", "ｃｕｓｔｏｍｅｒ１"],
 )
-def test_an_account_id_that_differs_only_by_case_spaces_or_width_is_the_same_account(client, owner, variant):
+def test_an_account_id_that_differs_only_by_case_or_width_is_the_same_account(client, owner, variant):
     response = register(client, variant)
 
     assert response.status_code == 409
@@ -226,8 +230,10 @@ def test_the_full_width_lookalike_of_admin_cannot_be_registered(client):
 
 def test_the_account_id_is_stored_normalized_and_found_ignoring_case_and_spaces(client, owner):
     name = unique("Mixed")
-    body = register(client, f"  {name}  ").get_json()
-    assert body["user"]["username"] == name  # trimmed, case kept as typed
+    assert register(client, f"  {name}  ").status_code == 400
+    fullwidth = "".join(chr(ord(ch) + 0xFEE0) for ch in name)
+    body = register(client, fullwidth).get_json()
+    assert body["user"]["username"] == name  # NFKC, case kept as typed
     assert db_row(owner, name)[1] == name
 
     for variant in (name, name.upper(), name.lower(), f" {name.lower()} "):
@@ -246,13 +252,15 @@ def test_simultaneous_registrations_of_one_account_id_create_exactly_one_account
 
     def attempt(_):
         barrier.wait()
-        return register(ApiClient(app.test_client()), name).status_code
+        return register(ApiClient(app.test_client()), name.upper() if _ % 2 else name).status_code
 
     with ThreadPoolExecutor(6) as pool:
         statuses = list(pool.map(attempt, range(6)))
 
     assert sorted(statuses) == [201] + [409] * 5
-    assert count_users(owner, name) == 1
+    with owner.cursor() as cursor:
+        cursor.execute("SELECT count(*) FROM users WHERE lower(username) = lower(%s)", (name,))
+        assert cursor.fetchone()[0] == 1
 
 
 @pytest.mark.parametrize(
@@ -261,14 +269,14 @@ def test_simultaneous_registrations_of_one_account_id_create_exactly_one_account
         ({"password": "x"}, "username", "Account ID is required."),
         ({"username": None, "password": "x"}, "username", "Account ID is required."),
         ({"username": "", "password": "x"}, "username", "Account ID is required."),
-        ({"username": "   ", "password": "x"}, "username", "Account ID is required."),
+        ({"username": "   ", "password": "x"}, "username", "Account ID contains a space, invisible character, or unsupported character."),
         ({"username": 12, "password": "x"}, "username", "Account ID must be text."),
         ({"username": ["a"], "password": "x"}, "username", "Account ID must be text."),
         ({"username": {"a": 1}, "password": "x"}, "username", "Account ID must be text."),
-        ({"username": "a" * 61, "password": "x"}, "username", "Account ID must be at most 60 characters."),
-        ({"username": "nul\u0000byte", "password": "x"}, "username", "Account ID must not contain control characters."),
-        ({"username": "line\nbreak", "password": "x"}, "username", "Account ID must not contain control characters."),
-        ({"username": "tab\there", "password": "x"}, "username", "Account ID must not contain control characters."),
+        ({"username": "a" * 61, "password": "x"}, "username", "Account ID must be at most 60 characters after normalization."),
+        ({"username": "nul\u0000byte", "password": "x"}, "username", "Account ID contains a space, invisible character, or unsupported character."),
+        ({"username": "line\nbreak", "password": "x"}, "username", "Account ID contains a space, invisible character, or unsupported character."),
+        ({"username": "tab\there", "password": "x"}, "username", "Account ID contains a space, invisible character, or unsupported character."),
         ({"username": "ok"}, "password", "Password is required."),
         ({"username": "ok", "password": ""}, "password", "Password is required."),
         ({"username": "ok", "password": None}, "password", "Password is required."),
@@ -309,16 +317,11 @@ def test_the_limits_are_inclusive_and_unicode_works(client, owner):
         assert db_row(owner, name)[1] == name
 
 
-def test_special_characters_in_the_account_id_are_data_not_sql(client, owner):
+def test_unsupported_account_id_characters_are_rejected(client, owner):
     name = "x'; DROP TABLE users; --" + uuid.uuid4().hex[:6]
 
-    assert register(client, name).status_code == 201
-    assert login(client, name).status_code == 200
-    assert count_users(owner, name) == 1
-    with owner.cursor() as cur:
-        cur.execute("SELECT count(*) FROM users")
-        assert cur.fetchone()[0] >= 3  # the table is intact
-    owner.rollback()
+    assert register(client, name).status_code == 400
+    assert count_users(owner, name) == 0
 
 
 def test_registration_needs_a_json_object(client):
@@ -831,3 +834,64 @@ def test_the_public_user_never_contains_the_password_hash():
     row = {"user_id": 1, "username": "a", "role": "CUSTOMER", "password_hash": "pbkdf2:sha256:1$a$b"}
 
     assert public_user(row) == {"user_id": 1, "username": "a", "role": "CUSTOMER"}
+
+
+USERNAME_CASES = [
+    ("one letter","q",True),("Korean","한글관객",True),("Vietnamese","ĐiệnẢnh",True),
+    ("Vietnamese decomposed","Nhe\u0323",True),("Unicode decimal","٨관객",True),
+    ("NFKC width","Ａｕｄｉｔ１２",True),("valid email","Cinema.One+2@sample.test",True),
+    ("max 60","Q"+"x"*59,True), ("60 supplementary-plane letters","𐐀"*60,True),("max 61","Q"+"x"*60,False),
+    ("trailing space past storage limit","Z"*60+" ",False),
+    ("NFKC expansion over 60","ﬃ"*21,False),("leading special","_audit",False), ("leading compatibility symbol","ⓐudit",False),
+    ("NFKC email punctuation","Ａudit＠sample.test",True),
+    ("leading space"," audit",False),("trailing space","audit ",False),("internal space","audit one",False),
+    ("NBSP","audit\u00a0one",False),("tab","audit\t",False),("zero width","audit\u200b",False),
+    ("Hangul filler","가\u3164",False),("variation selector","가\ufe0f",False),
+    ("two @","who@@sample.test",False),("email without dotted domain","who@local",False),
+    ("email empty label","who@sample..test",False),("email domain begins hyphen","who@-sample.test",False),
+    ("internationalized email","아이디@sample.test",False),
+]
+
+def test_username_matrix_matches_browser_api_and_postgresql(client, owner):
+    frontend = Path(__file__).resolve().parents[2] / "frontend"
+    script = """
+        import { registrationUsernameError } from "./js/username-policy.js";
+        const inputs = JSON.parse(process.argv[1]);
+        console.log(JSON.stringify(inputs.map(value => !registrationUsernameError(value))));
+    """
+    results = subprocess.check_output(
+        ["node", "--input-type=module", "-e", script, json.dumps([raw for _, raw, _ in USERNAME_CASES])],
+        cwd=frontend, text=True,
+    )
+    with owner.cursor() as cursor:
+        for (label, raw, accepted), js_ok in zip(USERNAME_CASES, json.loads(results), strict=True):
+            canonical = unicodedata.normalize("NFKC", raw)
+            assert js_ok == accepted, label
+            assert (registration_username(raw)[1] is None) == accepted, label
+            cursor.execute("SELECT public.cinema_username_is_valid(%s)", (raw,))
+            raw_storable = accepted and canonical == raw
+            assert cursor.fetchone()[0] == raw_storable, label
+            for operation in (
+                "INSERT INTO users(username, password_hash) VALUES (%s, %s)",
+                "UPDATE users SET username = %s WHERE password_hash = %s",
+            ):
+                cursor.execute("SAVEPOINT username_probe")
+                try:
+                    if operation.startswith("UPDATE"):
+                        cursor.execute("INSERT INTO users(username,password_hash) VALUES ('probe-target','probe-only')")
+                    if raw_storable:
+                        cursor.execute(operation, (raw, "probe-only"))
+                        assert cursor.rowcount == 1
+                    else:
+                        with pytest.raises(CheckViolation) as exc:
+                            cursor.execute(operation, (raw, "probe-only"))
+                        assert exc.value.diag.constraint_name == "users_username_format_check", label
+                finally:
+                    cursor.execute("ROLLBACK TO SAVEPOINT username_probe")
+                    cursor.execute("RELEASE SAVEPOINT username_probe")
+            owner.commit()
+            assert register(client, raw).status_code == (201 if accepted else 400), label
+            if accepted:
+                assert db_row(owner, canonical)[1] == canonical, label
+                assert login(client, raw).status_code == 200, label
+    owner.rollback()

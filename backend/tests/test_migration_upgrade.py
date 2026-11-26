@@ -1,4 +1,4 @@
-"""Upgrade migration tests (0001 -> 0003 -> 0004 -> 0005), check_schema preflight, and lock timeout handling.
+"""Upgrade migration tests (0001 -> 0003 -> 0004 -> 0005 -> 0006), check_schema preflight, and lock timeout handling.
 
 Runs strictly against disposable PostgreSQL databases created and dropped by this module.
 """
@@ -20,6 +20,7 @@ M0001 = MIGRATIONS / "0001_baseline.sql"
 M0003 = MIGRATIONS / "0003_booking_integrity.sql"
 M0004 = MIGRATIONS / "0004_finite_money.sql"
 M0005 = MIGRATIONS / "0005_username_case_insensitive.sql"
+M0006 = MIGRATIONS / "0006_username_validation.sql"
 
 
 def _create_db(postgres_settings, sql_files):
@@ -71,6 +72,7 @@ def test_upgrade_0001_to_0003_to_0004_preserves_history_and_passes_check_schema(
         db.apply_sql_file(M0003)
         db.apply_sql_file(M0004)
         db.apply_sql_file(M0005)
+        db.apply_sql_file(M0006)
 
         conn = db.connect()
         try:

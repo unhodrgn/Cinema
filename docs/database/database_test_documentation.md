@@ -75,7 +75,7 @@ The new integrity suite also fails against Member A's original schema (`column s
 ## 0005 계정 ID 정규화 검증
 
 - `backend/tests/test_auth_api.py`: `Customer1`, `CUSTOMER1`, ` customer1 `, 탭·줄바꿈·전각 공백으로 감싼 ID, 전각 `customer1`, 전각 `admin`은 등록 시 409이고, 앞뒤 공백이 있는 새 ID는 공백이 제거되어 저장되며, 대소문자·공백이 다른 입력으로도 로그인된다.
-- `backend/tests/test_migration_upgrade.py`: 업그레이드 경로 0001 → 0003 → 0004 → 0005에서 `check_schema`가 통과하고, 대소문자만 다른 ID(23505), 양끝 공백이 있는 ID(23514), NFKC가 아닌 ID(23514)가 있으면 0005가 데이터를 바꾸지 않고 중단하며 인덱스를 만들지 않는다.
+- `backend/tests/test_migration_upgrade.py`: 업그레이드 경로 0001 → 0003 → 0004 → 0005 → 0006에서 최종 `check_schema`가 통과하고, 대소문자만 다른 ID(23505), 양끝 공백이 있는 ID(23514), NFKC가 아닌 ID(23514)가 있으면 0005가 데이터를 바꾸지 않고 중단하며 인덱스를 만들지 않는다.
 
 ## 0003–0004 회귀 및 시연
 
@@ -113,3 +113,9 @@ SELECT status, payment_status, total_amount,
 FROM bookings WHERE booking_id = :demo_booking_id;
 ROLLBACK;
 ```
+
+## 0006 계정 ID 형식 검증
+
+- `backend/tests/test_auth_api.py`의 매트릭스는 공용 JavaScript 검사, Python, Flask API, PostgreSQL 검증 함수와 직접 INSERT/UPDATE를 비교한다. 정상 입력은 로그인까지 검증하며, 동시 요청은 대소문자 변형을 포함해 201 응답 한 건과 나머지 409 응답을 확인한다.
+- 0005 복원본에 유효하지 않은 행이 있으면 0006 전체가 롤백된다. 별도 유지보수 SQL로 확인된 두 테스트 행만 삭제한 후 0006을 적용하고 나머지 계정·예매 기록·시퀀스를 비교한다.
+- `frontend/e2e/reservation.spec.ts`에서 브라우저 입력 거절과 정상 이메일 ID 가입·로그인을 검증한다. 기존 보안 회귀 테스트는 계정 ID 거절, 인증·권한, 영화 입력의 안전한 렌더링까지 포함한다.

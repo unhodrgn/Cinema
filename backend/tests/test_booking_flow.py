@@ -18,7 +18,7 @@ import disposable_db
 from app import create_app
 from app.core import passwords, security
 from helpers import ApiClient
-from time_travel import create_spare_room_screening
+from time_travel import create_spare_room_screening, start_screening_in_past
 
 FRONTEND = "http://localhost:8080"
 HASH = passwords.hash_password("test-password-123")
@@ -180,18 +180,18 @@ def test_booking_input_validation(customer, future_screenings):
     assert resp.status_code == 400
 
 
-def test_cannot_book_started_screening(customer, public_client):
-    # Find a screening that has already started
-    resp = public_client.get("/api/screenings")
-    screenings = resp.get_json()["screenings"]
-    started = [s for s in screenings if s["has_started"]]
-    if not started:
-        pytest.skip("No started screenings available at current time")
-    sid = started[0]["showtime_id"]
-    seats_resp = public_client.get(f"/api/screenings/{sid}/seats").get_json()["seats"]
-    seat_id = seats_resp[0]["seat_id"]
+def test_cannot_book_started_screening(customer, booking_db):
+    connection = booking_db.connect()
+    try:
+        screening = create_spare_room_screening(connection)
+        sid = screening["showtime_id"]
+        start_screening_in_past(connection, sid)
+    finally:
+        connection.close()
 
-    book_resp = customer["client"].post("/api/bookings", {"screening_id": sid, "seat_ids": [seat_id]})
+    book_resp = customer["client"].post(
+        "/api/bookings", {"screening_id": sid, "seat_ids": [screening["seat_ids"][0]]}
+    )
     assert book_resp.status_code == 409
     assert book_resp.get_json()["error"]["code"] == "screening_started"
 

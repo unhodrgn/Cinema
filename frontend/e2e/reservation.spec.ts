@@ -302,10 +302,14 @@ test("SEC-01: stored and reflected XSS payloads render safely as text without ex
     "/register.html",
   );
 
-  // Register customer with XSS-like username
+  // Registration rejects markup and accepts a valid replacement
   await page.goto("/register.html");
   await page.getByLabel("Account ID").fill(xssUser);
   await page.getByLabel("Password", { exact: true }).fill("xss-test-1234");
+  await page.getByRole("button", { name: "Register", exact: true }).click();
+  await expect(page.getByLabel("Account ID")).toHaveAttribute("aria-invalid", "true");
+  const account = `Cinema.One+${Date.now()}@sample.test`;
+  await page.getByLabel("Account ID").fill(account);
   await page.getByRole("button", { name: "Register", exact: true }).click();
   await expect(page).toHaveURL(/\/login\.html\?registered=1/);
 
@@ -337,12 +341,12 @@ test("SEC-01: stored and reflected XSS payloads render safely as text without ex
     await page.goto(target);
   }
 
-  // Log out admin, then log in as XSS-named customer and check nav rendering
+  // Log out admin, then log in as the newly registered customer
   await page.getByRole("button", { name: "Log out" }).click();
   await expect(page).toHaveURL(/\/(index\.html)?$/);
   await page.goto("/login.html");
-  await login(page, xssUser, "xss-test-1234");
-  await expect(page.getByText(`${xssUser} (CUSTOMER)`)).toBeVisible();
+  await login(page, account, "xss-test-1234");
+  await expect(page.getByText(`${account} (CUSTOMER)`)).toBeVisible();
 
   expect(await page.evaluate(() => (window as unknown as { __xss?: unknown }).__xss)).toBeUndefined();
   expect(dialogs).toEqual([]);
