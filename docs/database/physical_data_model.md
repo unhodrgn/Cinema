@@ -1,6 +1,6 @@
 # 물리적 데이터 모델 (Physical Data Model)
 
-**DBMS:** PostgreSQL 18 (18.7에서 검증) · **확장:** `btree_gist` · **DDL:** `backend/migrations/0001_baseline.sql` + `0002_movie_delete_permissions.sql` + `0003_booking_integrity.sql` + `0004_finite_money.sql` · **시드:** `backend/seeds/demo.sql`
+**DBMS:** PostgreSQL 18 (18.7에서 검증) · **확장:** `btree_gist` · **DDL:** `backend/migrations/0001_baseline.sql` + `0002_movie_delete_permissions.sql` + `0003_booking_integrity.sql` + `0004_finite_money.sql` + `0005_username_case_insensitive.sql` · **시드:** `backend/seeds/demo.sql`
 컬럼별 타입·제약은 `table_description.md`, 도메인은 `domain_definition.md`에 있다. 이 문서는 구현 구조를 요약한다.
 
 ## 1. 물리 ERD

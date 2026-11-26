@@ -1,11 +1,11 @@
 # 논리적 데이터 모델 (Logical Data Model)
 
-**기준:** `backend/migrations/0001_baseline.sql` + `0003_booking_integrity.sql` + `0004_finite_money.sql`. 표기: PK 밑줄 대신 **PK**, 외래키는 FK, 후보키는 UK.
+**기준:** `backend/migrations/0001_baseline.sql` + `0003_booking_integrity.sql` + `0004_finite_money.sql` + `0005_username_case_insensitive.sql`. 표기: PK 밑줄 대신 **PK**, 외래키는 FK, 후보키는 UK.
 
 ## 1. 릴레이션 스키마
 
 ```
-USERS(user_id PK, username UK, password_hash, role, created_at)
+USERS(user_id PK, username UK, password_hash, role, created_at)   -- UK는 대소문자를 구분하지 않음(lower(username)), 0005
 MOVIES(movie_id PK, title, genre, duration_minutes, rating, synopsis, release_date, poster_url)
 ROOMS(room_id PK, room_name UK)                                  -- theater_rooms
 SEATS(seat_id PK, room_id FK→ROOMS, seat_row, seat_number)       -- UK(room_id, seat_row, seat_number)
@@ -25,6 +25,7 @@ BOOKING_SEATS(booking_seat_id PK, booking_id, showtime_id, seat_id FK→SEATS, p
 
 | 규칙 | 표현 |
 |---|---|
+| 계정 ID는 대소문자 구분 없이 유일. 저장 전 NFKC 정규화와 양끝 공백 제거 | `lower(username)` 고유 인덱스 (0005) + 응용 프로그램 정규화 |
 | 역할은 `CUSTOMER`/`ADMIN` | `role` 도메인 (D4: GUEST 없음) |
 | 예매 상태 `BOOKED`/`CANCELLED`/`EXPIRED`, 결제 상태 `UNPAID`/`PAID` | 도메인 (D3) |
 | `expires_at = booked_at + 10분` | 파생 제약 (D3) |

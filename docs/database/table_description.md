@@ -1,6 +1,6 @@
 # 테이블 기술서 (Table Description)
 
-**기준:** `backend/migrations/0001_baseline.sql` + `0002_movie_delete_permissions.sql` + `0003_booking_integrity.sql` + `0004_finite_money.sql` (PostgreSQL 18.7에서 검증). 업무 규칙은 BR-DL-001(D1~D6)과 B01~B05를 따른다.
+**기준:** `backend/migrations/0001_baseline.sql` + `0002_movie_delete_permissions.sql` + `0003_booking_integrity.sql` + `0004_finite_money.sql` + `0005_username_case_insensitive.sql` (PostgreSQL 18.7에서 검증). 업무 규칙은 BR-DL-001(D1~D6)과 B01~B05를 따른다.
 **논리 명칭 ↔ 물리 테이블:** USERS=`users`, MOVIES=`movies`, ROOMS=`theater_rooms`, SEATS=`seats`, SCREENINGS=`showtimes`, BOOKINGS=`bookings`, BOOKING_SEATS=`booking_seats`.
 
 모든 기본키(`*_id`)는 `bigint GENERATED ALWAYS AS IDENTITY`이다.
@@ -100,7 +100,7 @@
 
 ## 8. 인덱스
 
-`idx_showtimes_movie_start`(movie_id, starts_at), `idx_showtimes_room_start`(room_id, starts_at), `idx_bookings_user`(user_id, booked_at DESC), `idx_bookings_showtime_status`(showtime_id, status), `idx_booking_seats_seat`(seat_id), `idx_bookings_pending_expiry`(expires_at) WHERE `status='BOOKED' AND payment_status='UNPAID'` (만료 처리 탐색용 기술 인덱스). 부모의 `bookings_id_showtime_key`와 활성 배정의 `booking_seats_showtime_seat_key`는 고유 B-tree 인덱스를 생성한다.
+`idx_showtimes_movie_start`(movie_id, starts_at), `idx_showtimes_room_start`(room_id, starts_at), `idx_bookings_user`(user_id, booked_at DESC), `idx_bookings_showtime_status`(showtime_id, status), `idx_booking_seats_seat`(seat_id), `idx_bookings_pending_expiry`(expires_at) WHERE `status='BOOKED' AND payment_status='UNPAID'` (만료 처리 탐색용 기술 인덱스), `users_username_lower_key`(`lower(username)`) UNIQUE (계정 ID의 대소문자 무시 유일성, 0005). 부모의 `bookings_id_showtime_key`와 활성 배정의 `booking_seats_showtime_seat_key`는 고유 B-tree 인덱스를 생성한다.
 
 ## 9. 함수 및 런타임 권한 (응용 프로그램 호출용)
 

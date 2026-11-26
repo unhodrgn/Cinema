@@ -1,6 +1,6 @@
 # 도메인 정의서 (Domain Definition)
 
-**기준:** `backend/migrations/0001_baseline.sql` + `0003_booking_integrity.sql` + `0004_finite_money.sql`. 승인되지 않은 값 목록(장르, 관람 등급)은 정의하지 않는다 (BR-DL-001 §6).
+**기준:** `backend/migrations/0001_baseline.sql` + `0003_booking_integrity.sql` + `0004_finite_money.sql` + `0005_username_case_insensitive.sql`. 승인되지 않은 값 목록(장르, 관람 등급)은 정의하지 않는다 (BR-DL-001 §6).
 
 | 도메인 | 적용 컬럼 | PostgreSQL 타입 | 허용 범위 / 형식 | 검증 수단 |
 |---|---|---|---|---|
@@ -42,4 +42,4 @@
 
 ## 응용 프로그램이 검증할 항목
 
-로그인·권한·소유권 확인, 회원가입 시 `role` 미전달, 비밀번호 해시 생성, 입력 형식 검증(계정 ID·비밀번호 형식은 미승인), 만료 처리 호출 시점(요청 시점 처리).
+로그인·권한·소유권 확인, 회원가입 시 `role` 미전달, 비밀번호 해시 생성, 계정 ID 정규화(NFKC, 양끝 공백 제거)와 입력 검증(비밀번호 형식은 미승인), 만료 처리 호출 시점(요청 시점 처리).

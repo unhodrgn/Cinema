@@ -241,3 +241,7 @@ python backend/tests/run_database.py
 ### 10.4 Historical Nov 20 baseline test run (`run_all.sh`)
 
 `schema.sql` OK · `seed.sql` OK (3/5/5/250/140) · integrity **177/177** · probes **31 MATCH, 0 MISMATCH** · concurrency **16/16** · `ALL DATABASE TESTS PASSED` (PostgreSQL 18.6, disposable database, dropped afterwards). Subsequent `0002`–`0004` migrations and the 6-movie / 280-showtime seed are verified via `python backend/tests/run_database.py` and `docker compose --profile test run --build --rm verify`.
+
+---
+
+**Addendum 2026-11-26.** After this report, migration `0005_username_case_insensitive.sql` (account IDs: NFKC-normalized, trimmed, unique ignoring letter case; index `users_username_lower_key`) was added and approved by the project owner (decision D5 in `business_rules_decision_log.md`). The canonical migration set is now `0001`–`0005`; the status above describes `0001`–`0004` as audited on the original date.

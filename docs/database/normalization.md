@@ -1,6 +1,6 @@
 # 정규화 검토 (1NF → 3NF)
 
-**대상:** `0001_baseline.sql`, `0003_booking_integrity.sql`, `0004_finite_money.sql` 적용 후 7개 릴레이션. 이전 초안(`CinemaDB_FINAL_PostgreSQL_Handover/docs/04_Normalization_Review_KO.md`)은 승인된 결정(D1~D6) 이전 모델을 기준으로 하므로 이 문서가 대체한다.
+**대상:** `0001_baseline.sql`, `0003_booking_integrity.sql`, `0004_finite_money.sql`, `0005_username_case_insensitive.sql` 적용 후 7개 릴레이션. 이전 초안(`CinemaDB_FINAL_PostgreSQL_Handover/docs/04_Normalization_Review_KO.md`)은 승인된 결정(D1~D6) 이전 모델을 기준으로 하므로 이 문서가 대체한다.
 
 ## 1. 비정규형 예시
 
@@ -25,7 +25,7 @@
 
 | 릴레이션 | 결정자 → 종속 속성 | 이행 종속 여부 |
 |---|---|---|
-| users | user_id → username, password_hash, role, created_at; username → user_id(후보키) | 없음 |
+| users | user_id → username, password_hash, role, created_at; username → user_id(후보키, 대소문자 무시 유일: 0005) | 없음 |
 | movies | movie_id → title, genre, duration_minutes, rating, synopsis, release_date, poster_url | 없음 |
 | theater_rooms | room_id → room_name; room_name → room_id | 없음 |
 | seats | seat_id → room_id, seat_row, seat_number; (room_id, seat_row, seat_number) → seat_id | 없음 |

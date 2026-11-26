@@ -72,6 +72,11 @@ The new integrity suite also fails against Member A's original schema (`column s
 * The exact-deadline checks use the functions' optional `p_as_of` argument (tests only); real-clock behaviour is covered by the 1.5-second pre-deadline payment, the post-deadline payments and the timed race C4.
 * Flask-level behaviour (sessions, authorisation, registration role, request-time expiry calls, demo account login) is covered by the pytest suite under `backend/tests/` and Playwright E2E tests under `frontend/e2e/`, not by the SQL-only suite above. Demo account credentials are documented in the root `README.md` and `backend/seeds/demo.sql`.
 
+## 0005 계정 ID 정규화 검증
+
+- `backend/tests/test_auth_api.py`: `Customer1`, `CUSTOMER1`, ` customer1 `, 탭·줄바꿈·전각 공백으로 감싼 ID, 전각 `customer1`, 전각 `admin`은 등록 시 409이고, 앞뒤 공백이 있는 새 ID는 공백이 제거되어 저장되며, 대소문자·공백이 다른 입력으로도 로그인된다.
+- `backend/tests/test_migration_upgrade.py`: 업그레이드 경로 0001 → 0003 → 0004 → 0005에서 `check_schema`가 통과하고, 대소문자만 다른 ID(23505), 양끝 공백이 있는 ID(23514), NFKC가 아닌 ID(23514)가 있으면 0005가 데이터를 바꾸지 않고 중단하며 인덱스를 만들지 않는다.
+
 ## 0003–0004 회귀 및 시연
 
 - PostgreSQL 18.7에서 0001 → 0003 → 0004 스키마를 사용한다. 별도 Compose 검증 프로필의 기존 실행기는 DB 스키마 작성 후 시드한다.

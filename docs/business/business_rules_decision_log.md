@@ -75,6 +75,8 @@ The same detail-row release and parent-history retention principle applies when 
 
 No full name, email address, phone number, or other registration field is required by the approved scope. The role is assigned by the system as `CUSTOMER`; public registration must never create an `ADMIN` account. Passwords must be stored as a secure one-way password hash, not as plaintext and not as reversibly encrypted text.
 
+**Account ID uniqueness (approved by the project owner on 2026-11-26, migration `0005`):** an account ID is stored NFKC-normalized with leading and trailing whitespace removed, and is unique ignoring letter case. `Customer1`, ` customer1 ` and the full-width form of `customer1` are therefore the same account ID as `customer1`; registration is refused (`409 duplicate_value`) and login finds the account the same way. No other format rule for account IDs or passwords is approved.
+
 **Movie attributes to support:**
 - `title` — 영화 제목
 - `genre` — 장르
@@ -208,4 +210,4 @@ Technical choices needed to implement the approved rules (for example, exact SQL
 
 ## 7. Approval and change control
 
-The six decisions D1–D6 were explicitly selected by the project owner on 2026-11-17. Subsequent alignments (PostgreSQL 18 migration, `poster_url` support, conditional movie/screening deletion, migration `0003` composite FK + immediate unique index, migration `0004` finite money checks) are reflected across B01–B03, `docs/database/*`, `docs/api/api_contract.md`, and the application codebase.
+The six decisions D1–D6 were explicitly selected by the project owner on 2026-11-17. Subsequent alignments (PostgreSQL 18 migration, `poster_url` support, conditional movie/screening deletion, migration `0003` composite FK + immediate unique index, migration `0004` finite money checks, migration `0005` account ID normalization) are reflected across B01–B03, `docs/database/*`, `docs/api/api_contract.md`, and the application codebase.

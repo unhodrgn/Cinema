@@ -12,24 +12,24 @@
 
 Bài thuyết trình được xây dựng theo **mạch câu chuyện (Storytelling)** từ **Đặt vấn đề → Môi trường & Kiến trúc → Phân tích nghiệp vụ → Thiết kế & Tiến hóa Database → Hiện thực hóa Backend/Frontend → Kiểm chứng đa tầng → Live Demo (UI + SQL) → Giá trị làm việc nhóm trong kỷ nguyên AI**.
 
-| Slide | Chủ đề (Việt / Hàn) | Thời lượng | Mốc thời gian | Đáp ứng yêu cầu `important.md` |
-|---|---|---|---|---|
-| **01** | Trang bìa & Giới thiệu nhóm (`프로젝트 소개`) | 0:30 | 00:00 – 00:30 | Mở đầu mạch lạc |
-| **02** | Bài toán & Quy mô hệ thống (`배경 및 시스템 규모`) | 0:35 | 00:30 – 01:05 | Đặt vấn đề từ bản chất dữ liệu |
-| **03** | Môi trường phát triển, DBMS & Công cụ (`개발 환경 및 기술 스택`) | 0:35 | 01:05 – 01:40 | Giải thích cấu hình ban đầu, DBMS, ngôn ngữ, công cụ |
-| **04** | Kiến trúc tách biệt Logic & Vật lý (`논리적·물리적 분리 아키텍처`) | 0:50 | 01:40 – 02:30 | Chứng minh DB/Backend/Frontend tách rời độc lập |
-| **05** | Phân tích nghiệp vụ & 6 Quyết định cốt lõi (`업무 분석 및 D1–D6`) | 0:55 | 02:30 – 03:25 | Câu chuyện từ 기획 → 분석, 14 chức năng, BR-01~15 |
-| **06** | Thiết kế dữ liệu: Conceptual → Logical → 3NF (`데이터 모델링 및 정규화`) | 0:50 | 03:25 – 04:15 | ERD 7 bảng, chuẩn hóa & *Controlled Redundancy* |
-| **07** | Thiết kế vật lý & Động cơ toàn vẹn PostgreSQL (`물리 설계 및 무결성 엔진`) | 1:00 | 04:15 – 05:15 | Tính năng lõi: `btree_gist`, Trigger, Lock, Snapshot giá |
-| **08** | Đối soát bàn giao & Tiến hóa Schema `0001–0005` (`교차 검증 및 고도화`) | 0:50 | 05:15 – 06:05 | Độ vững chắc thiết kế: phát hiện & sửa lỗi MVCC/NaN |
-| **09** | Hiện thực hóa Backend API & Bảo mật (`백엔드 REST API 및 보안`) | 0:40 | 06:05 – 06:45 | Fail-closed policy, Token, SQLSTATE, chống SQLi/XSS |
-| **10** | Hiện thực hóa Frontend SPA & Trải nghiệm (`프런트엔드 및 사용자 흐름`) | 0:30 | 06:45 – 07:15 | React 19 + TS + Vite, Responsive, Legacy UI fallback |
-| **11** | Kiểm chứng đa tầng & Kết quả (`다층 검증 및 테스트 결과`) | 0:50 | 07:15 – 08:05 | SQL Integrity, Concurrency, Pytest, Node, Playwright |
-| **12** | **Live Demo 1:** Trải nghiệm Web UI (`웹 애플리케이션 시연`) | 2:00 | 08:05 – 10:05 | Luồng Customer & Admin thực tế trên Docker Compose |
-| **13** | **Live Demo 2:** Kịch bản SQL trực tiếp (`SQL 데이터 제어 시연`) | 3:10 | 10:05 – 13:15 | Chứng minh trạng thái, ngoại lệ, quyền `cinema_api`, đồng thời |
-| **14** | **Slide trọng tâm:** Làm việc nhóm trong kỷ nguyên AI (`AI 시대의 팀 프로젝트 의미`) | 1:15 | 13:15 – 14:30 | Câu hỏi bắt buộc cuối/giữa bài dựa trên trải nghiệm thật |
-| **15** | Tổng kết & Định hướng (`결론 및 Q&A`) | 0:30 | 14:30 – 15:00 | Chốt giá trị dự án & mở phần hỏi đáp |
-| **16** | *Phụ lục:* Bộ câu hỏi Q&A dự kiến & Checklist trước giờ G | — | Q&A (5–10p) | Dự phòng phản biện kỹ thuật |
+| Slide  | Chủ đề (Việt / Hàn)                                                        | Thời lượng | Mốc thời gian | Đáp ứng yêu cầu `important.md`                                            |
+| ------ | -------------------------------------------------------------------------- | ---------- | ------------- | ------------------------------------------------------------------------- |
+| **01** | Trang bìa & Giới thiệu nhóm (`프로젝트 소개`)                                    | 0:30       | 00:00 – 00:30 | Mở đầu mạch lạc                                                           |
+| **02** | Bài toán & Quy mô hệ thống (`배경 및 시스템 규모`)                                 | 0:35       | 00:30 – 01:05 | Đặt vấn đề từ bản chất dữ liệu                                            |
+| **03** | Môi trường phát triển, DBMS & Công cụ (`개발 환경 및 기술 스택`)                    | 0:35       | 01:05 – 01:40 | Giải thích cấu hình ban đầu, DBMS, ngôn ngữ, công cụ                      |
+| **04** | Kiến trúc tách biệt Logic & Vật lý (`논리적·물리적 분리 아키텍처`)                     | 0:50       | 01:40 – 02:30 | Chứng minh DB/Backend/Frontend tách rời độc lập                           |
+| **05** | Phân tích nghiệp vụ & 6 Quyết định cốt lõi (`업무 분석 및 D1–D6`)               | 0:55       | 02:30 – 03:25 | Câu chuyện từ 기획 → 분석, 14 chức năng, BR-01~15                             |
+| **06** | Thiết kế dữ liệu: Conceptual → Logical → 3NF (`데이터 모델링 및 정규화`)             | 0:50       | 03:25 – 04:15 | ERD 7 bảng, chuẩn hóa & *Controlled Redundancy*                           |
+| **07** | Thiết kế vật lý & Động cơ toàn vẹn PostgreSQL (`물리 설계 및 무결성 엔진`)           | 1:00       | 04:15 – 05:15 | Tính năng lõi: `btree_gist`, Trigger, Lock, Snapshot giá                  |
+| **08** | Đối soát bàn giao & Tiến hóa Schema `0001–0005` (`교차 검증 및 고도화`)            | 0:50       | 05:15 – 06:05 | Độ vững chắc thiết kế: phát hiện & sửa lỗi MVCC/NaN                       |
+| **09** | Hiện thực hóa Backend API & Bảo mật (`백엔드 REST API 및 보안`)                  | 0:40       | 06:05 – 06:45 | Fail-closed policy, Token, SQLSTATE, chống SQLi/XSS                       |
+| **10** | Hiện thực hóa Frontend SPA & Trải nghiệm (`프런트엔드 및 사용자 흐름`)                | 0:30       | 06:45 – 07:15 | React 19 + TS + Vite, Responsive, Legacy UI fallback                      |
+| **11** | Kiểm chứng đa tầng & Kết quả (`다층 검증 및 테스트 결과`)                            | 0:50       | 07:15 – 08:05 | SQL Integrity, Concurrency, Pytest, Node, Playwright                      |
+| **12** | **Live Demo 1:** Trải nghiệm Web UI (`웹 애플리케이션 시연`)                        | 2:00       | 08:05 – 10:05 | Luồng Customer & Admin thực tế trên Docker Compose                        |
+| **13** | **Live Demo 2:** Kịch bản SQL trực tiếp (`SQL 데이터 제어 시연`)                  | 3:10       | 10:05 – 13:15 | Chứng minh trạng thái, ngoại lệ, quyền `cinema_api`, đồng thời            |
+| **14** | **Slide trọng tâm:** Làm việc nhóm trong kỷ nguyên AI (`AI 시대의 팀 프로젝트 의미`) | 1:15       | 13:15 – 14:30 | Câu hỏi bắt buộc cuối/giữa bài dựa trên trải nghiệm thật                  |
+| **15** | Tổng kết & Định hướng (`결론 및 향후 계획`)                                       | 0:30       | 14:30 – 15:00 | Chốt giá trị dự án                                                        |
+| **16** | Lời cảm ơn (`감사합니다`), trang cuối chỉ có lời cảm ơn                         | —          | —             | Kết thúc; phần Q&A (5–10p) diễn ra sau, tài liệu chuẩn bị ở cuối file này |
 
 **Phân công trình bày & demo** (vai trò A/B suy từ lịch sử commit: commit `fix(db)` / `docs(db)` của 응오후인느, commit backend/giao diện của 응웬치롱; nhóm có thể đổi lại):
 
@@ -40,7 +40,7 @@ Bài thuyết trình được xây dựng theo **mạch câu chuyện (Storytell
 | **응웬치롱** (B) | 09 – 12 (backend, frontend, kiểm thử, **Live Demo 1 Web UI**) | 4:00 |
 | **응오후인느** (A) | 13 (**Live Demo 2 SQL**) | 3:10 |
 | Cả hai | 14 (AI 시대 팀 프로젝트): 응오후인느 nói ý 1–2 (hợp đồng, đối soát chéo), 응웬치롱 nói ý 3 và thông điệp chốt | 1:15 |
-| **응웬치롱** (B) | 15 (kết luận, mời Q&A) | 0:30 |
+| **응웬치롱** (B) | 15 (kết luận) và 16 (lời cảm ơn) | 0:30 |
 
 Tổng: 응웬치롱 ≈ 8:30, 응오후인느 ≈ 6:30. Q&A: câu hỏi DB/SQL do 응오후인느 trả lời, câu hỏi API/UI/kiểm thử do 응웬치롱 trả lời.
 
@@ -240,7 +240,7 @@ Tổng: 응웬치롱 ≈ 8:30, 응오후인느 ≈ 6:30. Q&A: câu hỏi DB/SQL 
    - **Constraint Triggers (`DEFERRABLE INITIALLY DEFERRED`):** `trg_bookings_z_consistency` & `trg_booking_seats_consistency` kiểm tra lúc `COMMIT` rằng vé `BOOKED` phải có `≥ 1` ghế và `total_amount = SUM(price_at_booking)`.
    - **State Machine Trigger (`trg_bookings_validate`):** Khóa mọi chuyển trạng thái trái phép (`UC007`), chặn đặt/hủy sau giờ chiếu (`UC004`, `UC005`), chặn thanh toán quá hạn 10 phút (`UC006`), tự động xóa ghế khi `CANCELLED`/`EXPIRED` (`trg_bookings_release_seats`).
 4. **Hiệu năng & Miền giá trị:**
-   - 6 Index (gồm **Partial Index** `idx_bookings_pending_expiry ON bookings(expires_at) WHERE status='BOOKED' AND payment_status='UNPAID'`).
+   - 7 Index (gồm **Partial Index** `idx_bookings_pending_expiry ON bookings(expires_at) WHERE status='BOOKED' AND payment_status='UNPAID'`).
    - Kiểu `timestamptz` chuẩn `clock_timestamp()` + `CHECK` chặn `NaN`, `Infinity`, `-Infinity`.
 
 ### Lời thoại thuyết trình (Speaker Notes)
@@ -478,16 +478,23 @@ Tổng: 응웬치롱 ≈ 8:30, 응오후인느 ≈ 6:30. Q&A: câu hỏi DB/SQL 
   - Tích hợp cổng thanh toán thật & luồng hoàn tiền cho vé `CANCELLED + PAID`.
   - Cơ chế thu hồi token phía server (Token Revocation / Redis) & HTTPS Reverse Proxy.
   - Hỗ trợ nhiều cụm rạp, chỉnh sửa sơ đồ ghế linh hoạt và đặt combo bắp nước.
-- **Lời cảm ơn:** 감사합니다! 질의응답을 받겠습니다. (Xin cảm ơn! Nhóm xin sẵn sàng nhận câu hỏi Q&A.)
 
 ### Lời thoại thuyết trình (Speaker Notes)
 > Tóm lại, dự án Cinema Reservation System đã hoàn thiện từ khâu phân tích nghiệp vụ, mô hình hóa dữ liệu, hiện thực hóa kiến trúc tách biệt 3 tầng cho đến kiểm chứng tự động đa lớp. Trong tương lai, nền tảng này hoàn toàn có thể mở rộng thêm cổng thanh toán thật kèm luồng hoàn tiền, cơ chế thu hồi token bằng Redis, hay quản lý nhiều chi nhánh rạp.
 >
-> Phần trình bày của nhóm đến đây là kết thúc. Xin cảm ơn thầy/cô và các bạn đã lắng nghe, rất mong nhận được câu hỏi và góp ý ạ.
 
 ---
 
-## SLIDE 16 (Phụ lục / Q&A) — Bộ Câu Hỏi Phản Biện Dự Kiến (5–10 Phút)
+## SLIDE 16 — Lời Cảm Ơn
+
+* **Tiêu đề PPT:** không có tiêu đề; chỉ chữ `감사합니다` (Xin cảm ơn) trên nền tối. Không có nội dung Q&A trên slide.
+
+### Lời thoại thuyết trình (Speaker Notes)
+> Phần trình bày của nhóm đến đây là kết thúc. Xin cảm ơn thầy/cô và các bạn đã lắng nghe.
+
+---
+
+## Tài Liệu Chuẩn Bị Q&A — Bộ Câu Hỏi Phản Biện Dự Kiến (5–10 Phút, không đưa vào slide)
 
 1. **Tại sao lại kiểm tra hết hạn 10 phút theo kiểu *request-time expiry* (`expire_overdue_bookings()`) mà không dùng Cron job hay background worker?**
    - *Trả lời:* Để không phụ thuộc thêm dịch vụ/tiến trình nền ngoài PostgreSQL và tránh độ trễ đồng bộ giữa lịch chạy cron với thời điểm khách bấm xem ghế hoặc thanh toán. Mọi thao tác đọc trạng thái ghế, đặt vé, trả tiền, hủy vé và xem lịch sử đều gọi `expire_overdue_bookings()` (dùng `FOR UPDATE SKIP LOCKED`) hoặc kiểm tra `clock_timestamp()` ngay trong cùng transaction, nên độ chính xác đạt tới từng micro-giây mà vẫn hoàn toàn lũy đẳng (idempotent).
@@ -542,6 +549,7 @@ psql -X -v ON_ERROR_STOP=1 -U cinema_owner -d postgres -c "CREATE DATABASE cinem
 for f in /docker-entrypoint-initdb.d/10-schema.sql \
          /docker-entrypoint-initdb.d/40-booking-integrity.sql \
          /docker-entrypoint-initdb.d/50-finite-money.sql \
+         /docker-entrypoint-initdb.d/60-username-case-insensitive.sql \
          /opt/cinema/demo.sql; do
   psql -X -v ON_ERROR_STOP=1 -U cinema_owner -d cinema_test_demo -f "$f" || break
 done
