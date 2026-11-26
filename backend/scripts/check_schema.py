@@ -1,11 +1,24 @@
-"""Read-only preflight for an existing PostgreSQL database before adopting baseline 0001."""
+"""Read-only preflight for an existing PostgreSQL database against migrations 0001, 0003 and 0004."""
 from pathlib import Path
 import re
 
 from app.core.config import DevelopmentConfig, load_environment
 from app.core.database import connect
 
-BASELINE = Path(__file__).resolve().parents[1] / "migrations/0001_baseline.sql"
+MIGRATIONS_DIR = Path(__file__).resolve().parents[1] / "migrations"
+BASELINE = MIGRATIONS_DIR / "0001_baseline.sql"
+
+MIGRATION_0003_CONSTRAINTS = (
+    "bookings_id_showtime_key",
+    "booking_seats_booking_showtime_fkey",
+    "booking_seats_showtime_seat_key",
+)
+MIGRATION_0003_TRIGGERS = ("trg_bookings_z_version_showtime",)
+MIGRATION_0004_FINITE_CHECKS = (
+    "showtimes_ticket_price_finite",
+    "bookings_total_amount_finite",
+    "booking_seats_price_at_booking_finite",
+)
 
 
 def missing_objects(cursor):
@@ -20,11 +33,46 @@ def missing_objects(cursor):
         ("constraint", r"^\s*CONSTRAINT (\w+)", "SELECT conname FROM pg_constraint WHERE connamespace='public'::regnamespace"),
     )
     missing = []
+    found_by_kind = {}
     for kind, pattern, query in checks:
         cursor.execute(query)
         found = {next(iter(row.values())) for row in cursor.fetchall()}
+        found_by_kind[kind] = found
         expected = set(re.findall(pattern, schema, re.MULTILINE))
         missing.extend(f"{kind} {name}" for name in sorted(expected - found))
+
+    for name in MIGRATION_0003_TRIGGERS:
+        if name not in found_by_kind["trigger"]:
+            missing.append(f"trigger {name}")
+
+    for name in MIGRATION_0003_CONSTRAINTS:
+        if name not in found_by_kind["constraint"]:
+            missing.append(f"constraint {name}")
+
+    cursor.execute(
+        "SELECT conname FROM pg_constraint "
+        "WHERE connamespace='public'::regnamespace AND contype='c' AND convalidated"
+    )
+    validated_checks = {next(iter(row.values())) for row in cursor.fetchall()}
+    for name in MIGRATION_0004_FINITE_CHECKS:
+        if name not in validated_checks:
+            missing.append(f"validated check {name}")
+
+    cursor.execute(
+        "SELECT 1 FROM information_schema.columns WHERE table_schema='public' "
+        "AND table_name='bookings' AND column_name='total_amount' "
+        "AND numeric_precision=12 AND numeric_scale=2"
+    )
+    if not cursor.fetchone():
+        missing.append("column bookings.total_amount numeric(12,2)")
+
+    cursor.execute(
+        "SELECT 1 FROM information_schema.columns WHERE table_schema='public' "
+        "AND table_name='booking_seats' AND column_name='showtime_id' AND is_nullable='NO'"
+    )
+    if not cursor.fetchone():
+        missing.append("column booking_seats.showtime_id NOT NULL")
+
     cursor.execute("SELECT 1 FROM pg_extension WHERE extname='btree_gist'")
     if not cursor.fetchone():
         missing.append("extension btree_gist")
@@ -45,9 +93,9 @@ def main():
         with connection.cursor() as cur:
             missing = missing_objects(cur)
         if missing:
-            print("Missing or incompatible baseline objects:", ", ".join(missing))
+            print("Missing or incompatible schema objects:", ", ".join(missing))
             return 1
-        print("Baseline inventory present. Compare schema definitions on a restored copy before adoption.")
+        print("Schema inventory (0001-0004) present. Compare schema definitions and grants on a restored copy before adoption.")
         return 0
     finally:
         connection.close()

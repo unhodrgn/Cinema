@@ -18,10 +18,55 @@ psql -X -v ON_ERROR_STOP=1 -d cinema_demo -f backend/seeds/demo.sql
 
 ## Database đã có dữ liệu
 
-1. Tạo backup bằng công cụ PostgreSQL và restore vào DB riêng. Cấu hình kết nối của terminal kiểm tra trỏ vào bản sao.
-2. Từ `backend/` chạy `python -m scripts.check_schema`. Công cụ sử dụng session read-only, kiểm tra bảng, hàm, trigger đang bật, index, constraint có tên, extension và cột poster.
-3. Đối chiếu định nghĩa bằng `pg_dump --schema-only --no-owner --no-privileges` của bản sao và một DB mới từ cùng chuỗi migration trên cùng major version. Kiểm tra riêng các khác biệt. Preflight chỉ kiểm tra inventory; sự tồn tại của một tên hàm chưa xác minh nội dung hàm.
-4. Khi schema khớp, có thể dùng bản ứng dụng mới với DB hiện hữu. Nếu thiếu đối tượng, chuẩn bị migration tăng dần riêng và kiểm chứng trên bản sao trước. Baseline có các lệnh tạo bảng một lần. Seed dành cho database trống.
+Chỉ thực hiện nâng cấp trên database đang có sau khi đã có phê duyệt. **Lưu ý với Docker Compose:** `docker compose restart` hoặc `docker compose up` **không chạy lại** các init script trong `/docker-entrypoint-initdb.d/` khi volume `cinema_data` đã tồn tại; các migration mới phải được áp dụng thủ công bằng role chủ database (`cinema_owner`).
+
+1. **Dừng toàn bộ writer** vào đúng project (ví dụ `docker compose stop api`), kiểm tra catalog hiện tại và dữ liệu bất thường trước khi backup.
+2. **Tạo backup custom + globals không có password** và thử restore vào cluster/database test biệt lập trước khi chạm vào bản chính:
+
+```sh
+# Ví dụ với Compose (chạy từ thư mục gốc)
+docker compose exec -T db pg_dump -Fc -U cinema_owner -d cinema > cinema_pre_upgrade.dump
+docker compose exec -T db pg_dumpall --globals-only --no-role-passwords -U cinema_owner > cinema_globals.sql
+```
+
+3. Trên bản sao đã restore, chạy `python -m scripts.check_schema` từ `backend/` (phiên `readonly=True`) để kiểm tra bảng, hàm, trigger đang bật, index, constraint (gồm `0003` và `0004`), kiểu `bookings.total_amount numeric(12,2)`, `booking_seats.showtime_id NOT NULL`, extension `btree_gist` và cột `movies.poster_url`.
+4. Đối chiếu định nghĩa bằng `pg_dump --schema-only --no-owner --no-privileges` giữa bản sao và một DB mới dựng từ cùng chuỗi migration trên cùng major version. Ngoài ra, **so sánh riêng grants của role runtime**, **constraints (`convalidated = true`)** và **fingerprint/số dòng** của 7 bảng trước và sau nâng cấp:
+
+```sql
+-- Kiểm tra grants của cinema_api
+SELECT table_name, privilege_type
+FROM information_schema.role_table_grants
+WHERE grantee = 'cinema_api' AND table_schema = 'public'
+ORDER BY table_name, privilege_type;
+
+-- Kiểm tra constraint 0003 & 0004 đã được xác thực
+SELECT conname, contype, convalidated
+FROM pg_constraint
+WHERE connamespace = 'public'::regnamespace
+  AND conname IN (
+    'bookings_id_showtime_key',
+    'booking_seats_booking_showtime_fkey',
+    'booking_seats_showtime_seat_key',
+    'showtimes_ticket_price_finite',
+    'bookings_total_amount_finite',
+    'booking_seats_price_at_booking_finite'
+  )
+ORDER BY conname;
+
+-- Fingerprint nhanh theo số dòng và tổng tiền lịch sử
+SELECT 'users' AS tbl, count(*) AS cnt, NULL::numeric AS total_sum FROM users
+UNION ALL SELECT 'movies', count(*), NULL FROM movies
+UNION ALL SELECT 'theater_rooms', count(*), NULL FROM theater_rooms
+UNION ALL SELECT 'seats', count(*), NULL FROM seats
+UNION ALL SELECT 'showtimes', count(*), NULL FROM showtimes
+UNION ALL SELECT 'bookings', count(*), COALESCE(sum(total_amount), 0) FROM bookings
+UNION ALL SELECT 'booking_seats', count(*), COALESCE(sum(price_at_booking), 0) FROM booking_seats;
+```
+
+5. **Phân nhánh áp migration bằng owner (`cinema_owner`):**
+   - Nếu DB đang ở `0002` (chưa có `0003`): áp `0003_booking_integrity.sql` rồi `0004_finite_money.sql`.
+   - Nếu DB đã ở `0003`: chỉ áp `0004_finite_money.sql`.
+   - Không bao giờ chạy lại `0001_baseline.sql` hoặc `backend/seeds/demo.sql` trên dữ liệu có sẵn.
 
 ## Quyền xóa phim trên database hiện hữu
 

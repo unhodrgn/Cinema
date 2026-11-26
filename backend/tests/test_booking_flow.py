@@ -435,7 +435,7 @@ def test_booking_exceeding_max_capacity_returns_400_not_500(customer, booking_db
         conn.close()
 
     sid = spare["showtime_id"]
-    for count in (51, 150):
+    for count in (51, 101, 150):
         resp = customer["client"].post(
             "/api/bookings",
             {"screening_id": sid, "seat_ids": list(range(1, count + 1))},
@@ -444,6 +444,14 @@ def test_booking_exceeding_max_capacity_returns_400_not_500(customer, booking_db
         body = resp.get_json()
         assert body["error"]["code"] == "validation_error"
         assert "seat_ids" in body["error"]["fields"]
+
+    conn = booking_db.connect()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT count(*) FROM bookings WHERE showtime_id = %s", (sid,))
+            assert cur.fetchone()[0] == 0
+    finally:
+        conn.close()
 
 
 def test_booking_exceeding_smaller_room_capacity_returns_400(customer, booking_db):
@@ -503,3 +511,48 @@ def test_booking_full_50_seat_room_capacity_succeeds(customer, booking_db):
     booking = resp.get_json()["booking"]
     assert len(booking["seats"]) == 50
     assert booking["total_amount"] == "4999999999.50"
+
+
+def test_booking_10_seats_returns_exact_decimal_total(customer, booking_db):
+    conn = booking_db.connect()
+    try:
+        spare = create_spare_room_screening(conn, starts_in_hours=96, ticket_price=Decimal("12500.50"))
+    finally:
+        conn.close()
+
+    resp = customer["client"].post(
+        "/api/bookings",
+        {"screening_id": spare["showtime_id"], "seat_ids": spare["seat_ids"][:10]},
+    )
+    assert resp.status_code == 201
+    booking = resp.get_json()["booking"]
+    assert len(booking["seats"]) == 10
+    assert booking["total_amount"] == "125005.00"
+
+
+def test_booking_seat_from_another_room_returns_400_and_rolls_back(customer, future_screenings, booking_db):
+    sid_room_a = future_screenings[0]["showtime_id"]
+    seat_from_room_b = future_screenings[1]["seat_ids"][0]
+
+    conn = booking_db.connect()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT count(*) FROM bookings WHERE showtime_id = %s", (sid_room_a,))
+            before_count = cur.fetchone()[0]
+    finally:
+        conn.close()
+
+    resp = customer["client"].post(
+        "/api/bookings",
+        {"screening_id": sid_room_a, "seat_ids": [seat_from_room_b]},
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()["error"]["code"] == "invalid_seat"
+
+    conn = booking_db.connect()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT count(*) FROM bookings WHERE showtime_id = %s", (sid_room_a,))
+            assert cur.fetchone()[0] == before_count
+    finally:
+        conn.close()

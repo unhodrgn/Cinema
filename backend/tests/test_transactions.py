@@ -7,8 +7,13 @@ import pytest
 from psycopg2.extensions import TRANSACTION_STATUS_IDLE, TRANSACTION_STATUS_INTRANS
 
 from app.core import database
-from app.core.database import TransactionError, expire_overdue_bookings, transaction
-from fake_driver import FakeCursor
+from app.core.database import (
+    TransactionError,
+    expire_overdue_bookings,
+    run_retryable_transaction,
+    transaction,
+)
+from fake_driver import FakeCursor, database_error
 
 # --- unit tests with the fake driver --------------------------------------------------
 
@@ -168,6 +173,59 @@ def test_connection_failure_propagates_before_the_block_runs(fake_app, fake_driv
         with pytest.raises(database.DatabaseUnavailableError):
             with transaction():
                 pytest.fail("must not run")
+
+
+@pytest.mark.parametrize("code", ["40001", "40P01"])
+def test_retryable_transaction_rolls_back_and_retries_in_a_new_transaction(fake_app, fake_driver, code):
+    attempts = []
+
+    def op(cur):
+        attempts.append(len(attempts) + 1)
+        cur.execute("SELECT 1 AS ok")
+        if len(attempts) == 1:
+            raise database_error(code, "transient concurrency abort")
+        return "ok"
+
+    with fake_app.app_context():
+        result = run_retryable_transaction(op, max_attempts=3)
+        assert result == "ok"
+        assert attempts == [1, 2]
+        assert fake_driver.last.events == ["rollback", "commit"]
+        assert fake_driver.last.status == TRANSACTION_STATUS_IDLE
+
+
+def test_retryable_transaction_stops_after_max_attempts(fake_app, fake_driver):
+    attempts = []
+
+    def op(cur):
+        attempts.append(1)
+        cur.execute("SELECT 1 AS ok")
+        raise database_error("40001", "still conflicting")
+
+    with fake_app.app_context():
+        with pytest.raises(psycopg2.Error) as excinfo:
+            run_retryable_transaction(op, max_attempts=3)
+        assert excinfo.value.pgcode == "40001"
+        assert len(attempts) == 3
+        assert fake_driver.last.events == ["rollback", "rollback", "rollback"]
+        assert fake_driver.last.status == TRANSACTION_STATUS_IDLE
+
+
+@pytest.mark.parametrize("code", ["UC002", "23505", "23514"])
+def test_retryable_transaction_never_retries_non_retryable_sqlstates(fake_app, fake_driver, code):
+    attempts = []
+
+    def op(cur):
+        attempts.append(1)
+        cur.execute("SELECT 1 AS ok")
+        raise database_error(code, "business rule error")
+
+    with fake_app.app_context():
+        with pytest.raises(psycopg2.Error) as excinfo:
+            run_retryable_transaction(op, max_attempts=3)
+        assert excinfo.value.pgcode == code
+        assert len(attempts) == 1
+        assert fake_driver.last.events == ["rollback"]
 
 
 # --- expire_overdue_bookings(cur): unit tests -----------------------------------------

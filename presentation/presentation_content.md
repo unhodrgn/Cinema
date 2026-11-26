@@ -328,13 +328,13 @@ Bài thuyết trình được xây dựng theo **mạch câu chuyện (Storytell
 | **2. Đồng thời đa phiên DB** | `test_booking_concurrency.py` (6 kịch bản `C1–C6`, đa luồng `psycopg2`) | **16/16 checks PASS**: 8 phiên tranh 1 ghế (1 thắng, 7 `UC002`), khóa 2 phiên `C2`, 40 luồng trả tiền vs 2 luồng hết hạn tại mốc 10 phút (`C4`), trả tiền vs hủy (`C5`), 5 luồng hết hạn song song (`C6`). |
 | **3. Backend API & Bảo mật** | `pytest` (`test_access_matrix`, `test_booking_flow`, `test_security_injection.py`, ...) | Bản Linux Compose `verify` đạt **1.356 pytest** (skip 1 test đặc thù Windows); Windows clean checkout đạt **1.354** (skip 2 symlink). Bổ sung active SQLi & Stored XSS suite (`test_security_injection.py`). |
 | **4. Logic Frontend** | `npm test` (Node test runner) + `npm run build` (`tsc --noEmit`) | **120/120 Node tests PASS**; kiểm tra type TypeScript không lỗi. |
-| **5. E2E Trình duyệt & DB Dump/Restore** | Playwright (`reservation.spec.ts` — 3 luồng), `pg_dump -Fc` / `pg_restore` | **3/3 luồng E2E PASS** (mobile `320px`/`375px` & desktop `1440px`); đối chiếu checksum cả 7 bảng sau backup/restore khớp 100%. |
+| **5. E2E Trình duyệt & DB Dump/Restore** | Playwright (`reservation.spec.ts` — 6 luồng), `pg_dump -Fc` / `pg_restore` | **6/6 luồng E2E PASS** (mobile `320px`/`375px`, desktop `1440px`, `UI-01` double-click/bàn phím/retry/reload-Back-Forward & `SEC-01` XSS); đối chiếu checksum cả 7 bảng sau backup/restore khớp 100%. |
 
 ### Lời thoại thuyết trình (Speaker Notes)
 > Nhóm không chỉ kiểm tra bằng tay trên giao diện, mà xây dựng một đường ống kiểm chứng tự động 5 tầng chạy trên database cô lập hoàn toàn qua lệnh `docker compose --profile test run --build --rm verify`:
 > - Ở tầng SQL, **177 kiểm tra toàn vẹn** và **31 đầu dò đối soát** đều đạt, kèm **5 bài test đột biến (mutation checks)** — tức là nhóm cố tình làm hỏng trigger rồi chạy lại test để chắc chắn bộ test thực sự bắt được lỗi.
 > - Ở tầng đồng thời, `test_booking_concurrency.py` chạy **6 kịch bản đa phiên thật (`C1–C6`)**, như cho 8 kết nối tranh nhau 1 ghế, hoặc cho 40 luồng thanh toán đụng độ với 2 luồng hết hạn ngay tại mốc 10 phút để chứng minh không bao giờ có ca thanh toán muộn nào lọt qua.
-> - Ở tầng ứng dụng, bản kiểm thử Compose đạt **1.356 ca pytest**, **120 bài Node test**, **3 kịch bản Playwright E2E** chạy HTTP thật trên cả mobile lẫn desktop, và nhóm đã bổ sung thêm suite `test_security_injection.py` chủ động kiểm tra SQL Injection và Stored XSS trên toàn bộ các endpoint. Sau tất cả, nhóm còn kiểm tra `pg_dump` và `pg_restore` để xác nhận checksum toàn bộ 7 bảng khớp 100%.
+> - Ở tầng ứng dụng, bản kiểm thử Compose đạt **>1.360 ca pytest**, **120 bài Node test**, **6 kịch bản Playwright E2E** chạy HTTP thật trên cả mobile lẫn desktop (gồm chống nhấn đúp/retry/Back-Forward `UI-01` và XSS `SEC-01`), cùng suite `test_security_injection.py` chủ động kiểm tra SQL Injection và Stored XSS trên toàn bộ các endpoint. Sau tất cả, nhóm còn kiểm tra `pg_dump` và `pg_restore` để xác nhận checksum toàn bộ 7 bảng khớp 100%.
 
 ---
 
@@ -446,7 +446,7 @@ Bài thuyết trình được xây dựng theo **mạch câu chuyện (Storytell
   - Thiết kế CSDL chuẩn hóa 3NF, bảo vệ toàn vẹn và đồng thời ngay tại tầng PostgreSQL 18 (`0001`–`0004`).
   - Kiến trúc 3 tầng tách biệt vật lý & logic hoàn chỉnh trên Docker Compose.
   - Đầy đủ 14 đơn vị nghiệp vụ, 28 API endpoints, 12 trang React/TS + bản UI dự phòng.
-  - Kiểm chứng toàn diện: 177 SQL integrity checks, 31 reconciliation probes, 16 concurrency checks, >1.350 pytest, 120 Node tests, 3 Playwright E2E, active SQLi/XSS & dump/restore checksum.
+  - Kiểm chứng toàn diện: 177 SQL integrity checks, 31 reconciliation probes, 16 concurrency checks, >1.360 pytest, 120 Node tests, 6 Playwright E2E, upgrade migration `0001→0003→0004`, active SQLi/XSS & dump/restore checksum.
 - **Hướng mở rộng (nằm ngoài phạm vi MVP hiện tại):**
   - Tích hợp cổng thanh toán thật & luồng hoàn tiền cho vé `CANCELLED + PAID`.
   - Cơ chế thu hồi token phía server (Token Revocation / Redis) & HTTPS Reverse Proxy.

@@ -220,6 +220,67 @@ test("UI-01: double-clicking Proceed to booking sends only one POST request and 
   expect(postCount).toBe(1);
 });
 
+test("UI-01: keyboard repeat, network-failure retry, and reload/back/forward do not duplicate bookings", async ({
+  page,
+}) => {
+  await page.goto("/screenings.html");
+  const date = page.getByLabel("Screening date");
+  await expect(date).toHaveValue(/\d{4}-\d{2}-\d{2}/);
+  const tomorrow = new Date((await date.inputValue()) + "T12:00:00Z");
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  await date.fill(tomorrow.toISOString().slice(0, 10));
+  await page.getByRole("link", { name: "Select Seats" }).first().click();
+
+  const freeSeat = page.locator("button.seat-btn:not([disabled])").first();
+  const seatLabel = await freeSeat.getAttribute("aria-label");
+  expect(seatLabel).toBeTruthy();
+  await freeSeat.click();
+  await page.getByRole("button", { name: "Proceed to booking" }).click();
+  await login(page, "customer2", "customer1234");
+  const seatBtn = page.getByRole("button", { name: seatLabel!, exact: true });
+  await expect(seatBtn).toHaveAttribute("aria-pressed", "true");
+
+  // 1. Network drop on first POST unlocks the button and allows a clean retry
+  let postCount = 0;
+  await page.route("**/api/bookings", async (route) => {
+    if (route.request().method() === "POST") {
+      postCount += 1;
+      if (postCount === 1) {
+        await route.abort("failed");
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    await route.continue();
+  });
+
+  const confirmBtn = page.getByRole("button", { name: "Proceed to booking" });
+  await confirmBtn.click();
+  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(confirmBtn).toBeEnabled();
+  expect(postCount).toBe(1);
+
+  // 2. Rapid keyboard Enter presses send only one additional POST
+  await confirmBtn.focus();
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/booking\.html\?id=\d+/);
+  expect(postCount).toBe(2);
+
+  // 3. Reload, Back, Forward never replay POST /api/bookings
+  const bookingUrl = page.url();
+  await page.reload();
+  await expect(page).toHaveURL(bookingUrl);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/seats\.html\?screening_id=/);
+  await expect(
+    page.getByRole("button", { name: `${seatLabel!} (Occupied)`, exact: true }),
+  ).toBeDisabled();
+  await page.goForward();
+  await expect(page).toHaveURL(bookingUrl);
+  expect(postCount).toBe(2);
+});
+
 test("SEC-01: stored and reflected XSS payloads render safely as text without executing scripts", async ({
   page,
 }) => {

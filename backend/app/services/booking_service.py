@@ -1,12 +1,12 @@
 import psycopg2
 
-from app.core.database import transaction
+from app.core.database import run_retryable_transaction
 from app.core.errors import ValidationError
 from app.models.booking import fetch_booking
 
 
 def reserve(user_id, screening_id, seat_ids):
-    with transaction() as cur:
+    def _reserve_once(cur):
         cur.execute(
             """
             SELECT (SELECT count(*) FROM seats se WHERE se.room_id = s.room_id) AS capacity
@@ -33,6 +33,6 @@ def reserve(user_id, screening_id, seat_ids):
                 ) from error
             raise
         booking_id = cur.fetchone()["booking_id"]
-        booking = fetch_booking(cur, booking_id, user_id)
+        return fetch_booking(cur, booking_id, user_id)
 
-    return booking
+    return run_retryable_transaction(_reserve_once)

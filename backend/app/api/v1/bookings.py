@@ -14,7 +14,7 @@ PostgreSQL enforces all core booking rules (schema.sql):
 from flask import Blueprint, g, jsonify
 
 from app.core.body import json_body
-from app.core.database import expire_overdue_bookings, transaction
+from app.core.database import expire_overdue_bookings, run_retryable_transaction, transaction
 from app.core.errors import HTTP_ERRORS, AppError
 from app.core.params import check_path_id
 from app.core.security import Policy, policy
@@ -95,12 +95,14 @@ def cancel_booking(booking_id):
     check_path_id(booking_id)
     user_id = g.current_user["user_id"]
 
-    with transaction() as cur:
+    def _cancel_once(cur):
         cur.execute(
             "SELECT cancel_booking(%s, %s) AS outcome",
             (booking_id, user_id),
         )
         outcome = cur.fetchone()["outcome"]  # 'CANCELLED' or 'EXPIRED'
         booking = fetch_booking(cur, booking_id, user_id)
+        return outcome, booking
 
+    outcome, booking = run_retryable_transaction(_cancel_once)
     return jsonify(outcome=outcome, booking=booking)

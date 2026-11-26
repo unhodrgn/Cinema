@@ -21,6 +21,7 @@ from psycopg2.extras import RealDictCursor
 logger = logging.getLogger(__name__)
 
 DEFAULT_APPLICATION_NAME = "cinema_flask"
+RETRYABLE_SQLSTATES = frozenset({"40001", "40P01"})
 
 
 class DatabaseUnavailableError(Exception):
@@ -171,6 +172,33 @@ def transaction():
             cursor.close()
         except psycopg2.Error:
             pass
+
+
+def run_retryable_transaction(operation, max_attempts=3):
+    """Run ``operation(cur)`` inside a fresh transaction, retrying on 40001 / 40P01.
+
+    Per PostgreSQL-Flask integration contract section 4: when PostgreSQL aborts a
+    transaction with serialization failure (``40001``) or deadlock detected (``40P01``),
+    the aborted transaction is rolled back by ``transaction()`` and the complete
+    operation is retried in a brand-new transaction. Only use for operations that are
+    safe to re-run from scratch.
+    """
+    if max_attempts < 1:
+        raise ValueError("max_attempts must be at least 1")
+    for attempt in range(1, max_attempts + 1):
+        try:
+            with transaction() as cur:
+                return operation(cur)
+        except psycopg2.Error as error:
+            if getattr(error, "pgcode", None) in RETRYABLE_SQLSTATES and attempt < max_attempts:
+                logger.info(
+                    "retrying transaction after SQLSTATE %s (attempt %s/%s)",
+                    error.pgcode,
+                    attempt,
+                    max_attempts,
+                )
+                continue
+            raise
 
 
 def first_value(row):
