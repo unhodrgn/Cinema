@@ -1,3 +1,4 @@
+import { registrationUsernameError } from "../username-policy.js";
 // Registration page. Sends only the account ID and the password; the server decides the
 // role (always CUSTOMER) and answers duplicate IDs and invalid input with messages.
 
@@ -31,8 +32,9 @@ form.addEventListener("submit", async (event) => {
   const username = fields.username.input.value;
   const password = fields.password.input.value;
   let valid = true;
-  if (username.trim() === "") {
-    setFieldError(fields.username.input, fields.username.error, "Account ID is required.");
+  const usernameError = registrationUsernameError(username);
+  if (usernameError) {
+    setFieldError(fields.username.input, fields.username.error, usernameError);
     valid = false;
   }
   if (password === "") {

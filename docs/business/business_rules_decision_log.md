@@ -75,7 +75,7 @@ The same detail-row release and parent-history retention principle applies when 
 
 No full name, email address, phone number, or other registration field is required by the approved scope. The role is assigned by the system as `CUSTOMER`; public registration must never create an `ADMIN` account. Passwords must be stored as a secure one-way password hash, not as plaintext and not as reversibly encrypted text.
 
-**Account ID uniqueness (approved by the project owner on 2026-11-26, migration `0005`):** an account ID is stored NFKC-normalized with leading and trailing whitespace removed, and is unique ignoring letter case. `Customer1`, ` customer1 ` and the full-width form of `customer1` are therefore the same account ID as `customer1`; registration is refused (`409 duplicate_value`) and login finds the account the same way. No other format rule for account IDs or passwords is approved.
+**Account ID policy (0005–0006):** public registration accepts a Unicode ID or a common ASCII email address used as the account ID. The first character of a normal ID is a Unicode letter or decimal digit. Subsequent characters can also include `_`, `-`, `.` and `+`. An email has exactly one `@`, an alphanumeric start, and a dotted domain with valid labels. Registration checks raw input and NFKC-normalized output, rejects spaces and invisible/control characters, and allows at most 60 normalized code points. Empty IDs are invalid. Case-insensitive uniqueness uses the 0005 database index. Login retains its existing NFKC and edge-whitespace handling. No email verification or separate email field is required.
 
 **Movie attributes to support:**
 - `title` — 영화 제목

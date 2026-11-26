@@ -1,6 +1,6 @@
 # 테이블 기술서 (Table Description)
 
-**기준:** `backend/migrations/0001_baseline.sql` + `0002_movie_delete_permissions.sql` + `0003_booking_integrity.sql` + `0004_finite_money.sql` + `0005_username_case_insensitive.sql` (PostgreSQL 18.7에서 검증). 업무 규칙은 BR-DL-001(D1~D6)과 B01~B05를 따른다.
+**기준:** `backend/migrations/0001_baseline.sql` + `0002_movie_delete_permissions.sql` + `0003_booking_integrity.sql` + `0004_finite_money.sql` + `0005_username_case_insensitive.sql` + `0006_username_validation.sql` (PostgreSQL 18.7에서 검증). 업무 규칙은 BR-DL-001(D1~D6)과 B01~B05를 따른다.
 **논리 명칭 ↔ 물리 테이블:** USERS=`users`, MOVIES=`movies`, ROOMS=`theater_rooms`, SEATS=`seats`, SCREENINGS=`showtimes`, BOOKINGS=`bookings`, BOOKING_SEATS=`booking_seats`.
 
 모든 기본키(`*_id`)는 `bigint GENERATED ALWAYS AS IDENTITY`이다.
@@ -10,7 +10,7 @@
 | 컬럼 | 타입 | NULL | 기본값 | 제약 / 설명 |
 |---|---|---|---|---|
 | `user_id` | bigint | N | identity | PK |
-| `username` | varchar(60) | N | | UNIQUE 및 `lower(username)` 고유 인덱스(대소문자 무시, 0005). 계정 ID (D5) |
+| `username` | varchar | N | | UNIQUE, `lower(username)` 고유 인덱스(0005), `users_username_format_check` (0006). NFKC, 최대 60자, 일반 ID 또는 이메일 형식 (D5) |
 | `password_hash` | text | N | | 일방향 해시만 저장 (D5) |
 | `role` | varchar(10) | N | `'CUSTOMER'` | CHECK ∈ {`CUSTOMER`,`ADMIN`}. `GUEST` 없음 (D4) |
 | `created_at` | timestamptz | N | `now()` | 기술 컬럼 |

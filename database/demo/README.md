@@ -2,7 +2,7 @@
 
 ## 테스트 준비
 
-PostgreSQL 18의 **새 격리 서버/Compose 테스트 프로젝트**에 `cinema_test_demo`를 만들고, 소유자로 0001·0003·0004·0005와 데모 seed를 순서대로 적용한다. `permissions.sql`까지 실행하려면 그 격리 서버에서 `compose-role.sql`과 0002로 `cinema_api`를 준비한다. 서버·포트·DB를 명시적으로 확인한다. 기존 데모와 로컬 운영 DB에는 실행하지 않는다.
+PostgreSQL 18의 **새 격리 서버/Compose 테스트 프로젝트**에 `cinema_test_demo`를 만들고, 소유자로 0001·0003·0004·0005·0006과 데모 seed를 순서대로 적용한다. `permissions.sql`까지 실행하려면 그 격리 서버에서 `compose-role.sql`과 0002로 `cinema_api`를 준비한다. 서버·포트·DB를 명시적으로 확인한다. 기존 데모와 로컬 운영 DB에는 실행하지 않는다.
 
 아래 예시는 테스트 서버 연결을 확인한 후 저장소 루트에서 실행한다. 각 스크립트는 DB 이름과 0004 제약을 먼저 확인한다.
 

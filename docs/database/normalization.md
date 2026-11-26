@@ -1,6 +1,6 @@
 # 정규화 검토 (1NF → 3NF)
 
-**대상:** `0001_baseline.sql`, `0003_booking_integrity.sql`, `0004_finite_money.sql`, `0005_username_case_insensitive.sql` 적용 후 7개 릴레이션. 이전 초안(`CinemaDB_FINAL_PostgreSQL_Handover/docs/04_Normalization_Review_KO.md`)은 승인된 결정(D1~D6) 이전 모델을 기준으로 하므로 이 문서가 대체한다.
+**대상:** `0001_baseline.sql`, `0003_booking_integrity.sql`, `0004_finite_money.sql`, `0005_username_case_insensitive.sql`, `0006_username_validation.sql` 적용 후 7개 릴레이션. 이전 초안(`CinemaDB_FINAL_PostgreSQL_Handover/docs/04_Normalization_Review_KO.md`)은 승인된 결정(D1~D6) 이전 모델을 기준으로 하므로 이 문서가 대체한다.
 
 ## 1. 비정규형 예시
 

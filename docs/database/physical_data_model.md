@@ -1,6 +1,6 @@
 # 물리적 데이터 모델 (Physical Data Model)
 
-**DBMS:** PostgreSQL 18 (18.7에서 검증) · **확장:** `btree_gist` · **DDL:** `backend/migrations/0001_baseline.sql` + `0002_movie_delete_permissions.sql` + `0003_booking_integrity.sql` + `0004_finite_money.sql` + `0005_username_case_insensitive.sql` · **시드:** `backend/seeds/demo.sql`
+**DBMS:** PostgreSQL 18 (18.7에서 검증) · **확장:** `btree_gist` · **DDL:** `backend/migrations/0001_baseline.sql` + `0002_movie_delete_permissions.sql` + `0003_booking_integrity.sql` + `0004_finite_money.sql` + `0005_username_case_insensitive.sql` + `0006_username_validation.sql` · **시드:** `backend/seeds/demo.sql`
 컬럼별 타입·제약은 `table_description.md`, 도메인은 `domain_definition.md`에 있다. 이 문서는 구현 구조를 요약한다.
 
 ## 1. 물리 ERD
@@ -17,7 +17,7 @@ erDiagram
 
     users {
         bigint user_id PK
-        varchar60 username UK
+        varchar username UK "NFKC, 1–60 chars, format CHECK"
         text password_hash
         varchar10 role "CUSTOMER|ADMIN"
         timestamptz created_at
@@ -76,6 +76,7 @@ erDiagram
 | 구분 | 요소 | 목적 |
 |---|---|---|
 | 선언적 제약 | `showtimes_no_room_overlap` (EXCLUDE gist), `showtimes_end_after_start`, `bookings_expiry_is_10_minutes`, `bookings_paid_at_matches`, `bookings_cancelled_at_matches`, `bookings_paid_never_expired`, 도메인 CHECK, UNIQUE, FK | BR-04, D3, D6 |
+| 계정 ID CHECK | `users_username_format_check` | NFKC 형태, 1–60자, Unicode 문자·십진 숫자 또는 일반 ASCII 이메일 ID (0006) |
 | 금액 CHECK | `showtimes_ticket_price_finite`, `bookings_total_amount_finite`, `booking_seats_price_at_booking_finite` | 비유한 단가·총액·스냅샷 거부, 기존 음수 제한 별도 적용 |
 | BEFORE 트리거 | `trg_showtimes_default_end_time`, `trg_showtimes_protect_booked` (D2), `trg_bookings_validate` (D1/D3 상태 전이·시각 설정), `trg_booking_seats_validate` (BR-07/08, D6 스냅샷, 상영 일정 행 잠금), `trg_booking_seats_protect_delete` | 규칙 강제 |
 | 첫 예매 BEFORE INSERT | `trg_bookings_z_version_showtime` | 첫 예매 시 상영 행 버전을 갱신하여 오래된 스냅샷을 가진 일정 수정 차단 |
@@ -83,6 +84,7 @@ erDiagram
 | 지연 제약 트리거 | `trg_bookings_z_consistency`, `trg_booking_seats_consistency` | COMMIT 시 좌석 ≥ 1, 총액 = 스냅샷 합 (D6) |
 | 함수 | `create_booking`, `pay_booking`, `cancel_booking`, `expire_overdue_bookings` | Flask가 호출하는 원자적 작업 (만료는 요청 시점 호출, 자동 스케줄러 없음) |
 | 활성 배정 제약 | `bookings_id_showtime_key`, `booking_seats_booking_showtime_fkey`, `booking_seats_showtime_seat_key` | 부모의 상영 ID와 일치하고 상영별 좌석 고유성 강제 |
+| 계정 ID 검증 함수 | `cinema_username_is_valid(text)` | 모든 `users.username`에 동일한 저장 형식 적용 |
 | 인덱스 | `idx_showtimes_movie_start`, `idx_showtimes_room_start`, `idx_bookings_user`, `idx_bookings_showtime_status`, `idx_booking_seats_seat`, `idx_bookings_pending_expiry`(부분), `users_username_lower_key`(`lower(username)` 고유) | 조회·만료 탐색. UNIQUE 제약은 B-tree 고유 인덱스를 사용 |
 
 ## 3. 동시성 설계

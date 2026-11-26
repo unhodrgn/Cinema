@@ -1,6 +1,6 @@
 # 논리적 데이터 모델 (Logical Data Model)
 
-**기준:** `backend/migrations/0001_baseline.sql` + `0003_booking_integrity.sql` + `0004_finite_money.sql` + `0005_username_case_insensitive.sql`. 표기: PK 밑줄 대신 **PK**, 외래키는 FK, 후보키는 UK.
+**기준:** `backend/migrations/0001_baseline.sql` + `0003_booking_integrity.sql` + `0004_finite_money.sql` + `0005_username_case_insensitive.sql` + `0006_username_validation.sql`. 표기: PK 밑줄 대신 **PK**, 외래키는 FK, 후보키는 UK.
 
 ## 1. 릴레이션 스키마
 
@@ -25,7 +25,7 @@ BOOKING_SEATS(booking_seat_id PK, booking_id, showtime_id, seat_id FK→SEATS, p
 
 | 규칙 | 표현 |
 |---|---|
-| 계정 ID는 대소문자 구분 없이 유일. 저장 전 NFKC 정규화와 양끝 공백 제거 | `lower(username)` 고유 인덱스 (0005) + 응용 프로그램 정규화 |
+| 계정 ID는 대소문자 구분 없이 유일. 가입 시 공백 거부, NFKC 정규화, 정규화 후 60자 이하 | 0005의 `lower(username)` 고유 인덱스와 0006의 `users_username_format_check` |
 | 역할은 `CUSTOMER`/`ADMIN` | `role` 도메인 (D4: GUEST 없음) |
 | 예매 상태 `BOOKED`/`CANCELLED`/`EXPIRED`, 결제 상태 `UNPAID`/`PAID` | 도메인 (D3) |
 | `expires_at = booked_at + 10분` | 파생 제약 (D3) |

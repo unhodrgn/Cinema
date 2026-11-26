@@ -1,4 +1,4 @@
-"""Read-only preflight for an existing PostgreSQL database against migrations 0001, 0003, 0004 and 0005."""
+"""Read-only preflight for an existing PostgreSQL database against migrations 0001–0006."""
 from pathlib import Path
 import re
 
@@ -60,6 +60,17 @@ def missing_objects(cursor):
             missing.append(f"validated check {name}")
 
     cursor.execute(
+        "SELECT 1 FROM pg_constraint WHERE conrelid='public.users'::regclass "
+        "AND conname='users_username_format_check' AND contype='c' AND convalidated "
+        "AND pg_get_constraintdef(oid) IN ('CHECK (cinema_username_is_valid((username)::text))', "
+        "'CHECK (public.cinema_username_is_valid((username)::text))')"
+    )
+    if not cursor.fetchone():
+        missing.append("validated check users_username_format_check")
+    if "cinema_username_is_valid" not in found_by_kind["function"]:
+        missing.append("function cinema_username_is_valid")
+
+    cursor.execute(
         "SELECT 1 FROM information_schema.columns WHERE table_schema='public' "
         "AND table_name='bookings' AND column_name='total_amount' "
         "AND numeric_precision=12 AND numeric_scale=2"
@@ -100,7 +111,7 @@ def main():
         if missing:
             print("Missing or incompatible schema objects:", ", ".join(missing))
             return 1
-        print("Schema inventory (0001-0005) present. Compare schema definitions and grants on a restored copy before adoption.")
+        print("Schema inventory (0001-0006) present. Compare schema definitions and grants on a restored copy before adoption.")
         return 0
     finally:
         connection.close()

@@ -259,11 +259,11 @@ def test_active_sql_injection_across_auth_catalog_booking_and_admin_endpoints(se
         assert login_resp.status_code == 401
         assert login_resp.get_json()["error"]["code"] == "invalid_credentials"
 
-        # 2. Registration stores SQL syntax strictly as literal string data
+        # 2. Registration rejects unsupported account-ID syntax
         reg_name = f"sqli_{idx}_{payload}"[:60]
         reg_resp = anon_client.post("/api/auth/register", {"username": reg_name, "password": "pw"})
-        assert reg_resp.status_code == 201
-        assert reg_resp.get_json()["user"]["username"] == reg_name
+        assert reg_resp.status_code == 400
+        assert "username" in reg_resp.get_json()["error"]["fields"]
 
         # 3. Catalog & seat endpoints reject SQLi query/path params with 400/404, never 500
         assert anon_client.get("/api/screenings", query_string={"date": payload}).status_code == 400
@@ -319,7 +319,7 @@ def test_stored_xss_payloads_returned_as_safe_json_with_security_headers(sec_app
     xss_user = f"xss_{uuid.uuid4().hex[:6]}_<svg onload=alert(1)>"
 
     reg_resp = anon_client.post("/api/auth/register", {"username": xss_user, "password": "pw"})
-    assert reg_resp.status_code == 201
+    assert reg_resp.status_code == 400
     assert reg_resp.headers["Content-Type"] == "application/json"
     assert reg_resp.headers["X-Content-Type-Options"] == "nosniff"
     assert "default-src 'none'" in reg_resp.headers["Content-Security-Policy"]

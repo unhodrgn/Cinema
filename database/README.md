@@ -1,6 +1,6 @@
 # PostgreSQL cho Cinema
 
-Schema hiện tại gồm [baseline 0001](../backend/migrations/0001_baseline.sql) cùng [migration 0003](../backend/migrations/0003_booking_integrity.sql) [migration 0004](../backend/migrations/0004_finite_money.sql) và [migration 0005](../backend/migrations/0005_username_case_insensitive.sql). Migration 0002 cấp quyền cho role runtime nếu dùng role đó. [Seed demo](../backend/seeds/demo.sql) và [quyền cho volume Compose mới](../backend/migrations/compose-role.sql) có vòng đời riêng. PostgreSQL cần extension `btree_gist`. Phiên bản dùng để kiểm chứng migration là PostgreSQL 18.
+Schema hiện tại gồm [baseline 0001](../backend/migrations/0001_baseline.sql) cùng [migration 0003](../backend/migrations/0003_booking_integrity.sql) [migration 0004](../backend/migrations/0004_finite_money.sql) và [migration 0005](../backend/migrations/0005_username_case_insensitive.sql) và [migration 0006](../backend/migrations/0006_username_validation.sql). Migration 0002 cấp quyền cho role runtime nếu dùng role đó. [Seed demo](../backend/seeds/demo.sql) và [quyền cho volume Compose mới](../backend/migrations/compose-role.sql) có vòng đời riêng. PostgreSQL cần extension `btree_gist`. Phiên bản dùng để kiểm chứng migration là PostgreSQL 18.
 
 ## Tạo database mới
 
@@ -12,6 +12,7 @@ psql -X -v ON_ERROR_STOP=1 -d cinema_demo -f backend/migrations/0001_baseline.sq
 psql -X -v ON_ERROR_STOP=1 -d cinema_demo -f backend/migrations/0003_booking_integrity.sql
 psql -X -v ON_ERROR_STOP=1 -d cinema_demo -f backend/migrations/0004_finite_money.sql
 psql -X -v ON_ERROR_STOP=1 -d cinema_demo -f backend/migrations/0005_username_case_insensitive.sql
+psql -X -v ON_ERROR_STOP=1 -d cinema_demo -f backend/migrations/0006_username_validation.sql
 psql -X -v ON_ERROR_STOP=1 -d cinema_demo -f backend/seeds/demo.sql
 ```
 
@@ -30,7 +31,7 @@ docker compose exec -T db pg_dump -Fc -U cinema_owner -d cinema > cinema_pre_upg
 docker compose exec -T db pg_dumpall --globals-only --no-role-passwords -U cinema_owner > cinema_globals.sql
 ```
 
-3. Trên bản sao đã restore, chạy `python -m scripts.check_schema` từ `backend/` (phiên `readonly=True`) để kiểm tra bảng, hàm, trigger đang bật, index, constraint (gồm `0003`, `0004` và index `users_username_lower_key` của `0005`), kiểu `bookings.total_amount numeric(12,2)`, `booking_seats.showtime_id NOT NULL`, extension `btree_gist` và cột `movies.poster_url`.
+3. Trên bản sao đã restore, chạy `python -m scripts.check_schema` từ `backend/` (phiên `readonly=True`) để kiểm tra bảng, hàm, trigger đang bật, index, constraint (gồm `0003`, `0004`, index `users_username_lower_key` của `0005` và CHECK username của `0006`), kiểu `bookings.total_amount numeric(12,2)`, `booking_seats.showtime_id NOT NULL`, extension `btree_gist` và cột `movies.poster_url`.
 4. Đối chiếu định nghĩa bằng `pg_dump --schema-only --no-owner --no-privileges` giữa bản sao và một DB mới dựng từ cùng chuỗi migration trên cùng major version. Ngoài ra, **so sánh riêng grants của role runtime**, **constraints (`convalidated = true`)** và **fingerprint/số dòng** của 7 bảng trước và sau nâng cấp:
 
 ```sql
@@ -67,7 +68,8 @@ UNION ALL SELECT 'booking_seats', count(*), COALESCE(sum(price_at_booking), 0) F
 5. **Phân nhánh áp migration bằng owner (`cinema_owner`):**
    - Nếu DB đang ở `0002` (chưa có `0003`): áp `0003_booking_integrity.sql`, `0004_finite_money.sql` rồi `0005_username_case_insensitive.sql`.
    - Nếu DB đã ở `0003`: áp `0004_finite_money.sql` rồi `0005_username_case_insensitive.sql`.
-   - Nếu DB đã ở `0004`: chỉ áp `0005_username_case_insensitive.sql`.
+   - Nếu DB đã ở `0004`: áp `0005_username_case_insensitive.sql`.
+   - Khi bản sao đã ở 0005, tiếp tục theo [quy trình 0006](#quy-tắc-username-thống-nhất-0006).
    - Không bao giờ chạy lại `0001_baseline.sql` hoặc `backend/seeds/demo.sql` trên dữ liệu có sẵn.
 
 ## Quyền xóa phim trên database hiện hữu
@@ -107,7 +109,7 @@ Trước khi mở writer, xác nhận ba constraint `showtimes_ticket_price_fini
 
 ## Tên đăng nhập không phân biệt hoa/thường (0005)
 
-API lưu tên đăng nhập ở dạng NFKC đã cắt khoảng trắng hai đầu và so trùng không phân biệt hoa/thường (`Customer1`, ` customer1 ` và `ｃｕｓｔｏｍｅｒ１` là cùng tài khoản với `customer1`). `0005_username_case_insensitive.sql` thêm unique index `users_username_lower_key` trên `lower(username)`. File tự kiểm dữ liệu dưới khóa và dừng, không sửa dữ liệu: `23505` nếu có hai tên chỉ khác chữ hoa/thường, `23514` nếu có tên còn khoảng trắng hai đầu hoặc chưa ở dạng NFKC (tên đó sẽ không thể gõ lại khi đăng nhập). Câu truy vấn đối soát nằm trong HINT của lỗi.
+Ở phiên bản 0005, API lưu tên đăng nhập ở dạng NFKC đã cắt khoảng trắng hai đầu và so trùng không phân biệt hoa/thường (`Customer1`, ` customer1 ` và `ｃｕｓｔｏｍｅｒ１` là cùng tài khoản với `customer1`). `0005_username_case_insensitive.sql` thêm unique index `users_username_lower_key` trên `lower(username)`. File tự kiểm dữ liệu dưới khóa và dừng, không sửa dữ liệu: `23505` nếu có hai tên chỉ khác chữ hoa/thường, `23514` nếu có tên còn khoảng trắng hai đầu hoặc chưa ở dạng NFKC (tên đó sẽ không thể gõ lại khi đăng nhập). Câu truy vấn đối soát nằm trong HINT của lỗi.
 
 ```sh
 docker compose exec -T db psql -X -v ON_ERROR_STOP=1 -U cinema_owner -d cinema < backend/migrations/0005_username_case_insensitive.sql
@@ -116,3 +118,15 @@ docker compose exec -T db psql -X -v ON_ERROR_STOP=1 -U cinema_owner -d cinema <
 ## Kiểm chứng độc lập
 
 Từ root chạy `docker compose --profile test run --build --rm verify`. Nếu đã có server test riêng, dùng `python backend/tests/run_database.py`. Lệnh Bash cũ `bash database/tests/run_all.sh` vẫn gọi cùng runner. Cần chỉ định port test hoặc `PGPORT` tường minh khi dùng wrapper này. Cả integrity và reconciliation chạy bằng `psql`; concurrency commit vào database riêng của runner. [Tài liệu kiểm thử](../docs/database/database_test_documentation.md)
+
+## Quy tắc username thống nhất (0006)
+
+Trên bản sao phục hồi ở schema 0005, migration 0006 giữ unique index `users_username_lower_key`, áp một CHECK cho mọi tài khoản và dừng với SQLSTATE `23514` nếu còn dòng không hợp lệ. Kiểu cột là `varchar` và CHECK kiểm tra giới hạn 60 ký tự. Cách này giữ được khoảng trắng cuối đầu vào cho CHECK phát hiện khi ghi bằng SQL trực tiếp. React, legacy và Flask đều kiểm tra đầu vào gốc và kết quả chuẩn hóa NFKC. Frontend gửi dữ liệu gốc để Flask kiểm tra lại và lưu giá trị đã chuẩn hóa. PostgreSQL yêu cầu giá trị đã chuẩn hóa khi INSERT/UPDATE. Login tiếp tục chấp nhận khoảng trắng hai đầu theo cách tra cứu hiện có.
+
+1. Khi có phê duyệt, dừng writer, backup database 0005 và kiểm tra restore trên đích riêng. Giữ database và volume cũ. Xác nhận hai tài khoản thử đã được duyệt vẫn đúng ID, username và role, không có booking và không có phụ thuộc mới. Trong môi trường khác, bỏ qua bước xóa trừ khi hai dòng đúng là dữ liệu thử đã được xác nhận.
+2. Trên bản sao đích đã đối chiếu, chạy `psql -X -v ON_ERROR_STOP=1 -d <database-dich> -f database/maintenance/remove_confirmed_test_accounts.sql`. Script khóa hai bảng, xác minh danh tính và phụ thuộc, và chỉ commit nếu xóa đúng hai dòng. Đây là thao tác bảo trì riêng.
+3. Chạy `psql -X -v ON_ERROR_STOP=1 -d <database-dich> -f backend/migrations/0006_username_validation.sql`. Nếu còn dữ liệu vi phạm, giữ website ở 0005 và quyết định từng dòng trước khi thử lại. Khoảng chờ lấy khóa cho mỗi bước là 5 giây.
+4. Xác minh `users_username_format_check` đã validate, unique index 0005 còn hiệu lực và chỉ hai dòng đã duyệt biến mất. So checksum tài khoản còn lại, lịch sử booking và sequence. Chạy `python -m scripts.check_schema` từ thư mục `backend/` và smoke test bằng bộ image cùng phiên bản trước khi mở lại ghi.
+5. Nếu bất kỳ kiểm tra nào thất bại trước khi mở ghi, khởi động lại dịch vụ 0005 với volume cũ. Nếu đã mở ghi, dừng writer và đối soát các giao dịch mới trước khi đổi kết nối.
+
+Compose tự áp dụng file 0006 trên volume mới. Với volume hiện có, thực hiện quy trình nâng cấp ở trên. Dump demo và ERD hiện hành là 0006. Xem [bản 0005 lưu trữ riêng](history/0005/README.md).

@@ -27,7 +27,7 @@ All keys are `bigint GENERATED ALWAYS AS IDENTITY` (never supply an id on INSERT
 
 | Table | Columns (all `NOT NULL` unless marked *null*) |
 |---|---|
-| `users` | `user_id`, `username varchar(60) UNIQUE` (= account ID), `password_hash text`, `role` ∈ {`CUSTOMER`,`ADMIN`} default `CUSTOMER`, `created_at timestamptz` |
+| `users` | `user_id`, `username varchar UNIQUE` (account ID, 0006 CHECK for canonical format and length ≤60, 0005 unique `lower(username)` index), `password_hash text`, `role` ∈ {`CUSTOMER`,`ADMIN`} default `CUSTOMER`, `created_at timestamptz` |
 | `movies` | `movie_id`, `title varchar(200)`, `genre varchar(100)` *null*, `duration_minutes integer` (1–300), `rating varchar(50)` *null*, `synopsis text` *null*, `release_date date` *null*, `poster_url varchar(255)` *null* |
 | `theater_rooms` | `room_id`, `room_name varchar(60) UNIQUE` |
 | `seats` | `seat_id`, `room_id` → `theater_rooms`, `seat_row char(1)` A–E, `seat_number smallint` 1–10, `UNIQUE(room_id, seat_row, seat_number)` |

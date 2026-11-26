@@ -190,7 +190,7 @@
 | 항목 | 내용 |
 |---|---|
 | 결정 내용 | 프로젝트의 DBMS로 **PostgreSQL**을 사용하고, 백엔드는 **Python / Flask / `psycopg2`**, 프런트엔드는 **React + TypeScript + Vite**(레거시 HTML UI 병행 유지)를 사용한다. |
-| 기술 기준 문서 | `database/README.md` (설치 및 마이그레이션 안내), `backend/migrations/0001_baseline.sql` ~ `0005_username_case_insensitive.sql` (스키마 및 권한 기준), `docs/database/postgresql_flask_integration_contract.md` (Flask 연동 계약), `docs/api/api_contract.md` (REST API 계약) |
+| 기술 기준 문서 | `database/README.md` (설치 및 마이그레이션 안내), `backend/migrations/0001_baseline.sql` ~ `0006_username_validation.sql` (스키마 및 권한 기준), `docs/database/postgresql_flask_integration_contract.md` (Flask 연동 계약), `docs/api/api_contract.md` (REST API 계약) |
 | 적용 범위 | 기술 환경에 한한다. 승인된 업무 범위 및 업무 규칙(BR-01 ~ BR-15, D1 ~ D6)과 일관되게 유지된다. |
 
 ---

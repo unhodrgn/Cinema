@@ -33,6 +33,7 @@ CURRENT_SCHEMA_PATHS = (
     SCHEMA_PATH.with_name("0003_booking_integrity.sql"),
     SCHEMA_PATH.with_name("0004_finite_money.sql"),
     SCHEMA_PATH.with_name("0005_username_case_insensitive.sql"),
+    SCHEMA_PATH.with_name("0006_username_validation.sql"),
 )
 SEED_PATH = BACKEND_DIR / "seeds" / "demo.sql"
 
