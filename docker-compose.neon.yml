@@ -1,0 +1,16 @@
+# Run API + frontend on this PC with the database on Neon (cloud PostgreSQL 18).
+#   docker compose -f docker-compose.yml -f docker-compose.neon.yml up --build -d --wait
+# Needs in .env: NEON_DB_HOST=<direct host, not "-pooler">; DB_PASSWORD = cinema_api password.
+# The local "db" service is only started with: --profile local (fallback / offline demo).
+services:
+  db:
+    profiles: [local]
+  api:
+    depends_on: !reset null
+    environment:
+      DB_HOST: ${NEON_DB_HOST:?Set NEON_DB_HOST in .env}
+      DB_PORT: 5432
+      DB_NAME: ${NEON_DB_NAME:-cinema_test_demo}
+      DB_USER: cinema_api
+      PGSSLMODE: require
+      DB_CONNECT_TIMEOUT: 15
