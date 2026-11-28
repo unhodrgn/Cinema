@@ -39,7 +39,7 @@ Tổng hợp từ hướng dẫn phát biểu cuối kỳ của giáo sư (`impo
 | # | Yêu cầu của giáo sư | Cách dự án Cinema đáp ứng |
 |---|---|---|
 | 1 | Giải thích **cấu hình môi trường ban đầu**, **DBMS**, **ngôn ngữ lập trình**, **công cụ bổ trợ** (framework, container, công cụ cộng tác) | PostgreSQL 18 (`btree_gist`), Python 3.12 + Flask 3.1.3 + `psycopg2`, React 19 + TypeScript + Vite, Docker Compose v2, pytest/Playwright/Node test, Git/GitHub. Thiết lập ban đầu 3 bước qua `.env` → `docker compose up` → `demo.sql`. |
-| 2 | **Kiến trúc tách biệt cả logic lẫn vật lý** giữa Database/Backend và Client (Web/App frontend) | 3 container & 3 tiến trình độc lập (`db:5432`, `api:5000`, `frontend:8080`). API không phục vụ HTML (`static_folder=None, template_folder=None`); Frontend là static server thuần không có thư viện DB; PostgreSQL chỉ kết nối nội bộ với API qua role `cinema_api`. Có test tự động `test_process_separation.py` và `test_architecture_live.py`. |
+| 2 | **Kiến trúc tách biệt cả logic lẫn vật lý** giữa Database/Backend và Client (Web/App frontend) | 2 container trên laptop (`api:5000`, `frontend:8080`) + database PostgreSQL 18 trên cloud Neon (server riêng). API không phục vụ HTML (`static_folder=None, template_folder=None`); Frontend là static server thuần không có thư viện DB; PostgreSQL ở Neon, API kết nối qua SSL bằng role `cinema_api`. Có test tự động `test_process_separation.py` và `test_architecture_live.py`. |
 | 3 | Trình bày theo **mạch câu chuyện (Storyline)**: Lập kế hoạch → Thiết kế → Hiện thực hóa → Kiểm chứng, **không chỉ liệt kê tính năng** | Đi xuyên suốt: 4 bài toán dữ liệu → Kiến trúc 3 tầng → 14 nghiệp vụ & 6 quyết định `D1–D6` → Mô hình hóa 3NF & Động cơ toàn vẹn DB → Đối soát 13 lỗi & 6 migrations `0001–0006` → Backend/Frontend → Kiểm chứng 5 tầng → Live Demo (UI + SQL) → Đúc kết vai trò làm nhóm thời AI. |
 | 4 | **Tài liệu PPT:** Tự do mẫu thiết kế | Đề xuất bộ 16 slide (mục 11), trình bày bằng tiếng Hàn (hoặc song ngữ theo yêu cầu lớp). |
 | 5 | **Thời lượng:** **15 phút thuyết trình** (cần tập bấm giờ) + **5–10 phút Q&A** | Đã chia chi tiết từng mốc phút–giây cho 16 slide (Slide 1–11: `08:05`, Demo Web: `02:00`, Demo SQL: `03:10`, Slide AI & Kết: `01:45`, tổng `15:00`). |
@@ -147,17 +147,17 @@ Nhìn bề ngoài như ứng dụng CRUD đơn giản, nhưng nghiệp vụ đ�
 
 ```text
 ┌─────────────────────────────┐      JSON / HTTP + CORS       ┌──────────────────────────────┐     PostgreSQL Protocol     ┌──────────────────────────────┐
-│     Frontend Container      │ ◄───────────────────────────► │     Backend API Container    │ ◄─────────────────────────► │     PostgreSQL Container     │
-│  (frontend/server.py :8080) │  Authorization: Bearer <tok>  │  (Flask REST API :5000)      │    Role: cinema_api (ít     │    (PostgreSQL 18 :5432)     │
-│  React/Vite dist/ (static)  │  (Không cookie, Exact CORS)   │  static_folder=None          │    quyền) · Mạng nội bộ     │    KHÔNG mở cổng ra ngoài    │
-│  Cấp động /config.js        │                               │  template_folder=None        │    Docker                   │    Duy nhất API kết nối tới  │
+│     Frontend Container      │ ◄───────────────────────────► │     Backend API Container    │ ◄─────────────────────────► │   PostgreSQL 18 (Neon cloud) │
+│  (frontend/server.py :8080) │  Authorization: Bearer <tok>  │  (Flask REST API :5000)      │    Role: cinema_api (ít     │  Server riêng, ngoài laptop  │
+│  React/Vite dist/ (static)  │  (Không cookie, Exact CORS)   │  static_folder=None          │    quyền) · Internet        │     Kết nối qua SSL (TLS)    │
+│  Cấp động /config.js        │                               │  template_folder=None        │    SSL                      │   Singapore · Neon free plan │
 └─────────────────────────────┘                               └──────────────────────────────┘                             └──────────────────────────────┘
 ```
 
 ### 4.1 Chứng minh Tách biệt Vật lý (Physical Separation)
 
 - **3 tiến trình / 3 container độc lập** với cấu hình biến môi trường tách riêng (`docker-compose.yml`).
-- **PostgreSQL (`:5432`) không publish port ra host** trong Docker Compose và không bao giờ mở cho trình duyệt. Kể cả khi triển khai LAN cho thiết bị thứ 2 (`CINEMA_BIND_HOST=0.0.0.0`, `API_BASE_URL=http://<LAN_IP>:5000`, `CORS_ALLOWED_ORIGINS=http://<LAN_IP>:8080`), thiết bị client chỉ thấy cổng `8080` và `5000`, hoàn toàn không có đường mạng tới PostgreSQL.
+- **PostgreSQL chạy trên cloud Neon (server riêng, không nằm trên laptop)**; trình duyệt không bao giờ nối trực tiếp tới DB, chỉ qua API. Máy khác có thể truy cập DB bằng chuỗi kết nối SSL (chưa kiểm chứng từ máy khác). Phương án dự phòng: Docker Compose local `db` (`docker compose up`, không publish port 5432 ra host).
 - **Frontend (`:8080`)** chạy bằng HTTP server tĩnh chỉ dùng thư viện chuẩn Python (`frontend/server.py`, không cài Flask, không cài `psycopg2`, không có thông tin `DB_*`). Địa chỉ API được bơm động lúc chạy qua `/config.js` từ biến môi trường `API_BASE_URL` → cùng một bản build có thể trỏ tới bất kỳ server API nào mà không cần build lại.
 
 ### 4.2 Chứng minh Tách biệt Logic (Logical Separation)
@@ -491,7 +491,7 @@ docker compose --profile test run --build --rm verify
 - **Slide 01 — Trang bìa:** Giới thiệu tên dự án, 2 thành viên + vai trò Database Lead / Application Lead, và thông điệp mở đầu: *"Không chỉ làm web đặt vé — mà xây hệ thống không thể bán trùng ghế, không thể chồng lịch chiếu và bảo toàn lịch sử ngay ở tầng PostgreSQL."*
 - **Slide 02 — Bài toán & Quy mô:** Nêu 4 bài toán dữ liệu (double booking, giữ ghế quá hạn, chồng lịch phòng, mất vết lịch sử/giá) và quy mô 1 rạp / 5 phòng / 250 ghế / 6 phim / 280 suất (14 ngày) / 2 vai trò (`CUSTOMER`, `ADMIN`).
 - **Slide 03 — Môi trường & Công cụ:** Trình bày bảng Tech Stack (PostgreSQL 18 + `btree_gist`, Python 3.12 + Flask 3.1.3 + `psycopg2`, React 19 + TS + Vite, Docker Compose, pytest/Playwright, Git/GitHub) + 3 bước dựng môi trường (`.env` → `docker compose up` tự chạy `0001–0006` → `demo.sql`).
-- **Slide 04 — Kiến trúc 3 tầng tách biệt:** Đặt sơ đồ 3 container (`frontend:8080` ↔ `api:5000` ↔ `db:5432`). Nhấn mạnh: Frontend không có thư viện DB và lấy URL qua `/config.js`; Backend `static_folder=None, template_folder=None`; DB chỉ mở nội bộ cho `cinema_api`.
+- **Slide 04 — Kiến trúc 3 tầng tách biệt:** Đặt sơ đồ: laptop (`frontend:8080` ↔ `api:5000`) ↔ Neon cloud (PostgreSQL 18). Nhấn mạnh: Frontend không có thư viện DB và lấy URL qua `/config.js`; Backend `static_folder=None, template_folder=None`; API dùng role `cinema_api` (ít quyền) kết nối tới DB trên Neon.
 - **Slide 05 — Phân tích nghiệp vụ & `D1–D6`:** Tóm tắt 14 chức năng (`CM/C/A`), 15 `BR`, 3 lưu đồ và bảng 6 quyết định `D1–D6` (đặc biệt nhấn mạnh tách biệt `status` vs `payment_status` và cơ chế *request-time expiry* 10 phút).
 - **Slide 06 — Mô hình hóa & Chuẩn hóa:** Giới thiệu 7 bảng (chèn ảnh `database/model/cinema_model_logical.png`), giải thích vì sao `seats` không có cột trạng thái, luồng chuẩn hóa 1NF→3NF và bảng 5 điểm *Controlled Redundancy*.
 - **Slide 07 — Thiết kế vật lý & Động cơ toàn vẹn:** Chèn ảnh `database/model/cinema_model_physical.png` (hoặc `cinema_model_constraints.png`), nhấn mạnh 4 trụ cột: `EXCLUDE USING gist`, `FOR UPDATE` + FK kép + `UNIQUE(showtime_id, seat_id)`, 9 triggers + 4 hàm nguyên tử (`FOR UPDATE SKIP LOCKED` & deferred consistency trigger), 7 indexes (gồm partial index hết hạn & functional index `lower(username)`).

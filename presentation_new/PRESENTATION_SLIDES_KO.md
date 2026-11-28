@@ -139,7 +139,7 @@
 | **DBMS** | **PostgreSQL 18** (`btree_gist` 확장) | `tstzrange` 배제 제약, 행 잠금, 트리거·함수 기반 무결성 엔진 |
 | **Backend** | **Python 3.12 · Flask 3.1.3 · `psycopg2 2.9.13`** | ORM 숨김 없이 트랜잭션 경계·`SQLSTATE` 직접 제어, 순수 JSON API |
 | **Frontend** | **React 19.3 · TypeScript 5.9 · Vite 7.3** | 12개 화면 SPA, 정적 타입 검증 (+ 레거시 HTML/JS 폴백 UI 병행) |
-| **컨테이너** | **Docker Compose v2** (`db`·`api`·`frontend` + `test` 프로필) | 3계층 독립 컨테이너, non-root 실행(`uid 10001`), `tmpfs` 검증 DB |
+| **컨테이너** | **Docker Compose v2** (`api`·`frontend`; DB는 Neon 클라우드, `db`·`test` 프로필은 로컬 대체/검증용) | 노트북 2컨테이너 · DB는 클라우드 · non-root 실행(`uid 10001`), `tmpfs` 검증 DB |
 | **검증·모델링** | **pytest 9.2 · Node test · Playwright 1.65 · draw.io** | 5계층 자동 테스트 및 DB 카탈로그 기반 ER 모델 산출 |
 | **협업 도구** | **Git / GitHub** (브랜치 · PR) + 계약 문서 | 역할 분담(`chia_viec.md`), PR 단위 교차 리뷰 |
 
@@ -163,7 +163,7 @@
 # SLIDE 04 — 논리적·물리적 분리 아키텍처
 
 - **배정 시간:** `0:50` (`01:40 – 02:30`) · **발표자:** 응웬치롱 (B)
-- **레이아웃 & 시각 자료:** 상단에 3개 독립 컨테이너 블록 다이어그램(화살표에 프로토콜·포트·권한 표기), 하단에 **물리적 분리 vs 논리적 분리** 2열 비교 카드 + 하단 검증 배지.
+- **레이아웃 & 시각 자료:** 상단에 Browser·Frontend·API(노트북)와 PostgreSQL(Neon 클라우드) 블록 다이어그램(화살표에 프로토콜·포트·권한 표기), 하단에 **물리적 분리 vs 논리적 분리** 2열 비교 카드 + 하단 검증 배지.
 
 ### 슬라이드 화면 텍스트 (PPT 그대로 입력)
 
@@ -177,15 +177,15 @@
      └── JSON / HTTP + CORS ──► [ Backend API Container :5000 ] (Flask · static/template=None)
          (Authorization: Bearer) • 인증·인가·검증·SQLSTATE 번역 · 쿠키 미사용
                                       │
-                                      └── PostgreSQL 프로토콜 (Docker 내부망 · cinema_api 권한)
+                                      └── PostgreSQL 프로토콜 (인터넷 · SSL · cinema_api 권한)
                                       ▼
-                                [ PostgreSQL 18 Container :5432 ]
-                                 • 호스트 포트 미노출 · 오직 API 컨테이너만 접근 가능
+                                [ PostgreSQL 18 (Neon 클라우드, Singapore) ]
+                                 • 노트북이 아닌 별도 서버 · SSL 필수 · 접속 문자열로 다른 기기에서도 접속 가능
 ```
 
 **[하단 좌측] 물리적 분리 (Physical Separation)**
-- **3개 독립 컨테이너/프로세스** + 개별 환경 설정
-- **PostgreSQL은 내부망 전용:** LAN 타 기기 접속(`0.0.0.0`) 시에도 클라이언트는 DB에 절대 접근 불가
+- **노트북(API·웹) / 클라우드(DB) 분리** + 개별 환경 설정
+- **PostgreSQL은 Neon 클라우드 서버:** 다른 기기에서도 접속 문자열(SSL)로 DB에 직접 접속 가능 (cinema_api는 최소 권한)
 - **런타임 주소 주입:** Frontend가 `/config.js`(`API_BASE_URL`)를 동적 생성 → 재빌드 없이 API 서버 분리 배포
 
 **[하단 우측] 논리적 분리 (Logical Separation)**
@@ -198,7 +198,7 @@
 ### 발표 대본 (한국어)
 > 이번 프로젝트의 핵심 요구사항 중 하나인 **논리적·물리적 분리 아키텍처**입니다.
 >
-> 그림처럼 프런트엔드, 백엔드 API, PostgreSQL은 각각 독립된 프로세스이자 컨테이너로 실행됩니다. 물리적으로 PostgreSQL 5432 포트는 외부에 열지 않고 오직 내부망의 API 컨테이너만 제한된 `cinema_api` 역할로 접속합니다. 프런트엔드는 Python 표준 라이브러리 정적 서버만 돌리며 DB 라이브러리도, 백엔드 코드도 전혀 포함하지 않고 `/config.js`로 API 주소만 전달받습니다.
+> 그림처럼 프런트엔드와 백엔드 API는 노트북의 독립된 컨테이너로 실행되고, PostgreSQL은 노트북이 아니라 클라우드 서비스 Neon의 별도 서버에서 실행됩니다. API는 인터넷을 통해 SSL로 접속하며 제한된 `cinema_api` 역할만 사용합니다. 프런트엔드는 Python 표준 라이브러리 정적 서버만 돌리며 DB 라이브러리도, 백엔드 코드도 전혀 포함하지 않고 `/config.js`로 API 주소만 전달받습니다.
 >
 > 논리적으로도 Flask는 `static_folder=None`, `template_folder=None`으로 HTML 렌더링을 원천 차단해 순수 JSON만 반환하며, 프런트엔드는 업무 규칙을 결정하지 않고 모든 시간과 기한 판정은 PostgreSQL 시계에만 의존합니다.
 
@@ -574,7 +574,7 @@
 
 **[좌측] 프로젝트 핵심 달성 성과**
 - ✅ **DB 중심 무결성 엔진:** PostgreSQL 18 (`0001~0006`), 7테이블 3NF, 9트리거, 5함수, `cinema_api` 최소 권한 분리
-- ✅ **완전 분리 3계층 아키텍처:** Docker Compose 기반 독립 컨테이너 (`frontend:8080` · `api:5000` · `db:5432`)
+- ✅ **완전 분리 3계층 아키텍처:** 노트북 컨테이너 (`frontend:8080` · `api:5000`) + 클라우드 DB (Neon PostgreSQL 18)
 - ✅ **전 기능 완성:** 14개 업무, 28개 REST API, 12개 React/TS 화면 (+ 레거시 UI 폴백), 12종 산출물 정합성 확보
 - ✅ **5계층 자동 검증 통과:** pytest `1,415` · SQL `177+31` · 동시성 `16/16` · Node `121` · Playwright `6+2` · 덤프/업그레이드 복원
 
@@ -622,5 +622,5 @@
 | **Q6** | `0006`에서 `users.username`을 왜 `varchar(60)`에서 `varchar`로 바꿨나요? | *(A)* SQL 표준과 PostgreSQL 특성상 `varchar(60)`은 60자를 넘는 **끝 공백을 CHECK 검사 전에 조용히 잘라낼 수** 있습니다. 컬럼을 `varchar`로 바꾸고 `cinema_username_is_valid()` CHECK 함수가 직접 길이(1~60)와 공백 금지·NFKC·Unicode 15.0 형식을 검사하도록 해 직접 SQL 우회까지 막았습니다. |
 | **Q7** | 왜 SQLAlchemy 같은 ORM 대신 `psycopg2`를 직접 사용했나요? | *(B)* 데이터베이스 중심 프로젝트로서 트랜잭션 경계(`with transaction():`), 4개 DB 함수 호출, `SQLSTATE`(`UC001~UC011`, `40001`, `40P01`) 처리를 숨김없이 명확하게 제어하기 위해서입니다. 모든 쿼리는 파라미터 바인딩을 사용하며 AST 테스트로 검증합니다. |
 | **Q8** | 동시성 충돌로 `40001`이나 데드락 `40P01`이 발생하면 앱은 어떻게 처리하나요? | *(B)* `run_retryable_transaction()`이 실패한 트랜잭션을 롤백하고 **완전히 새로운 트랜잭션으로 최대 3회까지 전체 작업을 재시도**합니다(예매·결제·취소 적용). 반면 이미 남이 잡은 좌석(`UC002`)은 재시도하지 않고 `409 seat_unavailable`을 반환해 재선택을 유도합니다. |
-| **Q9** | 프런트엔드와 백엔드/DB가 정말 분리되어 있다는 근거는 무엇인가요? | *(B)* 3개 독립 컨테이너(`db`, `api`, `frontend`)로 운영되며, 프런트엔드는 Python 표준 정적 서버로 DB 드라이버나 Flask 코드가 전혀 없고 `/config.js`로 API 주소만 받습니다. API는 `static_folder=None, template_folder=None`으로 순수 JSON만 반환하며, DB 포트는 외부에 열지 않고 내부망에서 API만 접속합니다. |
+| **Q9** | 프런트엔드와 백엔드/DB가 정말 분리되어 있다는 근거는 무엇인가요? | *(B)* 노트북의 2개 컨테이너(`api`, `frontend`)와 클라우드 Neon의 PostgreSQL로 분리 운영되며, 프런트엔드는 Python 표준 정적 서버로 DB 드라이버나 Flask 코드가 전혀 없고 `/config.js`로 API 주소만 받습니다. API는 `static_folder=None, template_folder=None`으로 순수 JSON만 반환하며, DB는 별도 클라우드 서버에서 SSL로만 접속하고, 앱은 최소 권한의 `cinema_api` 역할만 사용합니다. |
 | **Q10** | 권한 분리는 어디에서 어떻게 검증되나요? (웹 관리자 페이지 vs SQL 권한) | *(A/B)* **2중 방어(Defense in Depth)**로 구현했습니다. 앱 계층에서는 Fail-Closed `@policy`로 `CUSTOMER`와 `ADMIN`을 엄격히 분리하고(매 요청 DB 역할 재조회), DB 계층에서는 런타임 역할 `cinema_api`에 최소 권한만 부여해(`bookings DELETE`, `users/seats UPDATE` 차단 — `42501`) 앱 계정이 탈취돼도 이력 삭제나 권한 상승이 불가능합니다. |

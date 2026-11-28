@@ -115,7 +115,29 @@ API_BASE_URL=http://localhost:5001
 CORS_ALLOWED_ORIGINS=http://localhost:8081
 ```
 
-**Access from LAN.** Set `CINEMA_BIND_HOST=0.0.0.0`. Use the LAN IP of the host machine in `API_BASE_URL` and `CORS_ALLOWED_ORIGINS` with the corresponding ports. Apply the configuration with `docker compose up -d --wait`, then open the frontend address from a second device. Compose PostgreSQL uses the internal network.
+**Access from LAN.** Set `CINEMA_BIND_HOST=0.0.0.0`. Use the LAN IP of the host machine in `API_BASE_URL` and `CORS_ALLOWED_ORIGINS` with the corresponding ports. Apply the configuration with `docker compose up -d --wait`, then open the frontend address from a second device. The Compose PostgreSQL service uses the internal network; with Neon the database is a separate cloud server (see "Use the Neon Cloud Database").
+
+## Use the Neon Cloud Database
+
+The database can run on a separate cloud server (Neon, PostgreSQL 18) instead of the local Compose `db` container. The API and frontend still run on this PC.
+
+1. Create a Neon project (PostgreSQL 18) and a database named `cinema_test_demo` (the demo scripts accept only `cinema_test_*` names).
+2. Put the **direct** host (not the `-pooler` host) in `.env` as `NEON_DB_HOST=...`. `DB_PASSWORD` in `.env` becomes the `cinema_api` password.
+3. Load the schema, role and demo seed once. Docker Desktop must be running. The script asks for the Neon owner password and never stores it:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File database\cloud\apply_neon.ps1
+```
+
+4. Start only the API and the frontend, connected to Neon over SSL:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.neon.yml up --build -d --wait
+```
+
+5. Run the SQL demos against Neon: `powershell -ExecutionPolicy Bypass -File database\cloud\apply_neon.ps1 -Demo`.
+
+The Neon free plan suspends the database after 5 minutes without queries; the first request afterwards is slower. For an offline fallback, use `docker compose up --build -d --wait` without the override file (local `db` container). Never commit the owner password.
 
 ## Run Directly on the Host
 

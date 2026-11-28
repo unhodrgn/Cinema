@@ -13,7 +13,7 @@
     │
     └──── JSON over HTTP ──────► Backend API      :5000   Flask, JSON only
                                       │
-                                      └── PostgreSQL protocol ──► PostgreSQL :5432 (reachable by the API only)
+                                      └── PostgreSQL protocol ──► PostgreSQL 18 (Neon cloud server over SSL, or local Compose :5432 reachable by the API only)
 ```
 
 | Layer | Does | Never does |
@@ -377,9 +377,9 @@ All Phase 4 planned endpoints (T1–T8) are implemented and documented in Sectio
 |---|---|---|
 | Frontend server | 8080 | `FRONTEND_HOST` (default `127.0.0.1`), `FRONTEND_PORT`, `API_BASE_URL` (the API address **as the browser reaches it**) |
 | Backend API | 5000 | `flask --app app.main:create_app run --host … --port …` (or `FLASK_RUN_HOST` / `FLASK_RUN_PORT`); `SECRET_KEY`, `DB_*`, `CORS_ALLOWED_ORIGINS`, `AUTH_TOKEN_MAX_AGE_SECONDS`, `APP_TIMEZONE` |
-| PostgreSQL | 5432 | Not changed by this work. Reachable from the API process only. |
+| PostgreSQL | 5432 | Not changed by this work. Local Compose `db`: reachable from the API process only. Neon (`docker-compose.neon.yml`): separate cloud server reached by the API over SSL (`PGSSLMODE=require`, host from `NEON_DB_HOST`). |
 
-Compose starts the three services with `docker compose up --build`. For independent processes, build the frontend first with `npm --prefix frontend ci` and `npm --prefix frontend run build`, then start each service separately:
+Compose starts the three services with `docker compose up --build`. With Neon, `docker compose -f docker-compose.yml -f docker-compose.neon.yml up --build -d --wait` starts only the API and the frontend. For independent processes, build the frontend first with `npm --prefix frontend ci` and `npm --prefix frontend run build`, then start each service separately:
 
 ```bash
 python frontend/server.py                      # frontend, FRONTEND_PORT / API_BASE_URL from the environment
